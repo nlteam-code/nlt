@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,600;0,700;0,800;0,900;1,900&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <title>NLT Personal Training Club</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--ink:#16202a;--mute:#6b7785;--line:#e3e7ec;--acc:#1f6feb;--acc-ink:#fff;--grp:#dbe8ff;--grp-b:#7aa7f5;--solo:#d7f3df;--solo-b:#5dbb78;--warn:#b54708;--warn-bg:#fff2e0;--bad:#c0262d;--ok:#12794b;--shadow:0 8px 30px rgba(0,0,0,.18)}
@@ -103,79 +103,126 @@ label.f input,label.f select{color:var(--ink)}
 svg text{fill:var(--mute);font-size:11px}svg .bar{fill:var(--acc)}svg .gl{stroke:var(--line)}
 @media (max-width:640px){.day{min-width:110px}}
 
-/* ───── клиентски екран ───── */
-.cx{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:84px;font-family:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.c-top{display:flex;align-items:center;gap:10px;padding:14px max(18px,env(safe-area-inset-left,0px));position:sticky;top:0;background:var(--bg);z-index:5}
-.c-logo{font-weight:800;font-size:20px;letter-spacing:.14em}
-.c-who{color:var(--mute);font-size:13px;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.c-link{border:0;background:none;color:var(--acc);padding:8px;font-weight:600;cursor:pointer;min-height:36px}
-.c-main{padding:4px max(18px,env(safe-area-inset-left,0px)) 24px;display:flex;flex-direction:column;gap:14px}
-.c-hello{font-size:22px;font-weight:800;letter-spacing:-.01em;margin-top:2px}
-.c-title{font-size:24px;font-weight:800;margin:4px 0 2px;letter-spacing:-.01em}
-.c-h{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:8px 0 -4px}
-.c-hero{background:linear-gradient(135deg,#0d2a5e 0%,#1f6feb 100%);color:#fff;border-radius:22px;padding:20px 20px 18px;box-shadow:0 10px 30px rgba(31,111,235,.28)}
-.c-hero-k{font-size:12px;text-transform:uppercase;letter-spacing:.09em;opacity:.85}
-.c-hero-t{font-size:54px;font-weight:800;line-height:1.05;letter-spacing:-.03em;margin-top:6px}
-.c-hero-d{font-size:18px;font-weight:700;margin-top:2px;text-transform:capitalize}
-.c-hero-s{opacity:.9;margin-top:4px}
-.c-hero-b{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
-.c-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:46px;padding:0 18px;border-radius:14px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--ink);text-decoration:none;cursor:pointer;font-size:15px}
-.c-btn.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
-.c-btn.light{background:#fff;color:#0d2a5e;border-color:#fff}
-.c-btn.ghost{background:transparent;color:inherit;border-color:rgba(255,255,255,.55)}
-.c-card .c-btn.ghost,.cx > main > div .c-btn.ghost{border-color:var(--line);color:var(--ink)}
+/* ───── клиентски екран · NLT бранд ───── */
+:root{--c-bg:#f2f3f7;--c-card:#fff;--c-ink:#1d2430;--c-mute:#6a7482;--c-line:#e4e7ed;--c-navy:#262d38;--c-coral:#eb4c51;--c-orange:#f48460;--c-ringbg:rgba(38,45,56,.09);--c-nav:rgba(255,255,255,.82);--c-shadow:0 1px 2px rgba(20,28,40,.05),0 8px 24px rgba(20,28,40,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--c-bg:#11151b;--c-card:#1a1f27;--c-ink:#f3f5f8;--c-mute:#97a1af;--c-line:rgba(255,255,255,.09);--c-ringbg:rgba(255,255,255,.1);--c-nav:rgba(26,31,39,.78);--c-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px rgba(0,0,0,.35)}}
+:root[data-theme=dark]{--c-bg:#11151b;--c-card:#1a1f27;--c-ink:#f3f5f8;--c-mute:#97a1af;--c-line:rgba(255,255,255,.09);--c-ringbg:rgba(255,255,255,.1);--c-nav:rgba(26,31,39,.78);--c-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px rgba(0,0,0,.35)}
+body.cm{background:var(--c-bg);--bg:var(--c-bg);--card:var(--c-card);--ink:var(--c-ink);--mute:var(--c-mute);--line:var(--c-line);--acc:var(--c-coral);--acc-ink:#fff;font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+body.cm .md{border-radius:26px}
+body.cm button.pri{border-radius:14px;min-height:44px;font-weight:700}
+body.cm input,body.cm select{border-radius:14px;padding:12px 14px;font-size:16px}
+body.cm .login .card{background:transparent;border:0;box-shadow:none;align-items:stretch;gap:12px;text-align:center}
+body.cm .login{margin-top:9vh}
+body.cm .login .card .logo{display:none}
+body.cm .login button.pri{min-height:50px;font-size:16px;border-radius:16px}
+.c-logoimg{display:block;width:auto;max-width:60vw;object-fit:contain}
+.c-logo{font-family:Montserrat,sans-serif;font-weight:900;font-style:italic;letter-spacing:.04em;font-size:22px}
+.login .c-logoimg{margin:0 auto 6px;max-width:220px}
+body.cm:not(.x) .c-logoimg{filter:none}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]) .c-top .c-logoimg,:root:not([data-theme=dark]) .login .c-logoimg{background:var(--c-navy);padding:6px 12px;border-radius:12px}}
+:root[data-theme=light] .c-top .c-logoimg,:root[data-theme=light] .login .c-logoimg{background:var(--c-navy);padding:6px 12px;border-radius:12px}
+.cx{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+.c-top{display:flex;align-items:center;gap:10px;padding:max(14px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-left,0px)) 10px;position:sticky;top:0;z-index:5;background:linear-gradient(var(--c-bg) 70%,transparent)}
+.c-av{width:40px;height:40px;border-radius:50%;border:0;background:linear-gradient(140deg,var(--c-coral),var(--c-orange));color:#fff;font:800 16px Montserrat,sans-serif;display:grid;place-items:center;cursor:pointer;padding:0}
+.c-av.big{width:76px;height:76px;font-size:30px;cursor:default}
+.c-main{padding:6px max(20px,env(safe-area-inset-left,0px)) 24px;display:flex;flex-direction:column;gap:16px;animation:c-in .38s cubic-bezier(.2,.8,.2,1)}
+@keyframes c-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.c-hello{display:flex;flex-direction:column;line-height:1.1;margin-top:4px}
+.c-hello span{color:var(--c-mute);font-size:15px;font-weight:500}
+.c-hello b{font:800 32px Montserrat,sans-serif;letter-spacing:-.02em;margin-top:2px}
+.c-title{font:800 28px Montserrat,sans-serif;letter-spacing:-.02em;margin:4px 0 0}
+.c-h{font:700 12px Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--c-mute);margin:6px 0 -6px}
+.c-mute{color:var(--c-mute)}
+.c-hero{position:relative;overflow:hidden;color:#fff;border-radius:32px;padding:24px 22px 20px;background:radial-gradient(120% 90% at 100% 0%,rgba(235,76,81,.62) 0%,rgba(235,76,81,0) 58%),radial-gradient(90% 70% at 0% 100%,rgba(244,132,96,.22) 0%,rgba(244,132,96,0) 60%),linear-gradient(160deg,#343d4d 0%,#262d38 55%,#1b2028 100%);box-shadow:0 18px 40px rgba(38,45,56,.35)}
+.c-hero-k{display:flex;align-items:center;gap:8px;font:700 12px Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.12em;opacity:.9}
+.c-live{width:8px;height:8px;border-radius:50%;background:var(--c-coral);box-shadow:0 0 0 0 rgba(235,76,81,.7);animation:c-pulse 1.8s infinite}
+@keyframes c-pulse{70%{box-shadow:0 0 0 9px rgba(235,76,81,0)}100%{box-shadow:0 0 0 0 rgba(235,76,81,0)}}
+.c-hero-t{font:800 76px/1 Montserrat,sans-serif;letter-spacing:-.045em;margin-top:10px}
+.c-hero-d{font:700 20px Montserrat,sans-serif;margin-top:6px;text-transform:capitalize}
+.c-hero-s{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;opacity:.88;margin-top:6px;font-size:15px}
+.c-pinl{display:inline-flex;align-items:center;gap:4px}
+.c-hero-b{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.c-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border-radius:16px;font:700 15px Roboto,sans-serif;border:1px solid var(--c-line);background:var(--c-card);color:var(--c-ink);text-decoration:none;cursor:pointer;transition:transform .12s,opacity .2s}
+.c-btn:active{transform:scale(.97)}
+.c-btn.solid{background:linear-gradient(135deg,var(--c-coral),#f0645f);border-color:transparent;color:#fff;box-shadow:0 8px 20px rgba(235,76,81,.32)}
+.c-btn.solid.sm{min-height:42px;padding:0 18px}
+.c-btn.glass{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#fff;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.c-btn.outline{background:transparent}
+.c-btn.plain{border-color:transparent;background:transparent;color:var(--c-mute)}
 .c-btn.wide{width:100%}
-.c-btn:disabled{opacity:.45}
-.c-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
-.c-sum{display:flex;gap:16px;align-items:center;cursor:pointer}
-.c-ring{width:84px;height:84px;flex:none}
-.c-ring-n{font-size:24px;font-weight:800;fill:var(--ink)}
-.c-k{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
-.c-big{font-size:30px;font-weight:800;line-height:1.1}
-.c-big span{font-size:16px;color:var(--mute);font-weight:600}
-.c-warn{display:flex;gap:10px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:14px;padding:12px 14px;font-size:14px}
-.c-warn .mute{color:inherit;opacity:.85}
-.c-list{padding:4px 14px}
-.c-sess{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
-.c-sess:last-child{border-bottom:0}
-.c-when{width:58px;flex:none;text-align:center}
-.c-when b{display:block;font-size:20px;font-weight:800;line-height:1.1}
-.c-when span{font-size:12px;color:var(--mute);text-transform:uppercase}
+.c-btn:disabled{opacity:.4;box-shadow:none}
+.c-card{background:var(--c-card);border:1px solid var(--c-line);border-radius:26px;padding:18px;box-shadow:var(--c-shadow)}
+.c-sum{display:flex;gap:18px;align-items:center;cursor:pointer}
+.c-sum.big{flex-direction:column;cursor:default;padding:24px 18px}
+.c-rings{flex:none}
+.c-arc{animation:c-draw 1.1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes c-draw{from{stroke-dashoffset:var(--c)}}
+.c-rings-n{font:800 30px Montserrat,sans-serif;fill:var(--c-ink)}
+.c-rings-l{font:500 8.5px Roboto,sans-serif;fill:var(--c-mute);letter-spacing:.06em;text-transform:uppercase}
+.c-leg{display:flex;flex-direction:column;gap:14px;flex:1}
+.c-lg{display:flex;gap:10px;align-items:center}
+.c-lg i{width:10px;height:36px;border-radius:6px;flex:none}
+.c-lg b{display:block;font:800 18px Montserrat,sans-serif;letter-spacing:-.01em}
+.c-lg span{color:var(--c-mute);font-size:13px}
+.c-warn{display:flex;gap:12px;align-items:flex-start;background:rgba(235,76,81,.1);border:1px solid rgba(235,76,81,.28);border-radius:20px;padding:14px 16px;font-size:14px;line-height:1.4}
+.c-warn i{width:8px;height:8px;border-radius:50%;background:var(--c-coral);margin-top:6px;flex:none}
+.c-warn span{color:var(--c-mute)}
+.c-list{padding:4px 18px}
+.c-sess{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--c-line)}
+.c-sess:last-of-type{border-bottom:0}
+.c-when{width:60px;flex:none}
+.c-when b{display:block;font:800 21px Montserrat,sans-serif;letter-spacing:-.02em;line-height:1.1}
+.c-when span{font-size:12px;color:var(--c-mute);text-transform:uppercase;letter-spacing:.04em}
 .c-sinfo{flex:1;min-width:0}
-.c-st{font-weight:700}
-.c-ss{font-size:13px;color:var(--mute)}
-.c-ss .bad{color:var(--bad);font-weight:700}
-.c-acts{display:flex;align-items:center;gap:2px;flex:none}
-.c-ic{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;text-decoration:none;font-size:18px}
-.c-more{display:block;width:100%;border:0;background:none;color:var(--acc);font-weight:700;padding:12px 0;cursor:pointer}
-.c-days{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;margin:0 -2px;scrollbar-width:none}
+.c-st{font-weight:700;font-size:16px}
+.c-ss{font-size:13px;color:var(--c-mute);margin-top:1px}
+.c-acts{display:flex;gap:4px;flex:none}
+.c-ic{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;border:0;background:transparent;color:var(--c-ink);text-decoration:none;cursor:pointer}
+.c-ic:hover,.c-ic:active{background:var(--c-ringbg)}
+.c-more{display:block;width:100%;border:0;background:none;color:var(--c-coral);font:700 14px Roboto,sans-serif;padding:14px 0;cursor:pointer}
+.c-days{display:flex;gap:8px;overflow-x:auto;padding:4px 20px 10px;margin:0 -20px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding:0 20px}
 .c-days::-webkit-scrollbar{display:none}
-.c-day{flex:none;width:58px;padding:8px 0;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--card);border:1px solid var(--line);cursor:pointer}
-.c-day span{font-size:12px;color:var(--mute)}
-.c-day b{font-size:20px;font-weight:800}
-.c-day i{font-size:11px;font-style:normal;color:var(--mute)}
-.c-day.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
-.c-day.on span,.c-day.on i{color:inherit;opacity:.85}
-.c-day.off{opacity:.45}
-.c-dayh{font-weight:800;text-transform:capitalize;margin-top:2px}
-.c-class{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px}
-.c-class.mine{border-color:var(--ok)}
-.c-ct{font-size:24px;font-weight:800;width:68px;flex:none}
+.c-day{flex:none;width:56px;padding:10px 0 8px;border-radius:20px;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--c-card);border:1px solid var(--c-line);color:var(--c-ink);cursor:pointer;scroll-snap-align:start;transition:transform .12s}
+.c-day span{font-size:12px;color:var(--c-mute);font-weight:500}
+.c-day b{font:800 20px Montserrat,sans-serif}
+.c-day u{width:5px;height:5px;border-radius:50%;background:transparent}
+.c-day u.dot{background:var(--c-orange)}
+.c-day.on{background:linear-gradient(160deg,var(--c-coral),#f0645f);border-color:transparent;color:#fff;box-shadow:0 8px 20px rgba(235,76,81,.32)}
+.c-day.on span{color:rgba(255,255,255,.85)}
+.c-day.on u.dot{background:#fff}
+.c-day:disabled{opacity:.4;cursor:default}
+.c-dayh{font:800 17px Montserrat,sans-serif;text-transform:capitalize;margin-top:2px}
+.c-class{display:flex;align-items:center;gap:14px;background:var(--c-card);border:1px solid var(--c-line);border-radius:24px;padding:16px;box-shadow:var(--c-shadow)}
+.c-class.mine{border-color:rgba(46,160,100,.55)}
+.c-ct{font:800 26px Montserrat,sans-serif;letter-spacing:-.03em;width:74px;flex:none}
 .c-cinfo{flex:1;min-width:0}
-.c-done{color:var(--ok);font-weight:800;white-space:nowrap}
-.c-empty{text-align:center;color:var(--mute);padding:36px 12px;background:var(--card);border:1px dashed var(--line);border-radius:18px}
-.c-pk{margin-bottom:0}
+.c-spots{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--c-mute)}
+.c-spots .bad{color:var(--c-coral);font-weight:700}
+.c-meter{flex:1;height:5px;border-radius:9px;background:var(--c-ringbg);overflow:hidden;max-width:90px}
+.c-meter i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--c-orange),var(--c-coral))}
+.c-done{display:inline-flex;align-items:center;gap:4px;color:#2ea064;font-weight:700;font-size:14px;white-space:nowrap}
+.c-empty{text-align:center;color:var(--c-mute);padding:40px 16px;background:var(--c-card);border:1px dashed var(--c-line);border-radius:26px}
 .c-pk-h{display:flex;justify-content:space-between;gap:10px;align-items:center}
-.c-chip{font-size:12px;padding:2px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
-.c-chip.ok{color:var(--ok);border-color:var(--ok)}
-.c-bar{height:10px;border-radius:99px;background:var(--line);margin:14px 0 10px;overflow:hidden}
-.c-bar i{display:block;height:100%;background:var(--acc);border-radius:99px}
+.c-pk-h b{font:700 16px Montserrat,sans-serif}
+.c-chip{font-size:12px;padding:3px 11px;border-radius:99px;border:1px solid var(--c-line);color:var(--c-mute);white-space:nowrap;font-weight:500}
+.c-chip.ok{color:#2ea064;border-color:rgba(46,160,100,.45)}
+.c-bar{height:8px;border-radius:99px;background:var(--c-ringbg);margin:16px 0 12px;overflow:hidden}
+.c-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--c-orange),var(--c-coral));border-radius:99px}
 .c-pk-f{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}
-.c-nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:var(--card);border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px));z-index:10}
-.c-nav button{flex:1;max-width:130px;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;font-weight:700;color:var(--mute);padding:6px 2px;min-height:52px;border-radius:12px;cursor:pointer}
-.c-nav button span{font-size:20px;filter:grayscale(1);opacity:.7}
-.c-nav button.on{color:var(--acc)}
-.c-nav button.on span{filter:none;opacity:1}
+.c-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));width:min(calc(100% - 28px),460px);display:flex;padding:6px;border-radius:28px;background:var(--c-nav);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);border:1px solid var(--c-line);box-shadow:0 12px 36px rgba(0,0,0,.22);z-index:10}
+.c-nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font:600 11px Roboto,sans-serif;color:var(--c-mute);padding:9px 2px 8px;border-radius:22px;cursor:pointer;transition:background .2s,color .2s}
+.c-nav button.on{color:var(--c-coral);background:rgba(235,76,81,.12)}
+.c-sheet-ov{position:fixed;inset:0;background:rgba(8,11,16,.5);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:30;display:flex;align-items:flex-end;justify-content:center;animation:c-fade .2s}
+@keyframes c-fade{from{opacity:0}}
+.c-sheet{width:min(520px,100%);background:var(--c-card);color:var(--c-ink);border-radius:30px 30px 0 0;padding:10px 22px calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px;animation:c-up .32s cubic-bezier(.2,.8,.2,1)}
+@keyframes c-up{from{transform:translateY(100%)}}
+.c-grab{width:42px;height:5px;border-radius:9px;background:var(--c-line);align-self:center;margin-bottom:6px}
+.c-sheet-t{font:800 22px Montserrat,sans-serif;margin:4px 0 0}
+.c-ask{display:flex;gap:14px;align-items:center;background:var(--c-bg);border-radius:20px;padding:16px}
+.c-note{color:var(--c-mute);font-size:14px}
+.c-prof{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0 10px;font-size:15px}
+.c-prof b{font:800 20px Montserrat,sans-serif}
+@media (prefers-reduced-motion:reduce){.c-main,.c-sheet,.c-sheet-ov,.c-arc,.c-live{animation:none}}
 </style>
 </head>
 <body>
@@ -239,9 +286,10 @@ const cname = id => S.clients.find(c => c.id === id)?.name || '—';
 
 /* ───────── вход ───────── */
 function loginView(msg, mode) {
+  closeSheet(); document.body.classList.add('cm');
   const rec = mode === 'recovery', pw = mode === 'pw', otp = mode === 'otp';
   $('#app').innerHTML = `<div class="login"><div class="card">
-    <div class="logo" style="font-size:20px">NLT Personal Training Club</div>
+    <div class="logo" style="font-size:20px">NLT Personal Training Club</div>${logoHtml(64)}
     ${rec ? `<div>Въведи нова парола</div><input id="pw" type="password" placeholder="Нова парола (мин. 8 знака)" autocomplete="new-password">
       <button class="pri" data-act="setpw">Запази паролата</button>` :
     otp ? `<div>Изпратихме имейл до <b>${esc(S.otpEmail || '')}</b>.<br><span class="mute">Въведи кода от имейла или натисни линка в него.</span></div>
@@ -333,6 +381,7 @@ async function staffApp() {
   renderStaff();
 }
 function renderStaff() {
+  document.body.classList.remove('cm');
   const admin = S.me.row.role === 'admin';
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
@@ -930,50 +979,79 @@ async function clientApp() {
   C.classes = (cl.data || []).filter(s => new Date(`${s.date}T${hm(s.start_time)}:00`) > limit).filter(s => !me.location || s.location === me.location).map(s => ({ ...s, free: free[s.id]?.free, taken: free[s.id]?.taken, mine: mine.has(s.id) }));
   renderClient();
 }
+const LOGO_URL = 'https://newleveltraining.bg/wp-content/uploads/nltlogo-new.png';
+const logoHtml = h => `<img class="c-logoimg" src="${LOGO_URL}" alt="NLT Personal Training Club" style="height:${h}px" onerror="this.outerHTML='<span class=&quot;c-logo&quot;>NLT</span>'">`;
+const ICO = {
+  home: '<path d="M3.5 11 12 3.8 20.5 11"/><path d="M5.5 9.6V20h13V9.6"/><path d="M10 20v-5.5h4V20"/>',
+  plus: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+  cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M8 3v4M16 3v4M3.5 10.5h17"/>',
+  calplus: '<rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M8 3v4M16 3v4M3.5 10.5h17M12 13.5v4.5M9.75 15.75h4.5"/>',
+  ring: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/>',
+  edit: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  pin: '<path d="M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'
+};
+const ic = (n, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]}</svg>`;
 const WD = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 const dayWord = (d, t) => d === t ? 'Днес' : d === ymd(addDays(parse(t), 1)) ? 'Утре' : fmtLong(d);
+const greet = () => { const h = new Date().getHours(); return h < 5 ? 'Добра нощ' : h < 12 ? 'Добро утро' : h < 18 ? 'Добър ден' : 'Добър вечер'; };
 function untilText(se) {
   const mins = Math.round((new Date(`${se.date}T${hm(se.start_time)}:00`) - new Date()) / 60000);
   if (mins <= 0 || mins > 24 * 60) return '';
   return mins < 60 ? `след ${mins} мин` : `след ${Math.floor(mins / 60)} ч${mins % 60 ? ' ' + (mins % 60) + ' мин' : ''}`;
 }
-function ringSvg(left, total) {
-  const r = 34, c = 2 * Math.PI * r, f = total ? Math.max(0, Math.min(1, left / total)) : 0;
-  return `<svg class="c-ring" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="${r}" fill="none" stroke="var(--line)" stroke-width="8"/><circle cx="40" cy="40" r="${r}" fill="none" stroke="var(--acc)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 40 40)"/><text x="40" y="46" text-anchor="middle" class="c-ring-n">${left}</text></svg>`;
-}
 function cActivePkgs(t) {
-  return C.pkgs.filter(p => p.end_date >= t).map(p => ({ ...p, left: Math.max(0, p.total - p.used), days: Math.round((parse(p.end_date) - parse(t)) / 864e5) }));
+  return C.pkgs.filter(p => p.end_date >= t).map(p => {
+    const total = Math.max(1, Math.round((parse(p.end_date) - parse(p.start_date)) / 864e5) + 1);
+    const days = Math.max(0, Math.round((parse(p.end_date) - parse(t)) / 864e5));
+    return { ...p, left: Math.max(0, p.total - p.used), days, total_days: total };
+  });
 }
-function cSession(b, t, opts = {}) {
-  const se = b.sessions, grp = se.kind === 'group';
+function rings(p, size = 150) {
+  const arc = (r, f, col, w) => { const c = 2 * Math.PI * r, v = Math.max(0.001, Math.min(1, f));
+    return `<circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--c-ringbg)" stroke-width="${w}"/><circle class="c-arc" cx="60" cy="60" r="${r}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - v)).toFixed(1)}" style="--c:${c.toFixed(1)}" transform="rotate(-90 60 60)"/>`; };
+  return `<svg class="c-rings" viewBox="0 0 120 120" width="${size}" height="${size}" role="img" aria-label="Остават ${p.left} от ${p.total} посещения">${arc(52, p.total ? p.left / p.total : 0, 'var(--c-coral)', 11)}${arc(37, Math.min(1, p.days / p.total_days), 'var(--c-orange)', 11)}<text x="60" y="63" text-anchor="middle" class="c-rings-n">${p.left}</text><text x="60" y="77" text-anchor="middle" class="c-rings-l">остават</text></svg>`;
+}
+function cSheet(html) {
+  closeSheet();
+  const o = document.createElement('div'); o.id = 'c-sheet'; o.className = 'c-sheet-ov';
+  o.innerHTML = `<div class="c-sheet" role="dialog"><i class="c-grab"></i>${html}</div>`;
+  o.addEventListener('click', e => { if (e.target === o) closeSheet(); });
+  document.body.appendChild(o);
+}
+function closeSheet() { document.getElementById('c-sheet')?.remove(); }
+function cSession(b, t) {
+  const se = b.sessions, grp = se.kind === 'group', d = parse(se.date);
   return `<div class="c-sess">
-    <div class="c-when"><b>${hm(se.start_time)}</b><span>${parse(se.date).getDate()} ${parse(se.date).toLocaleDateString('bg-BG', { month: 'short' })}</span></div>
+    <div class="c-when"><b>${hm(se.start_time)}</b><span>${d.getDate()} ${d.toLocaleDateString('bg-BG', { month: 'short' })}</span></div>
     <div class="c-sinfo"><div class="c-st">${esc(se.title || (grp ? 'Групова тренировка' : 'Персонална тренировка'))}</div>
       <div class="c-ss">${esc(dayWord(se.date, t))}${se.location ? ' · ' + esc(se.location) : ''}</div></div>
     <div class="c-acts">
-      <a class="c-ic" title="Добави в Google Календар" aria-label="Добави в Google Календар" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}">📅</a>
-      ${grp ? `<button class="c-link" data-act="ccancel" data-bid="${b.id}" data-sid="${b.session_id}">Промяна</button>` : ''}
+      <a class="c-ic" title="Добави в Google Календар" aria-label="Добави в Google Календар" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}">${ic('calplus', 21)}</a>
+      ${grp ? `<button class="c-ic" title="Промяна" aria-label="Промяна" data-act="ccancel" data-bid="${b.id}" data-sid="${b.session_id}">${ic('edit', 20)}</button>` : ''}
     </div></div>`;
 }
 function clientHome(me, t, act) {
   const nb = C.bookings[0], first = (me.name || '').split(' ')[0];
   const warn = act.filter(p => p.left <= 2 || p.days <= 7);
   const main = act.slice().sort((a, b) => a.end_date.localeCompare(b.end_date))[0];
-  return `<div class="c-hello">Здравей, ${esc(first)} 👋</div>
+  const se = nb?.sessions;
+  return `<div class="c-hello"><span>${greet()},</span><b>${esc(first)}</b></div>
   ${nb ? `<section class="c-hero">
-      <div class="c-hero-k">Следваща тренировка${untilText(nb.sessions) ? ' · ' + untilText(nb.sessions) : ''}</div>
-      <div class="c-hero-t">${hm(nb.sessions.start_time)}</div>
-      <div class="c-hero-d">${esc(dayWord(nb.sessions.date, t))}</div>
-      <div class="c-hero-s">${esc(nb.sessions.title || (nb.sessions.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}${nb.sessions.location ? ' · ' + esc(nb.sessions.location) : ''}</div>
-      <div class="c-hero-b"><a class="c-btn light" target="_blank" rel="noopener" href="${esc(gcalUrl(nb.sessions))}">📅 В календара</a>
-      ${nb.sessions.kind === 'group' ? `<button class="c-btn ghost" data-act="ccancel" data-bid="${nb.id}" data-sid="${nb.session_id}">Промяна</button>` : ''}</div>
-    </section>` : `<section class="c-hero empty"><div class="c-hero-t" style="font-size:26px">Нямаш записана тренировка</div><div class="c-hero-s">Избери удобен час и се запиши за секунди.</div>
-      <div class="c-hero-b"><button class="c-btn light" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
-  ${warn.map(p => `<div class="c-warn">⚠️ <div><b>${esc(p.package_name || 'Абонамент')}</b>: ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span class="mute">Свържи се с клуба за подновяване.</span></div></div>`).join('')}
-  ${main ? `<section class="c-card c-sum" data-act="cnav" data-t="pkg">${ringSvg(main.left, main.total)}
-      <div><div class="c-k">Оставащи посещения</div><div class="c-big">${main.left} <span>от ${main.total}</span></div><div class="mute">${esc(main.package_name || '')} · до ${fmt(main.end_date)}</div></div></section>`
+      <div class="c-hero-k">${untilText(se) ? `<i class="c-live"></i>${untilText(se)}` : 'Следваща тренировка'}</div>
+      <div class="c-hero-t">${hm(se.start_time)}</div>
+      <div class="c-hero-d">${esc(dayWord(se.date, t))}</div>
+      <div class="c-hero-s">${esc(se.title || (se.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}${se.location ? `<span class="c-pinl">${ic('pin', 14)}${esc(se.location)}</span>` : ''}</div>
+      <div class="c-hero-b"><a class="c-btn glass" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}">${ic('calplus', 18)}В календара</a>
+      ${se.kind === 'group' ? `<button class="c-btn glass" data-act="ccancel" data-bid="${nb.id}" data-sid="${nb.session_id}">${ic('edit', 18)}Промяна</button>` : ''}</div>
+    </section>` : `<section class="c-hero empty"><div class="c-hero-d" style="font-size:26px;line-height:1.15">Нямаш записана тренировка</div><div class="c-hero-s">Избери удобен час и се запиши за секунди.</div>
+      <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
+  ${warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
+  ${main ? `<section class="c-card c-sum" data-act="cnav" data-t="pkg">${rings(main, 132)}
+      <div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.left} от ${main.total}</b><span>посещения</span></div></div>
+      <div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>`
     : `<section class="c-card"><div class="c-k">Абонамент</div><div>Нямаш активен абонамент. Свържи се с клуба.</div></section>`}
-  ${C.bookings.length > 1 ? `<h3 class="c-h">Предстоящи</h3><section class="c-card c-list">${C.bookings.slice(1, 4).map(b => cSession(b, t)).join('')}${C.bookings.length > 4 ? `<button class="c-more" data-act="cnav" data-t="mine">Всички (${C.bookings.length}) →</button>` : ''}</section>` : ''}`;
+  ${C.bookings.length > 1 ? `<h3 class="c-h">Предстоящи</h3><section class="c-card c-list">${C.bookings.slice(1, 4).map(b => cSession(b, t)).join('')}${C.bookings.length > 4 ? `<button class="c-more" data-act="cnav" data-t="mine">Всички (${C.bookings.length})</button>` : ''}</section>` : ''}`;
 }
 function clientBookTab(me, t, act) {
   const days = []; for (let i = 0; i < 14; i++) days.push(ymd(addDays(parse(t), i)));
@@ -982,40 +1060,60 @@ function clientBookTab(me, t, act) {
   const hasGroup = act.some(p => p.kind === 'group');
   const list = byDay[C.day] || [];
   return `<h2 class="c-title">Запиши се</h2>
-  ${hasGroup ? '' : '<div class="c-warn">ℹ️ <div>За записване за групов час е нужен активен групов абонамент. Свържи се с клуба.</div></div>'}
-  <div class="c-days" role="tablist">${days.map(d => { const dt = parse(d), n = (byDay[d] || []).length; return `<button class="c-day ${d === C.day ? 'on' : ''} ${n ? '' : 'off'}" data-act="cday" data-d="${d}" ${n ? '' : 'disabled'}><span>${d === t ? 'Днес' : WD[dt.getDay()]}</span><b>${dt.getDate()}</b><i>${n ? n + (n === 1 ? ' час' : ' часа') : '–'}</i></button>`; }).join('')}</div>
+  ${hasGroup ? '' : '<div class="c-warn"><i></i><div>За групов час е нужен активен групов абонамент.<br><span>Свържи се с клуба.</span></div></div>'}
+  <div class="c-days">${days.map(d => { const dt = parse(d), n = (byDay[d] || []).length; return `<button class="c-day ${d === C.day ? 'on' : ''}" data-act="cday" data-d="${d}" ${n ? '' : 'disabled'}><span>${d === t ? 'Днес' : WD[dt.getDay()]}</span><b>${dt.getDate()}</b><u class="${n ? 'dot' : ''}"></u></button>`; }).join('')}</div>
   <div class="c-dayh">${esc(dayWord(C.day, t))}</div>
   ${list.length ? list.map(s => {
-    const full = s.free === 0;
+    const full = s.free === 0, cap = s.capacity || ((s.taken || 0) + (s.free || 0)) || 0, pct = cap ? Math.min(100, (s.taken ?? 0) / cap * 100) : 0;
     return `<div class="c-class ${s.mine ? 'mine' : ''}"><div class="c-ct">${hm(s.start_time)}</div><div class="c-cinfo"><div class="c-st">${esc(s.title || 'Групова тренировка')}</div>
-      <div class="c-ss">${s.location ? esc(s.location) + ' · ' : ''}${full ? '<span class="bad">пълен</span>' : (s.free != null ? s.free + ' свободни места' : '')}</div></div>
-      ${s.mine ? '<span class="c-done">✓ Записан</span>' : `<button class="c-btn pri" data-act="cbook" data-id="${s.id}" ${full || !hasGroup ? 'disabled' : ''}>${full ? 'Пълен' : 'Запиши се'}</button>`}</div>`;
+      <div class="c-ss">${s.location ? esc(s.location) : ''}</div>
+      ${s.free != null ? `<div class="c-spots"><div class="c-meter"><i style="width:${pct}%"></i></div><span class="${full ? 'bad' : ''}">${full ? 'пълен' : s.free + ' свободни'}</span></div>` : ''}</div>
+      ${s.mine ? `<span class="c-done">${ic('check', 18)}Записан</span>` : `<button class="c-btn solid sm" data-act="cask" data-id="${s.id}" ${full || !hasGroup ? 'disabled' : ''}>${full ? 'Пълен' : 'Запиши'}</button>`}</div>`;
   }).join('') : '<div class="c-empty">Няма часове за този ден.</div>'}`;
 }
 function clientMine(t) {
   return `<h2 class="c-title">Моите тренировки</h2>
   ${C.bookings.length ? `<section class="c-card c-list">${C.bookings.map(b => cSession(b, t)).join('')}</section>
-    <div style="margin-top:12px"><button class="c-btn ghost wide" data-act="ics" data-id="">Всички в календара (.ics)</button></div>`
-    : `<div class="c-empty">Нямаш предстоящи тренировки.<br><button class="c-btn pri" style="margin-top:12px" data-act="cnav" data-t="book">Запиши се</button></div>`}`;
+    <button class="c-btn outline wide" data-act="ics" data-id="">${ic('calplus', 18)}Всички в календара (.ics)</button>`
+    : `<div class="c-empty">Нямаш предстоящи тренировки.<br><button class="c-btn solid" style="margin-top:14px" data-act="cnav" data-t="book">Запиши се</button></div>`}`;
 }
 function clientPkg(t, act) {
   const old = C.pkgs.filter(p => p.end_date < t);
-  const card = p => { const left = Math.max(0, p.total - p.used), pct = p.total ? Math.min(100, p.used / p.total * 100) : 0; return `<section class="c-card c-pk"><div class="c-pk-h"><b>${esc(p.package_name || 'Абонамент')}</b><span class="c-chip ${p.end_date >= t ? 'ok' : ''}">${p.end_date >= t ? 'активен' : 'изтекъл'}</span></div>
+  const card = p => { const left = Math.max(0, p.total - p.used), pct = p.total ? Math.min(100, p.used / p.total * 100) : 0, on = p.end_date >= t;
+    return `<section class="c-card c-pk"><div class="c-pk-h"><b>${esc(p.package_name || 'Абонамент')}</b><span class="c-chip ${on ? 'ok' : ''}">${on ? 'активен' : 'изтекъл'}</span></div>
     <div class="c-bar"><i style="width:${pct}%"></i></div>
-    <div class="c-pk-f"><span>Остават <b>${left}</b> от ${p.total}</span><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}</span></div></section>`; };
-  return `<h2 class="c-title">Абонаменти</h2>
+    <div class="c-pk-f"><span>Остават <b>${left}</b> от ${p.total}</span><span class="c-mute">${fmt(p.start_date)} – ${fmt(p.end_date)}</span></div></section>`; };
+  const main = act.slice().sort((a, b) => a.end_date.localeCompare(b.end_date))[0];
+  return `<h2 class="c-title">Абонамент</h2>
+  ${main ? `<section class="c-card c-sum big">${rings(main, 180)}<div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.left} от ${main.total}</b><span>оставащи посещения</span></div></div><div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>` : ''}
   ${act.length ? act.map(card).join('') : '<div class="c-empty">Нямаш активен абонамент.<br>Свържи се с клуба, за да го подновиш.</div>'}
   ${old.length ? `<h3 class="c-h">Изтекли</h3>${old.slice(0, 5).map(card).join('')}` : ''}`;
 }
+function clientProfile() {
+  const me = S.me.row;
+  cSheet(`<div class="c-prof"><div class="c-av big">${esc((me.name || '?').trim()[0] || '?')}</div><b>${esc(me.name)}</b><span class="c-mute">${esc(me.email || '')}</span>${me.location ? `<span class="c-mute">${esc(me.location)}</span>` : ''}</div>
+    <button class="c-btn outline wide" data-act="logout">Изход</button>`);
+}
+function clientAsk(sid) {
+  const s = C.classes.find(x => x.id === sid); if (!s) return;
+  const t = today(), pk = cActivePkgs(t).filter(p => p.kind === 'group' && p.start_date <= s.date && p.end_date >= s.date)[0] || cActivePkgs(t).find(p => p.kind === 'group');
+  cSheet(`<h3 class="c-sheet-t">Потвърди записване</h3>
+    <div class="c-ask"><div class="c-ct">${hm(s.start_time)}</div><div><div class="c-st">${esc(s.title || 'Групова тренировка')}</div><div class="c-ss">${esc(dayWord(s.date, t))}${s.location ? ' · ' + esc(s.location) : ''}</div></div></div>
+    ${pk ? `<div class="c-note">След записването ще ти останат <b>${Math.max(0, pk.left - 1)}</b> от ${pk.total} посещения.</div>` : ''}
+    <button class="c-btn solid wide" data-act="cbook" data-id="${sid}">Запиши ме</button>
+    <button class="c-btn plain wide" data-act="csheetx">Отказ</button>`);
+}
 function renderClient() {
+  closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
   const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : clientHome(me, t, act);
-  const nav = [['home', '🏠', 'Начало'], ['book', '➕', 'Запиши се'], ['mine', '📅', 'Часове'], ['pkg', '🎟️', 'Абонамент']];
-  $('#app').innerHTML = `<div class="cx"><header class="c-top"><span class="c-logo">NLT</span><span class="sp"></span><span class="c-who">${esc(me.name)}</span><button class="c-link" data-act="logout">Изход</button></header>
-    <main class="c-main">${body}</main>
-    <nav class="c-nav">${nav.map(([k, ic, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}"><span>${ic}</span>${l}</button>`).join('')}</nav></div>`;
+  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент']];
+  $('#app').innerHTML = `<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
+    <main class="c-main" key="${C.tab}">${body}</main>
+    <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
 }
 async function clientBook(sid) {
+  closeSheet();
   const { error } = await sb.rpc('book_session', { p_session: sid });
   if (error) return fail(error, 'Записването не успя'); toast('Записан си!'); clientApp();
 }
@@ -1061,9 +1159,12 @@ document.addEventListener('click', async e => {
       case 'othermail': S.otpEmail = ''; loginView(); break;
       case 'cnav': C.tab = el.dataset.t; renderClient(); window.scrollTo(0, 0); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
+      case 'cask': clientAsk(el.dataset.id); break;
+      case 'csheetx': closeSheet(); break;
+      case 'cprofile': clientProfile(); break;
       case 'forgot': await doForgot(); break;
       case 'setpw': await doSetPw(); break;
-      case 'logout': await sb.auth.signOut(); S.me = null; loginView(); break;
+      case 'logout': closeSheet(); await sb.auth.signOut(); S.me = null; loginView(); break;
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
       case 'wk': S.week = el.dataset.d === '0' ? monday(new Date()) : addDays(S.week, +el.dataset.d); weekView(); break;
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
