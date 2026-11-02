@@ -611,22 +611,34 @@ function drawClients() {
   const qi = $('#cq'); qi.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; drawClients(); const n = $('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
   $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
 }
-async function openClient(id) {
-  const [c, cp, pay, chg, bk] = await Promise.all([
+async function openClient(id, tab) {
+  const [c, cp, pay, chg, bk, hist] = await Promise.all([
     sb.from('clients').select('*').eq('id', id).single(),
     sb.from('package_status').select('*').eq('client_id', id).order('end_date', { ascending: false }),
     S.owner ? sb.from('payments').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     S.owner ? sb.from('charges').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
-    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').order('date', { foreignTable: 'sessions' }).limit(30)
+    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').order('date', { foreignTable: 'sessions' }).limit(30),
+    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).lt('sessions.date', today()).order('date', { foreignTable: 'sessions', ascending: false }).limit(500)
   ]);
   if (c.error) return fail(c.error, 'Клиентът не се отвори');
-  const x = c.data, pk = cp.data || [], pays = pay.data || [], chs = chg.data || [];
+  const x = c.data, pk = cp.data || [], pays = pay.data || [], chs = chg.data || [], t0 = today();
   const sumPk = pk.reduce((a, p) => a + Number(p.price || 0), 0), sumCh = chs.reduce((a, p) => a + Number(p.amount), 0), sumPay = pays.reduce((a, p) => a + Number(p.amount), 0);
   const bal = sumPk + sumCh - sumPay;
   const upcoming = (bk.data || []).filter(b => b.sessions).sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
+  const past = (hist.data || []).filter(b => b.sessions).sort((a, b) => (b.sessions.date + b.sessions.start_time).localeCompare(a.sessions.date + a.sessions.start_time));
   const chosen = S.packages.filter(p => p.active);
+  const tn = id2 => S.staff.find(t => t.id === id2)?.name || '';
+  const st = b => b.status === 'done' ? '<span class="chip" style="color:var(--ok)">Проведен</span>' : b.status === 'cancelled' ? (b.late ? '<span class="chip bad">Късен отказ</span>' : '<span class="chip">Отказан</span>') : '<span class="chip warn">Не е отбелязан</span>';
+  const nDone = past.filter(b => b.status === 'done').length, nCan = past.filter(b => b.status === 'cancelled').length, nLate = past.filter(b => b.late).length;
+  const pstate = p => p.end_date < t0 || p.used >= p.total ? '<span class="chip">Изтекъл</span>' : p.start_date > t0 ? '<span class="chip warn">Предстоящ</span>' : '<span class="chip" style="color:var(--ok)">Активен</span>';
+  const ledger = [...pays.map(p => ({ d: p.date, plus: true, a: p.amount, t: `${esc(p.method || '')} ${esc(p.note || '')}`, id: p.id, act: 'paydel' })), ...chs.map(p => ({ d: p.date, plus: false, a: p.amount, t: esc(p.note || 'Такса'), id: p.id, act: 'chdel' }))].sort((a, b) => String(b.d).localeCompare(String(a.d)));
+  const T = tab || 'profile';
+  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`]].concat(S.owner ? [['pays', 'Плащания']] : []);
   modal.show(`<div id="cl" data-cid="${x.id}">
     <h2>${esc(x.name)}</h2>
+    <div class="chips" style="margin-bottom:10px">${tabs.map(([k, l]) => `<button class="sm ${T === k ? 'on' : ''}" data-act="ctab" data-t="${k}">${l}</button>`).join('')}</div>
+
+    <div class="cpane" data-p="profile" ${T === 'profile' ? '' : 'hidden'}>
     <div class="grid2">
       <label class="f">Име<input id="c-name" value="${esc(x.name)}"></label>
       <label class="f">Телефон<input id="c-phone" value="${esc(x.phone || '')}"></label>
@@ -636,30 +648,40 @@ async function openClient(id) {
     </div>
     <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
     <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button></div>
+    ${S.owner ? `<div class="mute" style="margin-top:10px">Баланс: <b style="color:${bal > 0 ? 'var(--bad)' : 'var(--ok)'}">${bal > 0 ? 'Дължимо ' + money(bal) : bal < 0 ? 'Аванс ' + money(-bal) : 'Изравнено'}</b></div>` : ''}
+    </div>
 
-    <h3>Пакети</h3>
-    ${pk.map(p => { const left = p.total - p.used; return `<div class="pk"><div style="min-width:180px"><b>${esc(p.package_name || (p.kind === 'solo' ? 'Персонални' : 'Групови'))}</b><br><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}${S.owner ? ' · ' + money(p.price) : ''}</span></div>
+    <div class="cpane" data-p="pkgs" ${T === 'pkgs' ? '' : 'hidden'}>
+    <h3>История на абонаментите</h3>
+    ${pk.map(p => { const left = p.total - p.used; return `<div class="pk"><div style="min-width:180px"><b>${esc(p.package_name || (p.kind === 'solo' ? 'Персонални' : 'Групови'))}</b> ${pstate(p)}<br><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}${S.owner ? ' · ' + money(p.price) : ''}</span></div>
       <div class="bar2"><i style="width:${Math.min(100, p.used / p.total * 100)}%"></i></div><span>${p.used}/${p.total}${left <= 0 ? ' · изчерпан' : ''}</span>
-      <button class="sm danger" data-act="cpdel" data-id="${p.id}">✕</button></div>`; }).join('') || '<div class="mute">Няма пакети.</div>'}
-    <div class="row" style="margin-top:8px"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
+      <button class="sm danger" data-act="cpdel" data-id="${p.id}">✕</button></div>`; }).join('') || '<div class="mute">Няма абонаменти.</div>'}
+    <h3>Назначи услуга</h3>
+    <div class="row"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
       <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
+    </div>
 
-    <h3>Предстоящи часове</h3>
+    <div class="cpane" data-p="visits" ${T === 'visits' ? '' : 'hidden'}>
+    <div class="mute" style="margin-bottom:6px">Проведени ${nDone} · Отказани ${nCan}${nLate ? ` (късни ${nLate})` : ''}${past.length >= 500 ? ' · показани са последните 500' : ''}</div>
+    <h3>Предстоящи</h3>
     ${upcoming.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])}${b.sessions.location !== S.loc ? ' · ' + esc(b.sessions.location) : ''}</div></div>`).join('') || '<div class="mute">Няма.</div>'}
+    <h3>История</h3>
+    <div style="max-height:320px;overflow:auto">${past.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])} <span class="mute">${esc(b.sessions.location)}${tn(b.sessions.trainer_id) ? ' · ' + esc(tn(b.sessions.trainer_id)) : ''}</span> ${st(b)}${b.use_plan ? '' : ' <span class="chip warn">еднократно</span>'}</div></div>`).join('') || '<div class="mute">Още няма записани посещения в приложението. Старите от PT Minder са отчетени в „използвани" при абонаментите.</div>'}</div>
+    </div>
 
-    ${S.owner ? `    <h3>Плащания и такси</h3>
-    <div class="mute" style="margin-bottom:6px">Платено ${money(sumPay)} · Пакети ${money(sumPk)} · Такси ${money(sumCh)} · <b style="color:${bal > 0 ? 'var(--bad)' : 'var(--ok)'}">${bal > 0 ? 'Дължимо ' + money(bal) : bal < 0 ? 'Аванс ' + money(-bal) : 'Изравнено'}</b></div>
-    ${pays.map(p => `<div class="bk"><div class="nm">+ ${money(p.amount)} · ${fmt(p.date)} · ${esc(p.method || '')} ${esc(p.note || '')}</div><button class="sm danger" data-act="paydel" data-id="${p.id}">✕</button></div>`).join('')}
-    ${chs.map(p => `<div class="bk"><div class="nm">− ${money(p.amount)} · ${fmt(p.date)} · ${esc(p.note || '')}</div><button class="sm danger" data-act="chdel" data-id="${p.id}">✕</button></div>`).join('')}
+    ${S.owner ? `<div class="cpane" data-p="pays" ${T === 'pays' ? '' : 'hidden'}>
+    <h3>История на плащанията</h3>
+    <div class="mute" style="margin-bottom:6px">Платено ${money(sumPay)} · Абонаменти ${money(sumPk)} · Такси ${money(sumCh)}</div>
+    <div style="max-height:300px;overflow:auto">${ledger.map(l => `<div class="bk"><div class="nm"><b style="color:${l.plus ? 'var(--ok)' : 'var(--bad)'}">${l.plus ? '+' : '−'} ${money(l.a)}</b> · ${fmt(l.d)} · ${l.t}</div><button class="sm danger" data-act="${l.act}" data-id="${l.id}">✕</button></div>`).join('') || '<div class="mute">Няма плащания.</div>'}</div>
     <div class="row" style="margin-top:8px"><input type="number" id="pay-amt" placeholder="Сума" style="width:90px" step="0.01">
       <select id="pay-m"><option>В брой</option><option>Карта</option><option>Банков път</option></select><input id="pay-note" placeholder="Бележка" style="flex:1;min-width:120px">
       <button data-act="payadd">+ Плащане</button></div>
     <div class="row" style="margin-top:6px"><input type="number" id="chg-amt" placeholder="Сума" style="width:90px" step="0.01"><input id="chg-note" placeholder="Такса – за какво" style="flex:1;min-width:120px"><button data-act="chgadd">+ Такса</button></div>
-` : ''}
+    </div>` : ''}
   </div>`, true);
 }
 const cid = () => $('#cl')?.dataset.cid;
-async function afterClient() { const id = cid(); S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(id); }
+async function afterClient() { const id = cid(); S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(id, S.ctab); }
 async function saveClient() {
   const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, notes: $('#c-notes').value.trim() || null };
   if (!p.name) return toast('Името е задължително.');
@@ -1256,7 +1278,8 @@ document.addEventListener('click', async e => {
       case 'sdel': if (confirm('Да се изтрие ли часът заедно със записванията?')) { const id = sessId(); const { error } = await sb.from('sessions').delete().eq('id', id); if (error) return fail(error, 'Не се изтри'); modal.close(); weekView(); } break;
       case 'bst': await setBookingStatus(el.closest('.bk').dataset.bid, el.dataset.st); break;
       case 'brm': { const bid = el.closest('.bk').dataset.bid; if (!confirm('Да се премахне ли записването?')) break; const bb = (await sb.from('bookings').select('client_id,sessions(date,start_time)').eq('id', bid).single()).data; await removeCharge(bid); await sb.from('bookings').delete().eq('id', bid); if (bb) logEvent('removed', `Премахнат: ${bkLabel(bb.client_id, bb.sessions.date, bb.sessions.start_time)}`); await refreshAfter(sessId()); break; }
-      case 'client': modal.show('<div class="mute">Зареждане…</div>', true); await openClient(el.dataset.id); break;
+      case 'ctab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=ctab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; break; }
+      case 'client': S.ctab = 'profile'; modal.show('<div class="mute">Зареждане…</div>', true); await openClient(el.dataset.id); break;
       case 'csave': await saveClient(); break;
       case 'cpadd': await addPackage(); break;
       case 'cpdel': if (confirm('Да се изтрие ли пакетът?')) { await sb.from('client_packages').delete().eq('id', el.dataset.id); await afterClient(); } break;
