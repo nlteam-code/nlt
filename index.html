@@ -2,7 +2,8 @@
 <html lang="bg">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
 <title>NLT Personal Training Club</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--ink:#16202a;--mute:#6b7785;--line:#e3e7ec;--acc:#1f6feb;--acc-ink:#fff;--grp:#dbe8ff;--grp-b:#7aa7f5;--solo:#d7f3df;--solo-b:#5dbb78;--warn:#b54708;--warn-bg:#fff2e0;--bad:#c0262d;--ok:#12794b;--shadow:0 8px 30px rgba(0,0,0,.18)}
@@ -101,6 +102,80 @@ label.f input,label.f select{color:var(--ink)}
 .ev[draggable=true]{cursor:grab}
 svg text{fill:var(--mute);font-size:11px}svg .bar{fill:var(--acc)}svg .gl{stroke:var(--line)}
 @media (max-width:640px){.day{min-width:110px}}
+
+/* ───── клиентски екран ───── */
+.cx{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:84px;font-family:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.c-top{display:flex;align-items:center;gap:10px;padding:14px max(18px,env(safe-area-inset-left,0px));position:sticky;top:0;background:var(--bg);z-index:5}
+.c-logo{font-weight:800;font-size:20px;letter-spacing:.14em}
+.c-who{color:var(--mute);font-size:13px;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-link{border:0;background:none;color:var(--acc);padding:8px;font-weight:600;cursor:pointer;min-height:36px}
+.c-main{padding:4px max(18px,env(safe-area-inset-left,0px)) 24px;display:flex;flex-direction:column;gap:14px}
+.c-hello{font-size:22px;font-weight:800;letter-spacing:-.01em;margin-top:2px}
+.c-title{font-size:24px;font-weight:800;margin:4px 0 2px;letter-spacing:-.01em}
+.c-h{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:8px 0 -4px}
+.c-hero{background:linear-gradient(135deg,#0d2a5e 0%,#1f6feb 100%);color:#fff;border-radius:22px;padding:20px 20px 18px;box-shadow:0 10px 30px rgba(31,111,235,.28)}
+.c-hero-k{font-size:12px;text-transform:uppercase;letter-spacing:.09em;opacity:.85}
+.c-hero-t{font-size:54px;font-weight:800;line-height:1.05;letter-spacing:-.03em;margin-top:6px}
+.c-hero-d{font-size:18px;font-weight:700;margin-top:2px;text-transform:capitalize}
+.c-hero-s{opacity:.9;margin-top:4px}
+.c-hero-b{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.c-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:46px;padding:0 18px;border-radius:14px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--ink);text-decoration:none;cursor:pointer;font-size:15px}
+.c-btn.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.c-btn.light{background:#fff;color:#0d2a5e;border-color:#fff}
+.c-btn.ghost{background:transparent;color:inherit;border-color:rgba(255,255,255,.55)}
+.c-card .c-btn.ghost,.cx > main > div .c-btn.ghost{border-color:var(--line);color:var(--ink)}
+.c-btn.wide{width:100%}
+.c-btn:disabled{opacity:.45}
+.c-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.c-sum{display:flex;gap:16px;align-items:center;cursor:pointer}
+.c-ring{width:84px;height:84px;flex:none}
+.c-ring-n{font-size:24px;font-weight:800;fill:var(--ink)}
+.c-k{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+.c-big{font-size:30px;font-weight:800;line-height:1.1}
+.c-big span{font-size:16px;color:var(--mute);font-weight:600}
+.c-warn{display:flex;gap:10px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:14px;padding:12px 14px;font-size:14px}
+.c-warn .mute{color:inherit;opacity:.85}
+.c-list{padding:4px 14px}
+.c-sess{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.c-sess:last-child{border-bottom:0}
+.c-when{width:58px;flex:none;text-align:center}
+.c-when b{display:block;font-size:20px;font-weight:800;line-height:1.1}
+.c-when span{font-size:12px;color:var(--mute);text-transform:uppercase}
+.c-sinfo{flex:1;min-width:0}
+.c-st{font-weight:700}
+.c-ss{font-size:13px;color:var(--mute)}
+.c-ss .bad{color:var(--bad);font-weight:700}
+.c-acts{display:flex;align-items:center;gap:2px;flex:none}
+.c-ic{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;text-decoration:none;font-size:18px}
+.c-more{display:block;width:100%;border:0;background:none;color:var(--acc);font-weight:700;padding:12px 0;cursor:pointer}
+.c-days{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;margin:0 -2px;scrollbar-width:none}
+.c-days::-webkit-scrollbar{display:none}
+.c-day{flex:none;width:58px;padding:8px 0;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--card);border:1px solid var(--line);cursor:pointer}
+.c-day span{font-size:12px;color:var(--mute)}
+.c-day b{font-size:20px;font-weight:800}
+.c-day i{font-size:11px;font-style:normal;color:var(--mute)}
+.c-day.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.c-day.on span,.c-day.on i{color:inherit;opacity:.85}
+.c-day.off{opacity:.45}
+.c-dayh{font-weight:800;text-transform:capitalize;margin-top:2px}
+.c-class{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px}
+.c-class.mine{border-color:var(--ok)}
+.c-ct{font-size:24px;font-weight:800;width:68px;flex:none}
+.c-cinfo{flex:1;min-width:0}
+.c-done{color:var(--ok);font-weight:800;white-space:nowrap}
+.c-empty{text-align:center;color:var(--mute);padding:36px 12px;background:var(--card);border:1px dashed var(--line);border-radius:18px}
+.c-pk{margin-bottom:0}
+.c-pk-h{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.c-chip{font-size:12px;padding:2px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+.c-chip.ok{color:var(--ok);border-color:var(--ok)}
+.c-bar{height:10px;border-radius:99px;background:var(--line);margin:14px 0 10px;overflow:hidden}
+.c-bar i{display:block;height:100%;background:var(--acc);border-radius:99px}
+.c-pk-f{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}
+.c-nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:var(--card);border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px));z-index:10}
+.c-nav button{flex:1;max-width:130px;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;font-weight:700;color:var(--mute);padding:6px 2px;min-height:52px;border-radius:12px;cursor:pointer}
+.c-nav button span{font-size:20px;filter:grayscale(1);opacity:.7}
+.c-nav button.on{color:var(--acc)}
+.c-nav button.on span{filter:none;opacity:1}
 </style>
 </head>
 <body>
@@ -855,43 +930,90 @@ async function clientApp() {
   C.classes = (cl.data || []).filter(s => new Date(`${s.date}T${hm(s.start_time)}:00`) > limit).filter(s => !me.location || s.location === me.location).map(s => ({ ...s, free: free[s.id]?.free, taken: free[s.id]?.taken, mine: mine.has(s.id) }));
   renderClient();
 }
-function clientHero(me, t, cur) {
-  const nb = C.bookings.slice().sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time))[0];
-  const tom = ymd(addDays(parse(t), 1));
-  const when = d => d === t ? 'Днес' : d === tom ? 'Утре' : fmtLong(d);
-  const act = C.pkgs.filter(p => p.end_date >= t).map(p => ({ ...p, left: Math.max(0, p.total - p.used), days: Math.round((parse(p.end_date) - parse(t)) / 864e5) }));
+const WD = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+const dayWord = (d, t) => d === t ? 'Днес' : d === ymd(addDays(parse(t), 1)) ? 'Утре' : fmtLong(d);
+function untilText(se) {
+  const mins = Math.round((new Date(`${se.date}T${hm(se.start_time)}:00`) - new Date()) / 60000);
+  if (mins <= 0 || mins > 24 * 60) return '';
+  return mins < 60 ? `след ${mins} мин` : `след ${Math.floor(mins / 60)} ч${mins % 60 ? ' ' + (mins % 60) + ' мин' : ''}`;
+}
+function ringSvg(left, total) {
+  const r = 34, c = 2 * Math.PI * r, f = total ? Math.max(0, Math.min(1, left / total)) : 0;
+  return `<svg class="c-ring" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="${r}" fill="none" stroke="var(--line)" stroke-width="8"/><circle cx="40" cy="40" r="${r}" fill="none" stroke="var(--acc)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 40 40)"/><text x="40" y="46" text-anchor="middle" class="c-ring-n">${left}</text></svg>`;
+}
+function cActivePkgs(t) {
+  return C.pkgs.filter(p => p.end_date >= t).map(p => ({ ...p, left: Math.max(0, p.total - p.used), days: Math.round((parse(p.end_date) - parse(t)) / 864e5) }));
+}
+function cSession(b, t, opts = {}) {
+  const se = b.sessions, grp = se.kind === 'group';
+  return `<div class="c-sess">
+    <div class="c-when"><b>${hm(se.start_time)}</b><span>${parse(se.date).getDate()} ${parse(se.date).toLocaleDateString('bg-BG', { month: 'short' })}</span></div>
+    <div class="c-sinfo"><div class="c-st">${esc(se.title || (grp ? 'Групова тренировка' : 'Персонална тренировка'))}</div>
+      <div class="c-ss">${esc(dayWord(se.date, t))}${se.location ? ' · ' + esc(se.location) : ''}</div></div>
+    <div class="c-acts">
+      <a class="c-ic" title="Добави в Google Календар" aria-label="Добави в Google Календар" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}">📅</a>
+      ${grp ? `<button class="c-link" data-act="ccancel" data-bid="${b.id}" data-sid="${b.session_id}">Промяна</button>` : ''}
+    </div></div>`;
+}
+function clientHome(me, t, act) {
+  const nb = C.bookings[0], first = (me.name || '').split(' ')[0];
   const warn = act.filter(p => p.left <= 2 || p.days <= 7);
-  const first = (me.name || '').split(' ')[0];
-  return `<div class="card cl-card" style="border-left:4px solid var(--acc,#2d6cdf)">
-    <div class="mute">Здравей, ${esc(first)}</div>
-    ${nb ? `<h2 style="margin:4px 0">${when(nb.sessions.date)} в ${hm(nb.sessions.start_time)}</h2>
-      <div>${esc(nb.sessions.title || KIND[nb.sessions.kind])}${nb.sessions.location ? ' · ' + esc(nb.sessions.location) : ''}</div>`
-    : `<h2 style="margin:4px 0">Нямаш записана тренировка</h2><div class="mute">Избери час от списъка по-долу.</div>`}
-    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
-      <button class="pri" data-act="cscroll">Запиши се за час</button>
-      ${nb ? `<a class="sm" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:inherit" target="_blank" rel="noopener" href="${esc(gcalUrl(nb.sessions))}">📅 Добави в календара</a>` : ''}
-    </div>
-    ${warn.length ? warn.map(p => `<div class="err" style="margin-top:8px">${esc(p.package_name || 'Абонаментът')}: ${p.left === 0 ? 'няма оставащи посещения' : 'остават ' + p.left + ' посещения'}${p.days <= 7 ? ', изтича ' + (p.days <= 0 ? 'днес' : 'след ' + p.days + ' дни') : ''}. Свържи се с клуба за подновяване.</div>`).join('') : ''}
-  </div>`;
+  const main = act.slice().sort((a, b) => a.end_date.localeCompare(b.end_date))[0];
+  return `<div class="c-hello">Здравей, ${esc(first)} 👋</div>
+  ${nb ? `<section class="c-hero">
+      <div class="c-hero-k">Следваща тренировка${untilText(nb.sessions) ? ' · ' + untilText(nb.sessions) : ''}</div>
+      <div class="c-hero-t">${hm(nb.sessions.start_time)}</div>
+      <div class="c-hero-d">${esc(dayWord(nb.sessions.date, t))}</div>
+      <div class="c-hero-s">${esc(nb.sessions.title || (nb.sessions.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}${nb.sessions.location ? ' · ' + esc(nb.sessions.location) : ''}</div>
+      <div class="c-hero-b"><a class="c-btn light" target="_blank" rel="noopener" href="${esc(gcalUrl(nb.sessions))}">📅 В календара</a>
+      ${nb.sessions.kind === 'group' ? `<button class="c-btn ghost" data-act="ccancel" data-bid="${nb.id}" data-sid="${nb.session_id}">Промяна</button>` : ''}</div>
+    </section>` : `<section class="c-hero empty"><div class="c-hero-t" style="font-size:26px">Нямаш записана тренировка</div><div class="c-hero-s">Избери удобен час и се запиши за секунди.</div>
+      <div class="c-hero-b"><button class="c-btn light" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
+  ${warn.map(p => `<div class="c-warn">⚠️ <div><b>${esc(p.package_name || 'Абонамент')}</b>: ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span class="mute">Свържи се с клуба за подновяване.</span></div></div>`).join('')}
+  ${main ? `<section class="c-card c-sum" data-act="cnav" data-t="pkg">${ringSvg(main.left, main.total)}
+      <div><div class="c-k">Оставащи посещения</div><div class="c-big">${main.left} <span>от ${main.total}</span></div><div class="mute">${esc(main.package_name || '')} · до ${fmt(main.end_date)}</div></div></section>`
+    : `<section class="c-card"><div class="c-k">Абонамент</div><div>Нямаш активен абонамент. Свържи се с клуба.</div></section>`}
+  ${C.bookings.length > 1 ? `<h3 class="c-h">Предстоящи</h3><section class="c-card c-list">${C.bookings.slice(1, 4).map(b => cSession(b, t)).join('')}${C.bookings.length > 4 ? `<button class="c-more" data-act="cnav" data-t="mine">Всички (${C.bookings.length}) →</button>` : ''}</section>` : ''}`;
+}
+function clientBookTab(me, t, act) {
+  const days = []; for (let i = 0; i < 14; i++) days.push(ymd(addDays(parse(t), i)));
+  const byDay = {}; C.classes.forEach(s => (byDay[s.date] ||= []).push(s));
+  if (!C.day || !days.includes(C.day) || !byDay[C.day]) C.day = days.find(d => byDay[d]) || days[0];
+  const hasGroup = act.some(p => p.kind === 'group');
+  const list = byDay[C.day] || [];
+  return `<h2 class="c-title">Запиши се</h2>
+  ${hasGroup ? '' : '<div class="c-warn">ℹ️ <div>За записване за групов час е нужен активен групов абонамент. Свържи се с клуба.</div></div>'}
+  <div class="c-days" role="tablist">${days.map(d => { const dt = parse(d), n = (byDay[d] || []).length; return `<button class="c-day ${d === C.day ? 'on' : ''} ${n ? '' : 'off'}" data-act="cday" data-d="${d}" ${n ? '' : 'disabled'}><span>${d === t ? 'Днес' : WD[dt.getDay()]}</span><b>${dt.getDate()}</b><i>${n ? n + (n === 1 ? ' час' : ' часа') : '–'}</i></button>`; }).join('')}</div>
+  <div class="c-dayh">${esc(dayWord(C.day, t))}</div>
+  ${list.length ? list.map(s => {
+    const full = s.free === 0;
+    return `<div class="c-class ${s.mine ? 'mine' : ''}"><div class="c-ct">${hm(s.start_time)}</div><div class="c-cinfo"><div class="c-st">${esc(s.title || 'Групова тренировка')}</div>
+      <div class="c-ss">${s.location ? esc(s.location) + ' · ' : ''}${full ? '<span class="bad">пълен</span>' : (s.free != null ? s.free + ' свободни места' : '')}</div></div>
+      ${s.mine ? '<span class="c-done">✓ Записан</span>' : `<button class="c-btn pri" data-act="cbook" data-id="${s.id}" ${full || !hasGroup ? 'disabled' : ''}>${full ? 'Пълен' : 'Запиши се'}</button>`}</div>`;
+  }).join('') : '<div class="c-empty">Няма часове за този ден.</div>'}`;
+}
+function clientMine(t) {
+  return `<h2 class="c-title">Моите тренировки</h2>
+  ${C.bookings.length ? `<section class="c-card c-list">${C.bookings.map(b => cSession(b, t)).join('')}</section>
+    <div style="margin-top:12px"><button class="c-btn ghost wide" data-act="ics" data-id="">Всички в календара (.ics)</button></div>`
+    : `<div class="c-empty">Нямаш предстоящи тренировки.<br><button class="c-btn pri" style="margin-top:12px" data-act="cnav" data-t="book">Запиши се</button></div>`}`;
+}
+function clientPkg(t, act) {
+  const old = C.pkgs.filter(p => p.end_date < t);
+  const card = p => { const left = Math.max(0, p.total - p.used), pct = p.total ? Math.min(100, p.used / p.total * 100) : 0; return `<section class="c-card c-pk"><div class="c-pk-h"><b>${esc(p.package_name || 'Абонамент')}</b><span class="c-chip ${p.end_date >= t ? 'ok' : ''}">${p.end_date >= t ? 'активен' : 'изтекъл'}</span></div>
+    <div class="c-bar"><i style="width:${pct}%"></i></div>
+    <div class="c-pk-f"><span>Остават <b>${left}</b> от ${p.total}</span><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}</span></div></section>`; };
+  return `<h2 class="c-title">Абонаменти</h2>
+  ${act.length ? act.map(card).join('') : '<div class="c-empty">Нямаш активен абонамент.<br>Свържи се с клуба, за да го подновиш.</div>'}
+  ${old.length ? `<h3 class="c-h">Изтекли</h3>${old.slice(0, 5).map(card).join('')}` : ''}`;
 }
 function renderClient() {
-  const me = S.me.row, t = today();
-  const cur = C.pkgs.filter(p => p.kind === 'group' && p.end_date >= t);
-  const byDay = {};
-  C.classes.forEach(s => (byDay[s.date] ||= []).push(s));
-  $('#app').innerHTML = `<div class="bar"><span class="logo">NLT</span><span class="sp"></span><span class="mute">${esc(me.name)}</span><button class="sm" data-act="logout">Изход</button></div>
-  <div class="wrap" style="max-width:760px">
-    ${clientHero(me, t, cur)}
-    <div class="card cl-card"><h2>Моите абонаменти</h2>
-    ${C.pkgs.filter(p => p.end_date >= t).map(p => `<div class="pk"><div style="min-width:170px"><b>${esc(p.package_name || '')}</b><br><span class="mute">до ${fmt(p.end_date)}</span></div><div class="bar2"><i style="width:${Math.min(100, p.used / p.total * 100)}%"></i></div><span>остават ${Math.max(0, p.total - p.used)} от ${p.total}</span></div>`).join('') || '<div class="mute">Нямаш активен абонамент.</div>'}</div>
-    <div class="card cl-card"><h2>Предстоящи посещения</h2>
-    ${C.bookings.map(b => `<div class="bk" data-bid="${b.id}" data-sid="${b.session_id}"><div class="nm"><b>${fmtLong(b.sessions.date)}</b> · ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])}</div><a class="sm" style="padding:3px 8px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:inherit" target="_blank" rel="noopener" href="${esc(gcalUrl(b.sessions))}">📅 Google Календар</a><button class="sm" data-act="ics" data-id="${b.id}" title="За Apple / Outlook">.ics</button>${b.sessions.kind === 'group' ? '<button class="sm" data-act="ccancel">Откажи / премести</button>' : ''}</div>`).join('') || '<div class="mute">Нямаш записани часове.</div>'}
-    ${C.bookings.length > 1 ? '<div style="margin-top:8px"><button class="sm" data-act="ics" data-id="">Всички в календара (.ics)</button></div>' : ''}</div>
-    <div class="card cl-card" id="c-book"><h2>Запиши се за групов час</h2>
-    ${cur.length ? '' : '<div class="mute">За записване е нужен активен групов абонамент.</div>'}
-    ${Object.keys(byDay).sort().map(d => `<h3>${esc(fmtLong(d))}</h3>${byDay[d].map(s => `<div class="bk"><div class="nm">${hm(s.start_time)} · ${esc(s.title || 'Групов час')} <span class="mute">${s.free != null ? s.free + ' свободни места' : ''}</span></div>
-      ${s.mine ? '<span class="chip ok">записан</span>' : `<button class="sm pri" data-act="cbook" data-id="${s.id}" ${s.free === 0 || !cur.length ? 'disabled' : ''}>${s.free === 0 ? 'пълен' : 'Запиши ме'}</button>`}</div>`).join('')}`).join('')}</div>
-  </div>`;
+  const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
+  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : clientHome(me, t, act);
+  const nav = [['home', '🏠', 'Начало'], ['book', '➕', 'Запиши се'], ['mine', '📅', 'Часове'], ['pkg', '🎟️', 'Абонамент']];
+  $('#app').innerHTML = `<div class="cx"><header class="c-top"><span class="c-logo">NLT</span><span class="sp"></span><span class="c-who">${esc(me.name)}</span><button class="c-link" data-act="logout">Изход</button></header>
+    <main class="c-main">${body}</main>
+    <nav class="c-nav">${nav.map(([k, ic, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}"><span>${ic}</span>${l}</button>`).join('')}</nav></div>`;
 }
 async function clientBook(sid) {
   const { error } = await sb.rpc('book_session', { p_session: sid });
@@ -937,7 +1059,8 @@ document.addEventListener('click', async e => {
       case 'pwmode': S.otpEmail = ($('#em')?.value || '').trim(); loginView('', 'pw'); break;
       case 'codemode': loginView(); break;
       case 'othermail': S.otpEmail = ''; loginView(); break;
-      case 'cscroll': document.getElementById('c-book')?.scrollIntoView({ behavior: 'smooth' }); break;
+      case 'cnav': C.tab = el.dataset.t; renderClient(); window.scrollTo(0, 0); break;
+      case 'cday': C.day = el.dataset.d; renderClient(); break;
       case 'forgot': await doForgot(); break;
       case 'setpw': await doSetPw(); break;
       case 'logout': await sb.auth.signOut(); S.me = null; loginView(); break;
@@ -987,7 +1110,7 @@ document.addEventListener('click', async e => {
       case 'wclear': S.waitPick = null; $('#wbtn').innerHTML = waitHtml(); break;
       case 'ics': downloadIcs(el.dataset.id); break;
       case 'cbook': await clientBook(el.dataset.id); break;
-      case 'ccancel': clientCancelDialog(el.closest('.bk').dataset.bid, el.closest('.bk').dataset.sid); break;
+      case 'ccancel': clientCancelDialog(el.dataset.bid, el.dataset.sid); break;
       case 'cdo': await clientCancel(el.dataset.bid); break;
       case 'blate': break;
     }
