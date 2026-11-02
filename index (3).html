@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NLT Personal Training Club</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16202a;--mute:#6b7785;--line:#e3e7ec;--acc:#1f6feb;--acc-ink:#fff;--grp:#dbe8ff;--grp-b:#7aa7f5;--solo:#d7f3df;--solo-b:#5dbb78;--warn:#b54708;--warn-bg:#fff2e0;--bad:#c0262d;--ok:#12794b;--shadow:0 8px 30px rgba(0,0,0,.18)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1318;--card:#171d24;--ink:#e8edf2;--mute:#8a96a3;--line:#27303a;--acc:#4c8dff;--acc-ink:#07101f;--grp:#1d3358;--grp-b:#3e6bb8;--solo:#1b3a28;--solo-b:#3a8a56;--warn:#ffb866;--warn-bg:#3a2a12;--bad:#ff7b81;--ok:#58d39b;--shadow:0 8px 30px rgba(0,0,0,.6)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
+textarea{width:100%;resize:vertical}
+button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+button.danger{color:var(--bad)}
+button.sm{padding:3px 8px;font-size:12px}
+button:disabled{opacity:.5;cursor:default}
+.hide{display:none!important}
+.bar{display:flex;align-items:center;gap:10px;padding:10px max(16px,env(safe-area-inset-left,0px));background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:5}
+.logo{font-weight:800;letter-spacing:.04em}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{border:0;background:none;padding:6px 12px;border-radius:8px}
+.tab.on{background:var(--acc);color:var(--acc-ink)}
+.sp{flex:1}
+.wrap{padding:14px max(16px,env(safe-area-inset-left,0px)) 60px;max-width:1500px;margin:0 auto}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mute{color:var(--mute)}
+h2{margin:0 0 10px;font-size:18px}
+h3{margin:16px 0 6px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+/* login */
+.login{max-width:360px;margin:12vh auto;padding:0 16px}
+.login .card{display:flex;flex-direction:column;gap:10px}
+.err{color:var(--bad);min-height:1.2em}
+/* week */
+.week{display:flex;border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:auto}
+.times{width:46px;flex:none;position:relative;border-right:1px solid var(--line)}
+.times div{position:absolute;right:6px;font-size:11px;color:var(--mute);transform:translateY(-7px)}
+.day{flex:1;min-width:128px;border-right:1px solid var(--line);position:relative}
+.day:last-child{border-right:0}
+.dh{position:sticky;left:0;height:34px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);font-weight:600;font-size:12px;background:var(--card)}
+.dh.today{color:var(--acc)}
+.body{position:relative}
+.hl{position:absolute;left:0;right:0;border-top:1px solid var(--line);pointer-events:none}
+.hl.half{border-top-style:dotted;opacity:.6}
+.ev{position:absolute;border-radius:7px;padding:2px 5px;font-size:11.5px;line-height:1.25;overflow:hidden;cursor:pointer;background:var(--grp);border:1px solid var(--grp-b);border-left-width:4px}
+.ev.solo{background:var(--solo);border-color:var(--solo-b)}
+.ev.cx{opacity:.45;text-decoration:line-through}
+.ev b{font-weight:700}
+.ev .n{color:var(--mute)}
+.ev.full .n{color:var(--bad);font-weight:600}
+/* table */
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--mute);font-weight:600}
+tr.click{cursor:pointer}
+tr.click:hover{background:var(--bg)}
+.tw{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.chip{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
+.chip.ok{color:var(--ok);border-color:var(--ok)}
+.chip.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
+.chip.bad{color:var(--bad);border-color:var(--bad)}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto;z-index:20}
+.md{background:var(--card);border-radius:14px;box-shadow:var(--shadow);width:min(640px,100%);padding:18px;position:relative}
+.md.wide{width:min(820px,100%)}
+.x{position:absolute;right:10px;top:10px;border:0;background:none;font-size:20px;line-height:1}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mute)}
+label.f input,label.f select{color:var(--ink)}
+.bk{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.bk .nm{flex:1;min-width:140px}
+.seg button{border-radius:0;padding:3px 8px;font-size:12px}
+.seg button:first-child{border-radius:7px 0 0 7px}
+.seg button:last-child{border-radius:0 7px 7px 0}
+.seg button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.res{border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:200px;overflow:auto}
+.res div{padding:6px 10px;cursor:pointer}
+.res div:hover{background:var(--bg)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:10px;z-index:50;max-width:90vw}
+.pk{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}
+.bar2{height:7px;border-radius:5px;background:var(--line);overflow:hidden;min-width:90px;flex:1}
+.bar2 i{display:block;height:100%;background:var(--acc)}
+.cl-card{margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.kpi .kl{font-size:12px;color:var(--mute)}.kpi .kv{font-size:24px;font-weight:700}.kpi .ks{font-size:12px;color:var(--mute)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-bottom:12px}
+.neg{color:var(--bad);font-weight:600}.pos{color:var(--ok);font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chips button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.fe{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}.fe .ft{color:var(--mute);width:42px;flex:none}
+.stat2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat2 b{display:block;font-size:18px}.stat2 span{font-size:12px;color:var(--mute)}
+.wait{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;max-height:130px;overflow:auto}
+.wait .wi{padding:3px 9px;border:1px solid var(--line);border-radius:99px;cursor:grab;background:var(--card);font-size:12.5px}
+.wait .wi.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.irow{padding:7px 0;border-bottom:1px solid var(--line)}.irow .il{display:block;color:var(--mute);font-size:12px;margin-bottom:3px}
+.ev[draggable=true]{cursor:grab}
+svg text{fill:var(--mute);font-size:11px}svg .bar{fill:var(--acc)}svg .gl{stroke:var(--line)}
+@media (max-width:640px){.day{min-width:110px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal"></div>
+<div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+const CFG = window.NLT_CFG || {
+  url: 'https://krshyauillsrgoqzyjgc.supabase.co',
+  key: 'sb_publishable_RilZiN2LHMDZyc34pl3wwQ_L5SdjaJf'
+};
+const sb = supabase.createClient(CFG.url, CFG.key);
+const VISIT_PRICE = 37;
+const LOCS = ['Боян Петров', 'Лерин'];
+
+/* ───────── помощни ───────── */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const monday = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+const hm = t => String(t || '').slice(0, 5);
+const mins = t => { const [h, m] = hm(t).split(':').map(Number); return h * 60 + m; };
+const fromMins = n => `${pad(Math.floor(n / 60))}:${pad(n % 60)}`;
+const fmt = s => s ? parse(s).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const fmtLong = s => parse(s).toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' });
+const money = n => `${Number(n || 0).toFixed(2).replace(/\.00$/, '')} €`;
+const today = () => ymd(new Date());
+const KIND = { solo: 'Персонален', group: 'Групов' };
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+function toast(msg) {
+  const t = $('#toast'); t.innerHTML = `<div class="toast">${esc(msg)}</div>`;
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.innerHTML = '', 3500);
+}
+function fail(e, what) { console.error(what, e); toast(`${what}: ${e?.message || e}`); }
+const modal = {
+  show(html, wide) { $('#modal').innerHTML = `<div class="ov" data-act="ov"><div class="md ${wide ? 'wide' : ''}"><button class="x" data-act="close">×</button>${html}</div></div>`; },
+  close() { $('#modal').innerHTML = ''; },
+  open() { return !!$('#modal .ov'); }
+};
+const addMonths = (d, n) => { const x = new Date(d); const day = x.getDate(); x.setDate(1); x.setMonth(x.getMonth() + n); x.setDate(Math.min(day, new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate())); return x; };
+function pkgEnd(start, p) {
+  const s = parse(start);
+  return ymd(addDays(p.unit === 'weeks' ? addDays(s, 7 * p.duration) : addMonths(s, p.duration), -1));
+}
+
+/* ───────── състояние ───────── */
+const S = {
+  me: null,           // {role:'staff'|'client', row}
+  tab: 'week',
+  loc: store.get('nlt-loc', LOCS[0]),
+  week: monday(new Date()),
+  sessions: [], clients: [], packages: [], staff: [], pstat: [],
+  q: '', cfilter: 'all'
+};
+const cname = id => S.clients.find(c => c.id === id)?.name || '—';
+
+/* ───────── вход ───────── */
+function loginView(msg, mode) {
+  const rec = mode === 'recovery', pw = mode === 'pw', otp = mode === 'otp';
+  $('#app').innerHTML = `<div class="login"><div class="card">
+    <div class="logo" style="font-size:20px">NLT Personal Training Club</div>
+    ${rec ? `<div>Въведи нова парола</div><input id="pw" type="password" placeholder="Нова парола (мин. 8 знака)" autocomplete="new-password">
+      <button class="pri" data-act="setpw">Запази паролата</button>` :
+    otp ? `<div>Изпратихме имейл до <b>${esc(S.otpEmail || '')}</b>.<br><span class="mute">Въведи кода от имейла или натисни линка в него.</span></div>
+      <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Код от имейла" style="letter-spacing:4px;font-size:18px;text-align:center">
+      <button class="pri" data-act="verifycode">Вход</button>
+      <button class="sm" data-act="sendcode" style="border:0;background:none;color:var(--mute)">Изпрати нов код</button>
+      <button class="sm" data-act="othermail" style="border:0;background:none;color:var(--mute)">Друг имейл</button>` :
+    pw ? `<input id="em" type="email" placeholder="Имейл" autocomplete="username" value="${esc(S.otpEmail || '')}"><input id="pw" type="password" placeholder="Парола" autocomplete="current-password">
+      <button class="pri" data-act="login">Вход</button>
+      <button class="sm" data-act="forgot" style="border:0;background:none;color:var(--mute)">Забравена парола</button>
+      <button class="sm" data-act="codemode" style="border:0;background:none;color:var(--mute)">Вход с код по имейл</button>` :
+    `<div class="mute">Въведи имейла си и ще ти изпратим код за вход. Не е нужна парола.</div>
+      <input id="em" type="email" placeholder="Имейл" autocomplete="username" value="${esc(S.otpEmail || '')}">
+      <button class="pri" data-act="sendcode">Изпрати код</button>
+      <button class="sm" data-act="pwmode" style="border:0;background:none;color:var(--mute)">Вход с парола</button>`}
+    <div class="err" id="lerr">${esc(msg || '')}</div></div></div>`;
+  $('#pw')?.addEventListener('keydown', e => { if (e.key === 'Enter') $(rec ? '[data-act=setpw]' : '[data-act=login]').click(); });
+  $('#em')?.addEventListener('keydown', e => { if (e.key === 'Enter') $(pw ? '[data-act=login]' : '[data-act=sendcode]').click(); });
+  $('#code')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('[data-act=verifycode]').click(); });
+  (otp ? $('#code') : null)?.focus();
+}
+async function doSendCode() {
+  const email = ($('#em')?.value || S.otpEmail || '').trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) { $('#lerr').textContent = 'Въведи валиден имейл.'; return; }
+  $('#lerr').textContent = 'Изпращане…';
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
+  if (error) {
+    const m = error.message || '';
+    $('#lerr').textContent = /не е регистриран|database error|signups? not allowed|not allowed/i.test(m) ? 'Този имейл не е регистриран в клуба. Свържи се с нас.'
+      : /rate|seconds|too many/i.test(m) ? 'Изчакай малко и опитай пак.' : m;
+    return;
+  }
+  S.otpEmail = email; loginView('', 'otp');
+}
+async function doVerifyCode() {
+  const token = ($('#code').value || '').replace(/\s/g, '');
+  if (token.length < 6) { $('#lerr').textContent = 'Въведи кода от имейла.'; return; }
+  $('#lerr').textContent = '';
+  let r = await sb.auth.verifyOtp({ email: S.otpEmail, token, type: 'email' });
+  if (r.error) r = await sb.auth.verifyOtp({ email: S.otpEmail, token, type: 'signup' });
+  if (r.error) { $('#lerr').textContent = 'Грешен или изтекъл код. Изпрати нов.'; return; }
+  boot();
+}
+async function doLogin() {
+  const email = $('#em').value.trim(), password = $('#pw').value;
+  $('#lerr').textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) $('#lerr').textContent = /invalid/i.test(error.message) ? 'Грешен имейл или парола.' : error.message;
+  else boot();
+}
+async function doForgot() {
+  const email = ($('#em').value || '').trim();
+  if (!email) { $('#lerr').textContent = 'Въведи имейла си горе.'; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  $('#lerr').textContent = error ? error.message : 'Изпратихме линк за нова парола на имейла.';
+}
+async function doSetPw() {
+  const password = $('#pw').value;
+  if (password.length < 8) { $('#lerr').textContent = 'Паролата трябва да е поне 8 знака.'; return; }
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) $('#lerr').textContent = error.message; else { history.replaceState(null, '', location.pathname); boot(); }
+}
+
+/* ───────── зареждане ───────── */
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return loginView();
+  const uid = session.user.id;
+  const { data: st } = await sb.from('staff').select('*').eq('user_id', uid).eq('active', true).maybeSingle();
+  if (st) { S.me = { role: 'staff', row: st }; return staffApp(); }
+  const { data: cl } = await sb.from('clients').select('*').eq('user_id', uid).maybeSingle();
+  if (cl) { S.me = { role: 'client', row: cl }; return clientApp(); }
+  $('#app').innerHTML = `<div class="login"><div class="card"><div class="logo">NLT</div><div>Акаунтът ти още не е свързан с клиент или служител. Свържи се с клуба.</div><button data-act="logout">Изход</button></div></div>`;
+}
+sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') loginView('', 'recovery'); });
+
+/* ═════════════════ ПЕРСОНАЛ ═════════════════ */
+async function staffApp() {
+  const [c, p, s, q] = await Promise.all([
+    sb.from('clients').select('id,name,phone,email,status,location,notes').order('name').range(0, 4999),
+    sb.from('packages').select('*').order('sort_order'),
+    sb.from('staff').select('*').order('name'),
+    sb.from('settings').select('*')
+  ]);
+  if (c.error || p.error || s.error) return fail(c.error || p.error || s.error, 'Грешка при зареждане');
+  S.clients = c.data; S.packages = p.data; S.staff = s.data;
+  S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
+  S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
+  renderStaff();
+}
+function renderStaff() {
+  const admin = S.me.row.role === 'admin';
+  $('#app').innerHTML = `
+  <div class="bar"><span class="logo">NLT</span>
+    <div class="tabs">
+      ${[['dash', 'Обобщение'], ['week', 'График'], ['clients', 'Клиенти'], ['packages', 'Пакети'], ['team', 'Служители']].concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
+    </div><span class="sp"></span>
+    <select id="loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+    <span class="mute">${esc(S.me.row.name)}</span><button class="sm" data-act="logout">Изход</button></div>
+  <div class="wrap" id="main"></div>`;
+  $('#loc').onchange = e => { S.loc = e.target.value; store.set('nlt-loc', S.loc); renderTab(); };
+  renderTab();
+}
+function renderTab() {
+  ({ dash: dashView, week: weekView, clients: clientsView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
+}
+
+/* ── седмичен график ── */
+const H0 = 6, H1 = 21, HH = 48;
+async function weekView() {
+  const a = ymd(S.week), b = ymd(addDays(S.week, 6));
+  const main = $('#main');
+  main.innerHTML = `<div class="row" style="margin-bottom:10px">
+    <button data-act="wk" data-d="-7">←</button><button data-act="wk" data-d="0">Днес</button><button data-act="wk" data-d="7">→</button>
+    <b id="wlabel">${fmt(a)} – ${fmt(b)}</b><span class="sp"></span>
+    <span id="wbtn">${waitHtml()}</span><button class="pri" data-act="newsess">+ Нов час</button></div><div id="grid" class="mute">Зареждане…</div>`;
+  const { data, error } = await sb.from('sessions')
+    .select('*,bookings(id,status,client_id,use_plan)').eq('location', S.loc).gte('date', a).lte('date', b).order('start_time');
+  if (error) return fail(error, 'Графикът не се зареди');
+  if (ymd(S.week) !== a) return;
+  S.sessions = data;
+  drawGrid();
+}
+function layoutDay(evs) {
+  const items = evs.map(e => ({ e, s: mins(e.start_time), f: mins(e.start_time) + (e.duration_min || 60) })).sort((x, y) => x.s - y.s || x.f - y.f);
+  const out = []; let cluster = [], end = -1;
+  const flush = () => {
+    const cols = [];
+    cluster.forEach(it => { let c = cols.findIndex(x => x <= it.s); if (c < 0) { c = cols.length; cols.push(0); } cols[c] = it.f; it.col = c; });
+    cluster.forEach(it => it.n = cols.length); out.push(...cluster); cluster = [];
+  };
+  items.forEach(it => { if (cluster.length && it.s >= end) { flush(); end = -1; } cluster.push(it); end = Math.max(end, it.f); });
+  flush(); return out;
+}
+function drawGrid() {
+  const grid = $('#grid'); if (!grid) return;
+  const evs = S.sessions;
+  let h0 = H0, h1 = H1;
+  evs.forEach(e => { h0 = Math.min(h0, Math.floor(mins(e.start_time) / 60)); h1 = Math.max(h1, Math.ceil((mins(e.start_time) + (e.duration_min || 60)) / 60)); });
+  const total = (h1 - h0) * HH;
+  const days = [...Array(7)].map((_, i) => addDays(S.week, i));
+  const showWE = evs.some(e => { const w = (parse(e.date).getDay() + 6) % 7; return w >= 5; });
+  const shown = days.filter((_, i) => i < 5 || showWE);
+  let lines = '', labels = '';
+  for (let h = h0; h <= h1; h++) {
+    lines += `<div class="hl" style="top:${(h - h0) * HH}px"></div>`;
+    if (h < h1) lines += `<div class="hl half" style="top:${(h - h0) * HH + HH / 2}px"></div>`;
+    labels += `<div style="top:${34 + (h - h0) * HH}px">${pad(h)}:00</div>`;
+  }
+  grid.className = 'week';
+  grid.innerHTML = `<div class="times" style="height:${total + 34}px">${labels}</div>` + shown.map(d => {
+    const ds = ymd(d);
+    const items = layoutDay(evs.filter(e => e.date === ds));
+    const html = items.map(({ e, s, col, n }) => {
+      const act = e.bookings.filter(b => b.status !== 'cancelled');
+      const names = act.map(b => cname(b.client_id).split(' ')[0] + ' ' + (cname(b.client_id).split(' ')[1] || '')[0] + '.').join(', ');
+      const full = e.kind === 'group' && e.capacity && act.length >= e.capacity;
+      const top = (s - h0 * 60) / 60 * HH, hgt = Math.max(((e.duration_min || 60) / 60) * HH - 2, 18);
+      const label = e.kind === 'solo' ? (act.length ? esc(act.map(b => cname(b.client_id)).join(', ')) : '<span class="n">свободен</span>') : `${esc(e.title || 'Групов час')}`;
+      return `<div class="ev ${e.kind === 'solo' ? 'solo' : ''} ${e.cancelled ? 'cx' : ''} ${full ? 'full' : ''}" draggable="true" data-act="sess" data-id="${e.id}"
+        style="top:${top}px;height:${hgt}px;left:calc(${col / n * 100}% + 1px);width:calc(${100 / n}% - 3px)" title="${esc(names)}">
+        <b>${hm(e.start_time)}</b> ${label}${e.kind === 'group' ? ` <span class="n">${act.length}${e.capacity ? '/' + e.capacity : ''}</span>` : ''}</div>`;
+    }).join('');
+    return `<div class="day"><div class="dh ${ds === today() ? 'today' : ''}">${d.toLocaleDateString('bg-BG', { weekday: 'short', day: 'numeric', month: 'numeric' })}</div>
+      <div class="body" data-act="slot" data-date="${ds}" data-h0="${h0}" style="height:${total}px">${lines}${html}</div></div>`;
+  }).join('');
+}
+
+/* ── детайл на час ── */
+async function openSession(id) {
+  const { data: s, error } = await sb.from('sessions').select('*,bookings(id,status,late,use_plan,price,client_id)').eq('id', id).single();
+  if (error) return fail(error, 'Часът не се отвори');
+  const act = s.bookings.filter(b => b.status !== 'cancelled');
+  const trainers = S.staff.filter(t => t.active);
+  const rows = s.bookings.slice().sort((a, b) => cname(a.client_id).localeCompare(cname(b.client_id), 'bg')).map(b => `
+    <div class="bk" data-bid="${b.id}">
+      <div class="nm"><a href="#" data-act="client" data-id="${b.client_id}">${esc(cname(b.client_id))}</a>
+        ${!b.use_plan ? `<span class="chip warn">еднократно ${money(b.price)}</span>` : ''}${b.late ? ' <span class="chip bad">късен отказ</span>' : ''}</div>
+      <div class="seg">
+        <button class="${b.status === 'booked' ? 'on' : ''}" data-act="bst" data-st="booked" title="Записан">Записан</button><button class="${b.status === 'done' ? 'on' : ''}" data-act="bst" data-st="done" title="Проведен">Проведен</button><button class="${b.status === 'cancelled' ? 'on' : ''}" data-act="bst" data-st="cancelled" title="Отказ">Отказ</button>
+      </div>
+      ${b.status === 'cancelled' && b.use_plan ? `<label class="mute"><input type="checkbox" data-act="blate" ${b.late ? 'checked' : ''}> късен</label>` : ''}
+      <button class="sm danger" data-act="brm" title="Премахни">✕</button>
+    </div>`).join('');
+  modal.show(`<div data-sid="${s.id}" id="sess">
+    <h2>${KIND[s.kind]} час · ${esc(fmtLong(s.date))}</h2>
+    <div class="mute" style="margin-bottom:10px">${esc(s.location)}${s.cancelled ? ' · <b style="color:var(--bad)">Отменен</b>' : ''}</div>
+    <div class="grid2">
+      <label class="f">Дата<input type="date" id="s-date" value="${s.date}"></label>
+      <label class="f">Начало<div class="row" style="flex-wrap:nowrap"><button class="sm" data-act="mv" data-dm="-30">▲30</button><input type="time" step="1800" id="s-time" value="${hm(s.start_time)}" style="flex:1"><button class="sm" data-act="mv" data-dm="30">▼30</button></div></label>
+      <label class="f">Продължителност (мин)<input type="number" id="s-dur" value="${s.duration_min}" step="5" min="15"></label>
+      <label class="f">Треньор<select id="s-tr">${trainers.map(t => `<option value="${t.id}" ${t.id === s.trainer_id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
+      <label class="f">Заглавие<input id="s-title" value="${esc(s.title || '')}"></label>
+      <label class="f">Места<input type="number" id="s-cap" value="${s.capacity ?? ''}" min="1"></label>
+    </div>
+    <label class="f" style="margin-top:8px">Бележка<textarea id="s-notes" rows="2">${esc(s.notes || '')}</textarea></label>
+    <div class="row" style="margin-top:10px"><button class="pri" data-act="ssave">Запази</button>
+      <button data-act="scancel">${s.cancelled ? 'Върни часа' : 'Отмени часа'}</button><span class="sp"></span>
+      <button class="danger" data-act="sdel">Изтрий часа</button></div>
+    <h3>Записани (${act.length}${s.capacity ? ' от ' + s.capacity : ''})</h3>
+    <div id="bks">${rows || '<div class="mute">Няма записани.</div>'}</div>
+    <div style="margin-top:10px"><input id="add-q" placeholder="+ Добави клиент (търси по име)…" style="width:100%" autocomplete="off"><div id="add-res" class="res hide"></div></div>
+  </div>`);
+}
+const sessId = () => $('#sess')?.dataset.sid;
+
+async function refreshAfter(id) { await weekView(); if (id) await openSession(id); }
+
+async function saveSession() {
+  const id = sessId();
+  const patch = {
+    date: $('#s-date').value, start_time: $('#s-time').value, duration_min: +$('#s-dur').value || 60,
+    trainer_id: $('#s-tr').value, title: $('#s-title').value.trim() || null,
+    capacity: $('#s-cap').value ? +$('#s-cap').value : null, notes: $('#s-notes').value.trim() || null
+  };
+  const { error } = await sb.from('sessions').update(patch).eq('id', id);
+  if (error) return fail(error, 'Не се записа');
+  toast('Записано'); await refreshAfter(id);
+}
+async function moveSession(dm) {
+  const id = sessId(); const cur = mins($('#s-time').value);
+  const nt = Math.min(Math.max(cur + dm, 0), 23 * 60 + 30);
+  const { error } = await sb.from('sessions').update({ start_time: fromMins(nt) }).eq('id', id);
+  if (error) return fail(error, 'Не се премести');
+  logEvent('change', `Преместен час: ${dmm($('#s-date').value)} ${fromMins(cur)} → ${fromMins(nt)}`);
+  await refreshAfter(id);
+}
+async function addClientToSession(cid2) {
+  if (await bookClient(sessId(), cid2, false)) { toast('Добавен'); await refreshAfter(sessId()); }
+}
+async function removeCharge(bid) { await sb.from('charges').delete().eq('booking_id', bid); }
+async function setBookingStatus(bid, st) {
+  const { data: b } = await sb.from('bookings').select('use_plan').eq('id', bid).single();
+  const patch = { status: st }; if (st !== 'cancelled') patch.late = false;
+  const { error } = await sb.from('bookings').update(patch).eq('id', bid);
+  if (error) return fail(error, 'Не се промени');
+  if (st === 'cancelled' && b && !b.use_plan) await removeCharge(bid);
+  const cs = (await sb.from('bookings').select('client_id,sessions(date,start_time)').eq('id', bid).single()).data;
+  if (cs) logEvent(st === 'cancelled' ? 'cancel' : st === 'done' ? 'attended' : 'change', `${st === 'cancelled' ? 'Отказан' : st === 'done' ? 'Проведен' : 'Върнат като записан'}: ${bkLabel(cs.client_id, cs.sessions.date, cs.sessions.start_time)}`);
+  await refreshAfter(sessId());
+}
+async function createSession(f) {
+  const { data: t } = { data: S.staff.find(x => x.id === f.trainer) };
+  const row = { kind: f.kind, trainer_id: f.trainer, location: S.loc, title: f.title || null, capacity: f.kind === 'solo' ? 1 : (f.cap || null), green: f.kind === 'solo', duration_min: f.dur };
+  if (f.repeat) {
+    const wd = (parse(f.date).getDay() + 6) % 7;
+    const { error } = await sb.from('series').insert({ kind: f.kind, trainer_id: f.trainer, location: S.loc, weekday: wd, start_time: f.time, title: row.title, capacity: row.capacity, green: row.green, starts_on: f.date });
+    if (error) return fail(error, 'Не се създаде');
+    const r = await sb.rpc('extend_series', { horizon_weeks: 53 });
+    if (r.error) return fail(r.error, 'Не се разписа напред');
+  } else {
+    const { error } = await sb.from('sessions').insert({ ...row, date: f.date, start_time: f.time });
+    if (error) return fail(error, 'Не се създаде');
+  }
+  modal.close(); toast('Часът е създаден'); weekView();
+}
+function newSessionDialog(date, time) {
+  modal.show(`<h2>Нов час</h2><div class="grid2" id="ns">
+    <label class="f">Вид<select id="n-kind"><option value="group">Групов</option><option value="solo">Персонален</option></select></label>
+    <label class="f">Дата<input type="date" id="n-date" value="${date || today()}"></label>
+    <label class="f">Начало<input type="time" step="1800" id="n-time" value="${time || '08:30'}"></label>
+    <label class="f">Продължителност (мин)<input type="number" id="n-dur" value="60" step="5"></label>
+    <label class="f">Треньор<select id="n-tr">${S.staff.filter(t => t.active).map(t => `<option value="${t.id}" ${t.id === S.me.row.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
+    <label class="f">Заглавие<input id="n-title" placeholder="напр. Кондиция"></label>
+    <label class="f">Места<input type="number" id="n-cap" value="${S.policy?.capacity || 16}" min="1"></label>
+  </div>
+  <label class="row" style="margin-top:10px"><input type="checkbox" id="n-rep"> Повтаряй всяка седмица (53 седмици напред)</label>
+  <div class="row" style="margin-top:12px"><button class="pri" data-act="nsave">Създай</button></div>`);
+}
+
+/* ── клиенти ── */
+async function loadPstat() {
+  const { data, error } = await sb.from('package_status').select('*').order('end_date', { ascending: false }).range(0, 9999);
+  if (error) { fail(error, 'Пакетите не се заредиха (изпълнен ли е 03_popravki.sql?)'); return []; }
+  return data;
+}
+function curPkg(cid) {
+  const t = today();
+  const list = S.pstat.filter(p => p.client_id === cid);
+  return list.find(p => p.start_date <= t && p.end_date >= t) || null;
+}
+function pkgChip(p) {
+  if (!p) return '<span class="chip">без пакет</span>';
+  const left = p.total - p.used, days = Math.round((parse(p.end_date) - parse(today())) / 864e5);
+  const cls = left <= 0 ? 'bad' : (left <= 1 || days <= 3) ? 'warn' : 'ok';
+  return `<span class="chip ${cls}">${left}/${p.total} ${p.kind === 'solo' ? 'перс.' : 'груп.'} · до ${parse(p.end_date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'numeric' })}</span>`;
+}
+async function clientsView() {
+  $('#main').innerHTML = `<div class="mute">Зареждане…</div>`;
+  S.pstat = await loadPstat();
+  drawClients();
+}
+function drawClients() {
+  const q = S.q.toLowerCase();
+  const list = S.clients.filter(c => (!q || (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q))
+    && (c.location === S.loc || !c.location || q)).filter(c => {
+      const p = curPkg(c.id);
+      if (S.cfilter === 'nopkg') return !p;
+      if (S.cfilter === 'exp') { if (!p) return false; const left = p.total - p.used, days = (parse(p.end_date) - parse(today())) / 864e5; return left <= 1 || days <= 3; }
+      return true;
+    });
+  $('#main').innerHTML = `<div class="row" style="margin-bottom:10px">
+    <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
+    <select id="cf"><option value="all">Всички</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option><option value="nopkg" ${S.cfilter === 'nopkg' ? 'selected' : ''}>Без пакет</option></select>
+    <button class="pri" data-act="newclient">+ Нов клиент</button></div>
+    <div class="mute" style="margin-bottom:6px">${list.length} клиента · ${esc(S.loc)}</div>
+    <div class="tw"><table><thead><tr><th>Име</th><th>Телефон</th><th>Пакет</th></tr></thead><tbody>
+    ${list.slice(0, 400).map(c => `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}${c.status !== 'Active' ? ` <span class="chip">${esc(c.status)}</span>` : ''}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  const qi = $('#cq'); qi.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; drawClients(); const n = $('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
+  $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
+}
+async function openClient(id) {
+  const [c, cp, pay, chg, bk] = await Promise.all([
+    sb.from('clients').select('*').eq('id', id).single(),
+    sb.from('package_status').select('*').eq('client_id', id).order('end_date', { ascending: false }),
+    sb.from('payments').select('*').eq('client_id', id).order('date', { ascending: false }),
+    sb.from('charges').select('*').eq('client_id', id).order('date', { ascending: false }),
+    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').order('date', { foreignTable: 'sessions' }).limit(30)
+  ]);
+  if (c.error) return fail(c.error, 'Клиентът не се отвори');
+  const x = c.data, pk = cp.data || [], pays = pay.data || [], chs = chg.data || [];
+  const sumPk = pk.reduce((a, p) => a + Number(p.price || 0), 0), sumCh = chs.reduce((a, p) => a + Number(p.amount), 0), sumPay = pays.reduce((a, p) => a + Number(p.amount), 0);
+  const bal = sumPk + sumCh - sumPay;
+  const upcoming = (bk.data || []).filter(b => b.sessions).sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
+  const chosen = S.packages.filter(p => p.active);
+  modal.show(`<div id="cl" data-cid="${x.id}">
+    <h2>${esc(x.name)}</h2>
+    <div class="grid2">
+      <label class="f">Име<input id="c-name" value="${esc(x.name)}"></label>
+      <label class="f">Телефон<input id="c-phone" value="${esc(x.phone || '')}"></label>
+      <label class="f">Имейл<input id="c-email" value="${esc(x.email || '')}"></label>
+      <label class="f">Локация<select id="c-loc">${LOCS.map(l => `<option ${l === x.location ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="f">Статус<select id="c-st">${['Active', 'Lead', 'Inactive'].map(s => `<option ${s === x.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+    </div>
+    <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
+    <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button></div>
+
+    <h3>Пакети</h3>
+    ${pk.map(p => { const left = p.total - p.used; return `<div class="pk"><div style="min-width:180px"><b>${esc(p.package_name || (p.kind === 'solo' ? 'Персонални' : 'Групови'))}</b><br><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)} · ${money(p.price)}</span></div>
+      <div class="bar2"><i style="width:${Math.min(100, p.used / p.total * 100)}%"></i></div><span>${p.used}/${p.total}${left <= 0 ? ' · изчерпан' : ''}</span>
+      <button class="sm danger" data-act="cpdel" data-id="${p.id}">✕</button></div>`; }).join('') || '<div class="mute">Няма пакети.</div>'}
+    <div class="row" style="margin-top:8px"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
+      <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
+
+    <h3>Предстоящи часове</h3>
+    ${upcoming.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])}${b.sessions.location !== S.loc ? ' · ' + esc(b.sessions.location) : ''}</div></div>`).join('') || '<div class="mute">Няма.</div>'}
+
+    <h3>Плащания и такси</h3>
+    <div class="mute" style="margin-bottom:6px">Платено ${money(sumPay)} · Пакети ${money(sumPk)} · Такси ${money(sumCh)} · <b style="color:${bal > 0 ? 'var(--bad)' : 'var(--ok)'}">${bal > 0 ? 'Дължимо ' + money(bal) : bal < 0 ? 'Аванс ' + money(-bal) : 'Изравнено'}</b></div>
+    ${pays.map(p => `<div class="bk"><div class="nm">+ ${money(p.amount)} · ${fmt(p.date)} · ${esc(p.method || '')} ${esc(p.note || '')}</div><button class="sm danger" data-act="paydel" data-id="${p.id}">✕</button></div>`).join('')}
+    ${chs.map(p => `<div class="bk"><div class="nm">− ${money(p.amount)} · ${fmt(p.date)} · ${esc(p.note || '')}</div><button class="sm danger" data-act="chdel" data-id="${p.id}">✕</button></div>`).join('')}
+    <div class="row" style="margin-top:8px"><input type="number" id="pay-amt" placeholder="Сума" style="width:90px" step="0.01">
+      <select id="pay-m"><option>В брой</option><option>Карта</option><option>Банков път</option></select><input id="pay-note" placeholder="Бележка" style="flex:1;min-width:120px">
+      <button data-act="payadd">+ Плащане</button></div>
+    <div class="row" style="margin-top:6px"><input type="number" id="chg-amt" placeholder="Сума" style="width:90px" step="0.01"><input id="chg-note" placeholder="Такса – за какво" style="flex:1;min-width:120px"><button data-act="chgadd">+ Такса</button></div>
+  </div>`, true);
+}
+const cid = () => $('#cl')?.dataset.cid;
+async function afterClient() { const id = cid(); S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(id); }
+async function saveClient() {
+  const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, notes: $('#c-notes').value.trim() || null };
+  if (!p.name) return toast('Името е задължително.');
+  const { error } = await sb.from('clients').update(p).eq('id', cid());
+  if (error) return fail(error, 'Не се записа');
+  Object.assign(S.clients.find(c => c.id === cid()), p); toast('Записано'); if (S.tab === 'clients') drawClients();
+}
+async function addPackage() {
+  const p = S.packages.find(x => x.id === $('#np-sel').value), start = $('#np-start').value;
+  if (!p || !start) return;
+  const { error } = await sb.from('client_packages').insert({ client_id: cid(), package_id: p.id, kind: p.kind, start_date: start, end_date: pkgEnd(start, p), total: p.sessions || p.classes, price: p.price });
+  if (error) return fail(error, 'Не се добави'); toast('Пакетът е добавен'); afterClient();
+}
+function newClientDialog() {
+  modal.show(`<h2>Нов клиент</h2><div class="grid2">
+    <label class="f">Име<input id="nc-name"></label><label class="f">Телефон<input id="nc-phone"></label><label class="f">Имейл<input id="nc-email"></label>
+    <label class="f">Локация<select id="nc-loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="ncsave">Създай</button></div>`);
+}
+
+/* ═════════════════ ДОПЪЛНЕНИЯ ═════════════════ */
+const POL_DEF = { months: 1, notifyVisits: 1, notifyDays: 3, mustResched: true, capacity: 16, remind1: 24, remind2: 0, notifyFinished: true, notifyExpired: true, inactiveDays: 14 };
+const CV_DEF = { showSchedule: true, showBookings: true, showPackage: true, showMeasures: true, showChallenges: true, showFinance: true, home: 'bookings',
+  showSpaces: true, allowDouble: false, bookMinHours: 1, bookMaxDays: 0, maxPerDay: 1, waitlist: true, waitlistCredits: true, footer: 'Запази час онлайн',
+  cancelMinHours: 12, lateCharge: true, forceCredits: true, signup: false, reactivate: false, readonlyProfile: true, ownLocation: 'own', terms: false, termsText: '' };
+const CV_SECTIONS = [
+  ['Какво вижда клиентът след вход', [['showSchedule', 'b', 'График и записване на групови часове'], ['showBookings', 'b', 'Моите часове'], ['showPackage', 'b', 'Моят абонамент'], ['showMeasures', 'b', 'Мерки'], ['showChallenges', 'b', 'Състезания и предизвикателства'], ['showFinance', 'b', 'Плащания и дължими суми'], ['home', 's', 'Първа страница след вход', [['bookings', 'Моите часове'], ['schedule', 'График'], ['package', 'Моят абонамент']]]]],
+  ['Групови часове', [['showSpaces', 'b', 'Показвай колко места остават'], ['allowDouble', 'b', 'Позволи запис за два часа по едно и също време'], ['waitlist', 'b', 'Лист на изчакване, когато часът е пълен'], ['waitlistCredits', 'b', 'В листа на изчакване само клиенти с оставащи посещения'],
+    ['bookMinHours', 'n', 'Не може да се записва по-късно от (часа преди началото)', 0], ['bookMaxDays', 'n', 'Записване най-много (дни напред; 0 = до края на абонамента)', 0], ['maxPerDay', 'n', 'Най-много групови часове на ден', 1], ['footer', 't', 'Текст под бутона за записване']]],
+  ['Отмяна', [['cancelMinHours', 'n', 'Безплатен отказ най-късно (часа преди началото)', 0], ['lateCharge', 'b', 'Късен отказ е позволен, но часът се таксува'], ['forceCredits', 'b', 'Записването винаги взима посещение от абонамента']]],
+  ['Вход и профил', [['signup', 'b', 'Клиентите могат сами да се регистрират'], ['reactivate', 'b', 'Неактивен клиент се активира отново при вход'], ['readonlyProfile', 'b', 'Клиентът не променя личните си данни'], ['ownLocation', 's', 'Какви часове вижда', [['own', 'Само от своя обект'], ['both', 'От двата обекта']]], ['terms', 'b', 'Приема общи условия при първия вход'], ['termsText', 't', 'Текст на общите условия']]]
+];
+const MONTHS = ['януари', 'февруари', 'март', 'април', 'май', 'юни', 'юли', 'август', 'септември', 'октомври', 'ноември', 'декември'];
+const MSHORT = ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'];
+const firstOf = d => `${String(d).slice(0, 7)}-01`;
+const shiftM = (m, n) => { const d = parse(m); d.setDate(1); d.setMonth(d.getMonth() + n); return ymd(d); };
+const mLabel = m => `${MONTHS[+m.slice(5, 7) - 1]} ${m.slice(0, 4)}`;
+const eur = n => `€${(Math.round((+n || 0) * 100) / 100).toLocaleString('bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const dmm = d => `${d.slice(8)}.${d.slice(5, 7)}`;
+const D = { month: firstOf(today()), tab: 'due', chart: 'pay', day: today(), filter: 'all' };
+
+function logEvent(type, text) { sb.from('activity').insert({ type, text, actor: S.me?.row?.user_id || null }).then(() => {}, () => {}); }
+const bkLabel = (cid, date, time) => `${cname(cid)} · ${dmm(date)} ${hm(time)}`;
+
+/* ── Обобщение ── */
+async function dashView() {
+  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  const cur = firstOf(today()), from = shiftM(cur, -10), to = shiftM(cur, 2);
+  const dayA = new Date(D.day + 'T00:00:00'), dayB = new Date(dayA.getTime() + 864e5);
+  const [m, bal, tr, act] = await Promise.all([
+    sb.rpc('dash_months', { from_m: from, to_m: to }), sb.rpc('dash_balances'), sb.rpc('dash_trainers', { mon: D.month }),
+    sb.from('activity').select('*').gte('at', dayA.toISOString()).lt('at', dayB.toISOString()).order('at', { ascending: false }).limit(300)
+  ]);
+  const er = m.error || bal.error || tr.error;
+  if (er) return fail(er, 'Обобщението не се зареди (изпълнен ли е 04_dopalneniya.sql?)');
+  S.pstat = await loadPstat();
+  const months = m.data, row = mm => months.find(x => x.m === mm) || { n: 0, n_done: 0, proj: 0, done: 0, pay: 0, chg: 0 };
+  const balances = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c);
+  const due = balances.filter(r => r.bal > 0).sort((a, z) => z.bal - a.bal), cred = balances.filter(r => r.bal < 0).sort((a, z) => a.bal - z.bal), even = balances.filter(r => r.bal === 0);
+  const sum = l => l.reduce((a, r) => a + Math.abs(r.bal), 0);
+  const kpi = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
+  const cr = row(cur), st = row(D.month), pv = row(shiftM(D.month, -1));
+  const diff = pv.proj ? Math.round((st.proj - pv.proj) / pv.proj * 100) : null;
+  const list = D.tab === 'due' ? due : D.tab === 'credit' ? cred : even;
+  const chip = (act, v, l, cur2, extra = '') => `<button class="sm ${cur2 === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}${extra}</button>`;
+  // графика
+  const cm = [...Array(12)].map((_, i) => shiftM(cur, i - 9));
+  const vals = cm.map(x => { const r = row(x); return +(D.chart === 'pay' ? r.pay : D.chart === 'chg' ? r.chg : r.proj); });
+  const mx = Math.max(1, ...vals), W = 720, H = 240, ml = 50, mt = 18, mb = 26, pw = W - ml - 8, ph = H - mt - mb, slot = pw / 12, bw = Math.min(34, slot * .62);
+  const y = v => mt + ph - v / mx * ph;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">`;
+  for (let i = 0; i <= 4; i++) { const v = mx / 4 * i; svg += `<line class="gl" x1="${ml}" x2="${W - 8}" y1="${y(v)}" y2="${y(v)}"/><text x="${ml - 6}" y="${y(v) + 4}" text-anchor="end">${v >= 1000 ? Math.round(v / 100) / 10 + 'к' : Math.round(v)}</text>`; }
+  cm.forEach((x, j) => { const cx = ml + slot * (j + .5), v = vals[j], by = y(v);
+    if (v > 0) svg += `<rect class="bar" opacity="${x === cur ? 1 : .55}" x="${cx - bw / 2}" y="${by}" width="${bw}" height="${mt + ph - by}" rx="3"><title>${mLabel(x)}: ${eur(v)}</title></rect>`;
+    if (v > 0 && x === cur) svg += `<text x="${cx}" y="${by - 5}" text-anchor="middle" style="fill:var(--ink)">${Math.round(v)}</text>`;
+    svg += `<text x="${cx}" y="${H - 8}" text-anchor="middle">${MSHORT[+x.slice(5, 7) - 1]}</text>`; });
+  svg += '</svg>';
+  // дневна активност
+  const FEEDS = { cancel: 'Отказан', change: 'Сменен', paid: 'Платен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит' };
+  const acts = act.data || [], cnt = t => acts.filter(e => e.type === t).length;
+  const shownActs = acts.filter(e => D.filter === 'all' || e.type === D.filter);
+  const dd = parse(D.day);
+  // КПД
+  const trows = tr.data.map(r => ({ ...r, t: S.staff.find(x => x.id === r.trainer_id) })).filter(r => r.t).sort((a, z) => a.t.name.localeCompare(z.t.name, 'bg'));
+  $('#main').innerHTML = `
+    <div class="kpis">${kpi('Приход', eur(cr.pay), 'този месец')}${kpi('Часове', cr.n, 'посещения този месец')}${kpi('Дължимо', eur(sum(due)), eur(sum(cred)) + ' преплатено')}${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active').length)}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
+    <div class="cols">
+      <div class="card"><h2>Дневна активност</h2>
+        <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
+        <div class="chips">${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}</div>
+        <div style="max-height:340px;overflow:auto">${shownActs.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
+      <div class="card"><h2>Прогноза за месеца</h2>
+        <div class="row" style="margin-bottom:8px"><button class="sm" data-act="dmonth" data-d="-1">‹</button><b>${mLabel(D.month)}</b><button class="sm" data-act="dmonth" data-d="1">›</button></div>
+        <div class="stat2"><div><b>${eur(st.proj)}</b><span>Прогнозен приход</span></div><div><b>${eur(st.done)}</b><span>Реализиран до момента</span></div><div><b>${st.n_done} / ${st.n}</b><span>Проведени / всички посещения</span></div><div><b>${eur(st.n ? st.proj / st.n : 0)}</b><span>Средна цена на посещение</span></div></div>
+        <p class="mute">${diff === null ? 'Няма данни за предишния месец.' : `Спрямо ${mLabel(shiftM(D.month, -1))}: ${diff >= 0 ? '+' : ''}${diff}% (${eur(pv.proj)}).`} Цената на пакета ÷ броя посещения в него; еднократните — по тяхната цена. Отказаните не се броят.</p></div>
+    </div>
+    <div class="card" style="margin-bottom:12px"><h2>Плащания</h2>
+      <div class="chips">${chip('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sum(due))}`)}${chip('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sum(cred))}`)}${chip('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}</div>
+      <div class="tw" style="max-height:340px;overflow:auto"><table><thead><tr><th>Клиент</th><th>${D.tab === 'due' ? 'Дължимо' : D.tab === 'credit' ? 'В кредит' : 'Баланс'}</th><th>Пакет</th><th></th></tr></thead><tbody>
+      ${list.slice(0, 100).map(r => `<tr><td><b>${esc(r.c.name)}</b></td><td>${D.tab === 'due' ? `<span class="neg">−${eur(r.bal)}</span>` : D.tab === 'credit' ? `<span class="pos">+${eur(-r.bal)}</span>` : eur(0)}</td><td>${pkgChip(curPkg(r.c.id))}</td>
+      <td style="white-space:nowrap">${D.tab === 'due' ? `<button class="sm pri" data-act="quickpay" data-id="${r.c.id}" data-amt="${r.bal}">Платено</button> ` : ''}<button class="sm" data-act="client" data-id="${r.c.id}">Отвори</button></td></tr>`).join('') || '<tr><td colspan="4" class="mute">Няма.</td></tr>'}</tbody></table></div>
+      <p class="mute">Дължимото = цени на пакетите + такси − плащания. Клиенти без пакети, такси и плащания не се показват.</p></div>
+    <div class="card" style="margin-bottom:12px"><h2>Финансова графика по месеци</h2>
+      <div class="chips">${chip('ctab', 'pay', 'Плащания', D.chart)}${chip('ctab', 'chg', 'Такси', D.chart)}${chip('ctab', 'proj', 'Прогноза по посещения', D.chart)}</div>${svg}</div>
+    <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
+      <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
+      ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>`;
+}
+
+/* ── Пакети ── */
+const UNITS = { weeks: 'седмици', months: 'месеца' };
+async function packagesView() {
+  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  S.pstat = await loadPstat(); drawPackages();
+}
+function drawPackages() {
+  const t = today(), q = (S.pq || '').toLowerCase();
+  const cats = {}; S.packages.filter(p => !q || (p.name + ' ' + (p.category || '')).toLowerCase().includes(q)).forEach(p => (cats[p.category || 'Без категория'] ||= []).push(p));
+  $('#main').innerHTML = `<div class="row" style="margin-bottom:10px"><input id="pq" placeholder="Търси пакет…" value="${esc(S.pq || '')}" style="flex:1;min-width:200px"><button class="pri" data-act="pkgnew">+ Нов пакет</button></div>` +
+    Object.entries(cats).map(([k, list]) => `<h3>${esc(k)}</h3><div class="tw"><table><thead><tr><th>Име</th><th>Цена</th><th>Продължителност</th><th>Сесии</th><th>Класове</th><th>Активни клиенти</th><th></th></tr></thead><tbody>
+    ${list.map(p => { const mine = S.pstat.filter(x => x.package_id === p.id && x.start_date <= t && x.end_date >= t), open = S.openPkg === p.id;
+      return `<tr><td><b>${esc(p.name)}</b>${p.active ? '' : ' <span class="chip">неактивен</span>'}${p.description ? `<br><span class="mute">${esc(p.description)}</span>` : ''}</td><td>${eur(p.price)}</td><td>${p.duration} ${UNITS[p.unit] || ''}</td><td>${p.kind === 'solo' ? p.sessions : '—'}</td><td>${p.kind === 'group' ? p.classes : '—'}</td>
+      <td><button class="sm" data-act="pkgtoggle" data-id="${p.id}">${mine.length}</button></td><td><button class="sm" data-act="pkgedit" data-id="${p.id}">Редактирай</button></td></tr>
+      ${open ? `<tr><td colspan="7">${mine.map(x => `<div class="bk"><div class="nm"><a href="#" data-act="client" data-id="${x.client_id}">${esc(cname(x.client_id))}</a></div><span class="mute">${x.used} използвани · остават ${Math.max(0, x.total - x.used)} от ${x.total} · до ${fmt(x.end_date)}</span></div>`).join('') || '<span class="mute">Няма активни клиенти.</span>'}</td></tr>` : ''}`; }).join('')}</tbody></table></div>`).join('') || '<div class="mute">Няма пакети.</div>';
+  $('#pq').oninput = e => { S.pq = e.target.value; const pos = e.target.selectionStart; drawPackages(); const n = $('#pq'); n.focus(); n.setSelectionRange(pos, pos); };
+}
+function pkgDialog(id) {
+  const p = id === 'new' ? { kind: 'group', unit: 'months', duration: 1, active: true } : S.packages.find(x => x.id === id);
+  modal.show(`<div id="pkd" data-id="${id}"><h2>${id === 'new' ? 'Нов пакет' : 'Редакция на пакет'}</h2><div class="grid2">
+    <label class="f">Име<input id="pk-name" value="${esc(p.name || '')}"></label>
+    <label class="f">Вид<select id="pk-kind"><option value="solo" ${p.kind === 'solo' ? 'selected' : ''}>Индивидуални (сесии)</option><option value="group" ${p.kind === 'group' ? 'selected' : ''}>Групови (класове)</option></select></label>
+    <label class="f">Категория<input id="pk-cat" list="pk-cats" value="${esc(p.category || '')}"><datalist id="pk-cats">${[...new Set(S.packages.map(x => x.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
+    <label class="f">Цена (€)<input type="number" id="pk-price" step="0.01" value="${p.price ?? ''}"></label>
+    <label class="f">Брой посещения<input type="number" id="pk-count" value="${(p.kind === 'solo' ? p.sessions : p.classes) || ''}"></label>
+    <label class="f">Продължителност<input type="number" id="pk-dur" value="${p.duration || 1}"></label>
+    <label class="f">Единица<select id="pk-unit"><option value="months" ${p.unit === 'months' ? 'selected' : ''}>месеца</option><option value="weeks" ${p.unit === 'weeks' ? 'selected' : ''}>седмици</option></select></label>
+    <label class="f">Статус<select id="pk-act"><option value="1" ${p.active !== false ? 'selected' : ''}>Активен</option><option value="0" ${p.active === false ? 'selected' : ''}>Неактивен</option></select></label></div>
+    <label class="f" style="margin-top:8px">Описание<input id="pk-desc" value="${esc(p.description || '')}"></label>
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="pkgsave">Запази</button>${id !== 'new' ? '<span class="sp"></span><button class="danger" data-act="pkgdel">Изтрий</button>' : ''}</div></div>`);
+}
+async function savePkg() {
+  const id = $('#pkd').dataset.id, kind = $('#pk-kind').value, n = +$('#pk-count').value || 0;
+  const row = { name: $('#pk-name').value.trim(), kind, category: $('#pk-cat').value.trim() || null, price: +$('#pk-price').value || 0, sessions: kind === 'solo' ? n : 0, classes: kind === 'group' ? n : 0, duration: +$('#pk-dur').value || 1, unit: $('#pk-unit').value, active: $('#pk-act').value === '1', description: $('#pk-desc').value.trim() || null };
+  if (!row.name) return toast('Въведи име.');
+  const r = id === 'new' ? await sb.from('packages').insert(row) : await sb.from('packages').update(row).eq('id', id);
+  if (r.error) return fail(r.error, 'Не се записа');
+  const l = await sb.from('packages').select('*').order('sort_order'); S.packages = l.data; modal.close(); toast('Записано'); drawPackages();
+}
+
+/* ── Служители ── */
+function teamView() {
+  const admin = S.me.row.role === 'admin', today2 = today();
+  $('#main').innerHTML = `<div class="row" style="margin-bottom:10px"><h2 style="margin:0">Служители</h2><span class="sp"></span>${admin ? '<button class="pri" data-act="trnew">+ Нов служител</button>' : ''}</div>` +
+    S.staff.map(t => `<div class="card" style="margin-bottom:8px"><div class="row"><div style="flex:1;min-width:200px"><b>${esc(t.name)}</b> <span class="chip">${esc(t.position || (t.role === 'admin' ? 'Администратор' : 'Треньор'))}</span>${t.role === 'admin' ? ' <span class="chip ok">админ</span>' : ''}${t.active ? '' : ' <span class="chip">неактивен</span>'}
+      <br><span class="mute">${[t.phone, t.email].filter(Boolean).map(esc).join(' · ') || 'без контакти'} · ${t.user_id ? 'има акаунт ✓' : 'още без акаунт'}</span><br>${(t.locations || []).map(l => `<span class="chip">${esc(l)}</span>`).join(' ')}${t.notes ? `<br><span class="mute">${esc(t.notes)}</span>` : ''}</div>
+      ${admin ? `<button class="sm" data-act="tredit" data-id="${t.id}">Редактирай</button>` : ''}</div></div>`).join('') +
+    (admin ? '<p class="mute">Нов служител получава достъп, когато в Supabase → Authentication → Users → Add user се създаде акаунт със същия имейл.</p>' : '');
+}
+function trainerDialog(id) {
+  const t = id === 'new' ? { role: 'trainer', active: true, locations: [...LOCS], position: 'Треньор' } : S.staff.find(x => x.id === id);
+  modal.show(`<div id="trd" data-id="${id}"><h2>${id === 'new' ? 'Нов служител' : 'Редакция: ' + esc(t.name)}</h2><div class="grid2">
+    <label class="f">Име<input id="tr-name" value="${esc(t.name || '')}"></label>
+    <label class="f">Длъжност<select id="tr-pos">${['Треньор', 'Администратор', 'Рецепция', 'Масажист'].map(r => `<option ${r === (t.position || 'Треньор') ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+    <label class="f">Права в системата<select id="tr-role"><option value="trainer" ${t.role === 'trainer' ? 'selected' : ''}>Обикновен достъп</option><option value="admin" ${t.role === 'admin' ? 'selected' : ''}>Администратор (настройки и служители)</option></select></label>
+    <label class="f">Телефон<input id="tr-phone" value="${esc(t.phone || '')}"></label>
+    <label class="f">Имейл за вход<input id="tr-email" type="email" value="${esc(t.email || '')}"></label>
+    <label class="f">Статус<select id="tr-act"><option value="1" ${t.active ? 'selected' : ''}>Активен</option><option value="0" ${!t.active ? 'selected' : ''}>Неактивен</option></select></label></div>
+    <div style="margin:10px 0" class="row">Обекти: ${LOCS.map(l => `<label><input type="checkbox" class="tr-loc" value="${esc(l)}" ${(t.locations || []).includes(l) ? 'checked' : ''}> ${esc(l)}</label>`).join(' ')}</div>
+    <label class="f">Бележки<textarea id="tr-notes" rows="2">${esc(t.notes || '')}</textarea></label>
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="trsave">Запази</button>${id !== 'new' ? '<span class="sp"></span><button class="danger" data-act="trdel">Изтрий</button>' : ''}</div></div>`);
+}
+async function saveTrainer() {
+  const id = $('#trd').dataset.id;
+  const row = { name: $('#tr-name').value.trim(), position: $('#tr-pos').value, role: $('#tr-role').value, phone: $('#tr-phone').value.trim() || null, email: $('#tr-email').value.trim() || null, active: $('#tr-act').value === '1', locations: [...document.querySelectorAll('.tr-loc:checked')].map(x => x.value), notes: $('#tr-notes').value.trim() || null };
+  if (!row.name) return toast('Въведи име.');
+  const r = id === 'new' ? await sb.from('staff').insert(row) : await sb.from('staff').update(row).eq('id', id);
+  if (r.error) return fail(r.error, 'Не се записа');
+  const l = await sb.from('staff').select('*').order('name'); S.staff = l.data; modal.close(); toast('Записано'); teamView();
+}
+
+/* ── Настройки ── */
+function settingsView() {
+  const sub = S.sub || 'policy';
+  $('#main').innerHTML = `<div class="chips"><button class="${sub === 'policy' ? 'on' : ''}" data-act="sub" data-v="policy">Известия за клиенти</button><button class="${sub === 'cv' ? 'on' : ''}" data-act="sub" data-v="cv">Клиентска визия</button></div><div class="card" style="max-width:760px" id="sbox">${sub === 'policy' ? policyHtml() : cvHtml()}</div>`;
+}
+function policyHtml() {
+  const p = S.policy;
+  const num = (id, v, min) => `<input type="number" id="${id}" min="${min}" value="${v}" style="width:80px">`;
+  const chk = (id, v, t) => `<label><input type="checkbox" id="${id}" ${v ? 'checked' : ''}> ${t}</label>`;
+  const hrs = (id, v) => `<select id="${id}">${[[0, 'Не изпращай'], [2, '2 часа преди'], [3, '3 часа преди'], [6, '6 часа преди'], [12, '12 часа преди'], [24, '24 часа преди'], [48, '48 часа преди'], [72, '72 часа преди']].map(x => `<option value="${x[0]}" ${+v === x[0] ? 'selected' : ''}>${x[1]}</option>`).join('')}</select>`;
+  const row = (l, v) => `<div class="irow"><span class="il">${l}</span>${v}</div>`;
+  return `<p class="mute">Правила и имейл известия към клиентите. Важат за всички обекти.</p>
+    <h3>Напомняне преди час</h3>${row('Първо напомняне', hrs('po-r1', p.remind1))}${row('Второ напомняне', hrs('po-r2', p.remind2))}
+    <h3>Абонамент</h3>${row('Срок на абонамент', num('po-months', p.months, 1) + ' месец(а)')}
+    ${row('Изтичащ абонамент', `имейл, когато остане ${num('po-nv', p.notifyVisits, 0)} посещение или ${num('po-nd', p.notifyDays, 0)} дни до края`)}
+    ${row('Свършил / изтекъл', chk('po-fin', p.notifyFinished, 'имейл, когато посещенията свършат') + '<br>' + chk('po-exp', p.notifyExpired, 'имейл, когато срокът изтече'))}
+    <h3>Групови часове</h3>${row('Места в групов час (за нови часове)', num('po-cap', p.capacity, 1) + ' души')}
+    ${row('Отказ от час', chk('po-resched', p.mustResched, 'Клиентът може да откаже, но задължително записва час за друг ден в рамките на абонамента си'))}
+    <h3>Клиенти без часове</h3>${row('Известие към персонала', `ако активен клиент няма часове повече от ${num('po-inact', p.inactiveDays, 0)} дни (0 = изключено)`)}
+    <div style="margin-top:14px"><button class="pri" data-act="policysave">Запази</button></div>
+    <p class="mute">Правилото за отказ и местата се прилагат от записването на клиентите. Изпращането на имейли още не е включено.</p>`;
+}
+function cvHtml() {
+  const c = S.cv;
+  let h = '<p class="mute">Какво вижда и какво може да прави клиентът във клиентското приложение.</p>';
+  CV_SECTIONS.forEach(sec => { h += `<h3>${sec[0]}</h3>`; sec[1].forEach(f => {
+    const id = 'cv-' + f[0], v = c[f[0]]; let ctl;
+    if (f[1] === 'b') ctl = `<label><input type="checkbox" id="${id}" ${v ? 'checked' : ''}> ${f[2]}</label>`;
+    else { ctl = f[1] === 'n' ? `<input type="number" id="${id}" min="${f[3]}" value="${esc(v)}" style="width:90px">` : f[1] === 's' ? `<select id="${id}">${f[3].map(o => `<option value="${o[0]}" ${v === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>` : `<input type="text" id="${id}" value="${esc(v)}" style="width:100%;max-width:420px">`; ctl = `<span class="il">${f[2]}</span>${ctl}`; }
+    h += `<div class="irow">${ctl}</div>`; }); });
+  return h + '<div style="margin-top:14px"><button class="pri" data-act="cvsave">Запази</button></div><p class="mute">В сила от клиентския изглед: часове за записване преди началото, часове за безплатен отказ, такса при късен отказ. Останалите настройки се пазят за следващи версии.</p>';
+}
+async function saveSetting(key, value) {
+  const u = await sb.from('settings').update({ value }).eq('key', key).select();
+  const r = u.error ? u : (u.data && u.data.length ? u : await sb.from('settings').insert({ key, value }));
+  if (r.error) return fail(r.error, 'Не се записа'); toast('Записано');
+}
+async function savePolicy() {
+  const n = id => +$('#' + id).value || 0, b = id => $('#' + id).checked;
+  S.policy = { ...S.policy, remind1: n('po-r1'), remind2: n('po-r2'), months: Math.max(1, n('po-months')), notifyVisits: n('po-nv'), notifyDays: n('po-nd'), notifyFinished: b('po-fin'), notifyExpired: b('po-exp'), capacity: Math.max(1, n('po-cap')), mustResched: b('po-resched'), inactiveDays: n('po-inact') };
+  await saveSetting('policy', S.policy);
+}
+async function saveCv() {
+  const v = { ...S.cv };
+  CV_SECTIONS.forEach(sec => sec[1].forEach(f => { const el = $('#cv-' + f[0]); v[f[0]] = f[1] === 'b' ? el.checked : f[1] === 'n' ? +el.value || 0 : el.value; }));
+  S.cv = v; await saveSetting('client', v);
+}
+
+/* ── чакащи клиенти и влачене ── */
+function waitHtml() {
+  if (!S.waitOpen) return `<button class="sm" data-act="wtoggle">Чакащи (${S.clients.filter(c => c.status === 'Lead').length})</button>`;
+  const q = (S.wq || '').toLowerCase(), all = S.clients.filter(c => c.status === 'Lead');
+  const list = q ? all.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)) : all;
+  const pc = S.waitPick && S.clients.find(c => c.id === S.waitPick);
+  return `<div class="card" style="margin-bottom:10px;width:100%"><div class="row"><b>Чакащи (${all.length})</b><input id="wq" placeholder="Търси…" value="${esc(S.wq || '')}"><span class="sp"></span><button class="sm" data-act="wtoggle">Скрий</button></div>
+    <div class="wait">${list.map(c => `<span class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="true" data-act="wpick" data-id="${c.id}" title="${esc(c.name)}">${esc(c.name.length > 22 ? c.name.split(' ')[0] + ' ' + c.name.split(' ').slice(-1) : c.name)}</span>`).join('') || '<span class="mute">Няма клиенти със статус „Очакване“.</span>'}</div>
+    ${pc ? `<div>Избран: <b>${esc(pc.name)}</b>. Натисни час в графика или го пусни върху графика. <button class="sm" data-act="wclear">Откажи</button></div>` : '<div class="mute">Избери клиент и натисни час (записва се при Аксел), или го завлачи върху графика.</div>'}</div>`;
+}
+async function quickBook(cid, date, time) {
+  const tr = S.staff.find(t => t.active && t.name.startsWith('Аксел'));
+  if (!tr) return toast('Не намирам треньор „Аксел“.');
+  const tm = mins(time);
+  let ses = S.sessions.find(e => e.trainer_id === tr.id && e.date === date && e.kind === 'solo' && !e.cancelled && Math.abs(mins(e.start_time) - tm) < 30);
+  if (!ses) {
+    const r = await sb.from('sessions').insert({ kind: 'solo', trainer_id: tr.id, location: S.loc, date, start_time: time, duration_min: 60, capacity: 1, green: true }).select().single();
+    if (r.error) return fail(r.error, 'Не се създаде часът'); ses = r.data;
+  }
+  S.waitPick = null;
+  const ok = await bookClient(ses.id, cid, true);
+  if (ok) toast(`Записан: ${bkLabel(cid, date, time)} · ${tr.name}`);
+  weekView();
+}
+async function dropOnGrid(e) {
+  const body = e.target.closest('.body'); if (!body) return;
+  e.preventDefault();
+  const data = e.dataTransfer.getData('text/plain') || '', r = body.getBoundingClientRect(), h0 = +body.dataset.h0;
+  if (data.startsWith('wait:')) { const m = Math.floor((e.clientY - r.top) / (HH / 2)) * 30 + h0 * 60; return quickBook(data.slice(5), body.dataset.date, fromMins(m)); }
+  if (data.startsWith('ev:')) {
+    const off = S.dragOff || 0, m = Math.round((e.clientY - r.top - off) / (HH / 2)) * 30 + h0 * 60;
+    const ev = S.sessions.find(x => x.id === data.slice(3)); if (!ev) return;
+    const nt = fromMins(Math.max(0, Math.min(m, 23 * 60 + 30)));
+    if (ev.date === body.dataset.date && hm(ev.start_time) === nt) return;
+    const { error } = await sb.from('sessions').update({ date: body.dataset.date, start_time: nt }).eq('id', ev.id);
+    if (error) return fail(error, 'Не се премести');
+    logEvent('change', `Преместен час: ${dmm(ev.date)} ${hm(ev.start_time)} → ${dmm(body.dataset.date)} ${nt}${ev.title ? ' · ' + ev.title : ''}`);
+    weekView();
+  }
+}
+
+/* ── записване на клиент в час (общо) ── */
+async function bookClient(sid, cid2, auto) {
+  const { data: s } = await sb.from('sessions').select('*,bookings(id,status,client_id)').eq('id', sid).single();
+  const ex = s.bookings.find(b => b.client_id === cid2);
+  const taken = s.bookings.filter(b => b.status !== 'cancelled').length;
+  if (ex && ex.status !== 'cancelled') { toast(`${cname(cid2)} вече е записан.`); return false; }
+  if (s.capacity && taken >= s.capacity) { if (auto) { toast('Часът е пълен.'); return false; } if (!confirm(`Часът е пълен (${taken}/${s.capacity}). Да се добави ли все пак?`)) return false; }
+  const { data: ps } = await sb.from('package_status').select('*').eq('client_id', cid2).eq('kind', s.kind).lte('start_date', s.date).gte('end_date', s.date);
+  const valid = (ps || []).find(p => p.used < p.total);
+  let use_plan = true, price = null;
+  if (!valid) {
+    if (!auto) {
+      const why = (ps || []).length ? 'пакетът му е изчерпан' : 'няма ' + (s.kind === 'solo' ? 'пакет с персонални тренировки' : 'пакет с групови класове') + ' за тази дата';
+      if (!confirm(`${cname(cid2)}: ${why}.\n\nOK = добави като еднократно посещение (${money(VISIT_PRICE)}).\nОтказ = не добавяй.`)) return false;
+    }
+    use_plan = false; price = VISIT_PRICE;
+  }
+  let bid;
+  if (ex) { const r = await sb.from('bookings').update({ status: 'booked', late: false, use_plan, price }).eq('id', ex.id).select('id').single(); if (r.error) { fail(r.error, 'Не се добави'); return false; } bid = r.data.id; }
+  else { const r = await sb.from('bookings').insert({ session_id: sid, client_id: cid2, use_plan, price }).select('id').single(); if (r.error) { fail(r.error, 'Не се добави'); return false; } bid = r.data.id; }
+  if (!use_plan) await sb.from('charges').insert({ client_id: cid2, amount: price, date: s.date, booking_id: bid, note: `Еднократно посещение ${fmt(s.date)} ${hm(s.start_time)}` });
+  logEvent('new', `Записан: ${bkLabel(cid2, s.date, s.start_time)}${s.title ? ' · ' + s.title : ''}${use_plan ? ' (абонамент)' : ' (еднократно)'}`);
+  return true;
+}
+
+/* ═════════════════ КЛИЕНТ ═════════════════ */
+const calStamp = (date, time, addMin = 0) => { const [y, m, d] = date.split('-').map(Number), t = mins(time) + addMin; const x = new Date(y, m - 1, d + Math.floor(t / 1440)); return `${x.getFullYear()}${pad(x.getMonth() + 1)}${pad(x.getDate())}T${pad(Math.floor((t % 1440) / 60))}${pad(t % 60)}00`; };
+function gcalUrl(se) {
+  const q = new URLSearchParams({ action: 'TEMPLATE', text: `${se.title || KIND[se.kind] + ' час'} · NLT Personal Training Club`, dates: `${calStamp(se.date, se.start_time)}/${calStamp(se.date, se.start_time, se.duration_min || 60)}`, ctz: 'Europe/Sofia', location: `NLT Personal Training Club, ${se.location}`, details: 'Записан час в NLT Personal Training Club.' });
+  return 'https://calendar.google.com/calendar/render?' + q;
+}
+function icsFor(list) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  const ev = list.map(b => `BEGIN:VEVENT\r\nUID:${b.id}@nlt-gym\r\nDTSTAMP:${stamp}\r\nDTSTART;TZID=Europe/Sofia:${calStamp(b.sessions.date, b.sessions.start_time)}\r\nDTEND;TZID=Europe/Sofia:${calStamp(b.sessions.date, b.sessions.start_time, b.sessions.duration_min || 60)}\r\nSUMMARY:${(b.sessions.title || KIND[b.sessions.kind] + ' час').replace(/[,;]/g, ' ')} · NLT\r\nLOCATION:NLT Personal Training Club ${b.sessions.location}\r\nEND:VEVENT`).join('\r\n');
+  return `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//NLT//BG\r\nCALSCALE:GREGORIAN\r\n${ev}\r\nEND:VCALENDAR\r\n`;
+}
+function downloadIcs(bid) {
+  const list = bid ? C.bookings.filter(b => b.id === bid) : C.bookings; if (!list.length) return;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([icsFor(list)], { type: 'text/calendar' })); a.download = bid ? 'nlt-chas.ics' : 'nlt-chasove.ics'; document.body.appendChild(a); a.click(); a.remove();
+}
+const C = { pkgs: [], bookings: [], classes: [], policy: {}, cv: {} };
+async function clientApp() {
+  const me = S.me.row, t = today(), to = ymd(addDays(new Date(), 28));
+  const [pk, bk, cl, set] = await Promise.all([
+    sb.from('package_status').select('*').eq('client_id', me.id).order('end_date', { ascending: false }),
+    sb.from('bookings').select('id,status,late,session_id,sessions!inner(id,date,start_time,duration_min,kind,title,location,cancelled)').eq('client_id', me.id).gte('sessions.date', t).order('date', { foreignTable: 'sessions' }),
+    sb.from('sessions').select('id,date,start_time,title,location,capacity,kind,cancelled').eq('kind', 'group').eq('cancelled', false).gte('date', t).lte('date', to).order('date').order('start_time'),
+    sb.from('settings').select('*')
+  ]);
+  C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
+  C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {};
+  const ids = (cl.data || []).map(s => s.id);
+  const sp = ids.length ? await sb.from('session_spaces').select('*').in('session_id', ids) : { data: [] };
+  const free = Object.fromEntries((sp.data || []).map(r => [r.session_id, r]));
+  const mine = new Set(C.bookings.map(b => b.session_id));
+  const minH = C.cv.bookMinHours ?? 1, limit = new Date(Date.now() + minH * 3600e3);
+  C.classes = (cl.data || []).filter(s => new Date(`${s.date}T${hm(s.start_time)}:00`) > limit).filter(s => !me.location || s.location === me.location).map(s => ({ ...s, free: free[s.id]?.free, taken: free[s.id]?.taken, mine: mine.has(s.id) }));
+  renderClient();
+}
+function clientHero(me, t, cur) {
+  const nb = C.bookings.slice().sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time))[0];
+  const tom = ymd(addDays(parse(t), 1));
+  const when = d => d === t ? 'Днес' : d === tom ? 'Утре' : fmtLong(d);
+  const act = C.pkgs.filter(p => p.end_date >= t).map(p => ({ ...p, left: Math.max(0, p.total - p.used), days: Math.round((parse(p.end_date) - parse(t)) / 864e5) }));
+  const warn = act.filter(p => p.left <= 2 || p.days <= 7);
+  const first = (me.name || '').split(' ')[0];
+  return `<div class="card cl-card" style="border-left:4px solid var(--acc,#2d6cdf)">
+    <div class="mute">Здравей, ${esc(first)}</div>
+    ${nb ? `<h2 style="margin:4px 0">${when(nb.sessions.date)} в ${hm(nb.sessions.start_time)}</h2>
+      <div>${esc(nb.sessions.title || KIND[nb.sessions.kind])}${nb.sessions.location ? ' · ' + esc(nb.sessions.location) : ''}</div>`
+    : `<h2 style="margin:4px 0">Нямаш записана тренировка</h2><div class="mute">Избери час от списъка по-долу.</div>`}
+    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+      <button class="pri" data-act="cscroll">Запиши се за час</button>
+      ${nb ? `<a class="sm" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:inherit" target="_blank" rel="noopener" href="${esc(gcalUrl(nb.sessions))}">📅 Добави в календара</a>` : ''}
+    </div>
+    ${warn.length ? warn.map(p => `<div class="err" style="margin-top:8px">${esc(p.package_name || 'Абонаментът')}: ${p.left === 0 ? 'няма оставащи посещения' : 'остават ' + p.left + ' посещения'}${p.days <= 7 ? ', изтича ' + (p.days <= 0 ? 'днес' : 'след ' + p.days + ' дни') : ''}. Свържи се с клуба за подновяване.</div>`).join('') : ''}
+  </div>`;
+}
+function renderClient() {
+  const me = S.me.row, t = today();
+  const cur = C.pkgs.filter(p => p.kind === 'group' && p.end_date >= t);
+  const byDay = {};
+  C.classes.forEach(s => (byDay[s.date] ||= []).push(s));
+  $('#app').innerHTML = `<div class="bar"><span class="logo">NLT</span><span class="sp"></span><span class="mute">${esc(me.name)}</span><button class="sm" data-act="logout">Изход</button></div>
+  <div class="wrap" style="max-width:760px">
+    ${clientHero(me, t, cur)}
+    <div class="card cl-card"><h2>Моите абонаменти</h2>
+    ${C.pkgs.filter(p => p.end_date >= t).map(p => `<div class="pk"><div style="min-width:170px"><b>${esc(p.package_name || '')}</b><br><span class="mute">до ${fmt(p.end_date)}</span></div><div class="bar2"><i style="width:${Math.min(100, p.used / p.total * 100)}%"></i></div><span>остават ${Math.max(0, p.total - p.used)} от ${p.total}</span></div>`).join('') || '<div class="mute">Нямаш активен абонамент.</div>'}</div>
+    <div class="card cl-card"><h2>Предстоящи посещения</h2>
+    ${C.bookings.map(b => `<div class="bk" data-bid="${b.id}" data-sid="${b.session_id}"><div class="nm"><b>${fmtLong(b.sessions.date)}</b> · ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])}</div><a class="sm" style="padding:3px 8px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:inherit" target="_blank" rel="noopener" href="${esc(gcalUrl(b.sessions))}">📅 Google Календар</a><button class="sm" data-act="ics" data-id="${b.id}" title="За Apple / Outlook">.ics</button>${b.sessions.kind === 'group' ? '<button class="sm" data-act="ccancel">Откажи / премести</button>' : ''}</div>`).join('') || '<div class="mute">Нямаш записани часове.</div>'}
+    ${C.bookings.length > 1 ? '<div style="margin-top:8px"><button class="sm" data-act="ics" data-id="">Всички в календара (.ics)</button></div>' : ''}</div>
+    <div class="card cl-card" id="c-book"><h2>Запиши се за групов час</h2>
+    ${cur.length ? '' : '<div class="mute">За записване е нужен активен групов абонамент.</div>'}
+    ${Object.keys(byDay).sort().map(d => `<h3>${esc(fmtLong(d))}</h3>${byDay[d].map(s => `<div class="bk"><div class="nm">${hm(s.start_time)} · ${esc(s.title || 'Групов час')} <span class="mute">${s.free != null ? s.free + ' свободни места' : ''}</span></div>
+      ${s.mine ? '<span class="chip ok">записан</span>' : `<button class="sm pri" data-act="cbook" data-id="${s.id}" ${s.free === 0 || !cur.length ? 'disabled' : ''}>${s.free === 0 ? 'пълен' : 'Запиши ме'}</button>`}</div>`).join('')}`).join('')}</div>
+  </div>`;
+}
+async function clientBook(sid) {
+  const { error } = await sb.rpc('book_session', { p_session: sid });
+  if (error) return fail(error, 'Записването не успя'); toast('Записан си!'); clientApp();
+}
+function clientCancelDialog(bid, sid) {
+  const b = C.bookings.find(x => x.id === bid); if (!b) return;
+  const must = C.policy.mustResched !== false;
+  const pk = C.pkgs.find(p => p.kind === 'group' && p.start_date <= b.sessions.date && p.end_date >= b.sessions.date);
+  const opts = C.classes.filter(s => !s.mine && s.free !== 0 && s.date !== b.sessions.date && pk && s.date >= pk.start_date && s.date <= pk.end_date);
+  const hrs = C.cv.cancelMinHours ?? 12;
+  modal.show(`<h2>Отказ от час</h2><div class="mute">${fmtLong(b.sessions.date)} · ${hm(b.sessions.start_time)}</div>
+    <p>${must ? `Часът трябва да се презапише за друг ден в рамките на абонамента. Отказ по-късно от ${hrs} ч. преди началото се брои като проведен.` : 'Можеш да се откажеш или да преместиш часа.'}</p>
+    <label class="f">Нов час<select id="re-sel">${must ? '' : '<option value="">— само отказ —</option>'}${opts.map(s => `<option value="${s.id}">${fmtLong(s.date)} · ${hm(s.start_time)} (${s.free ?? '?'} места)</option>`).join('')}</select></label>
+    ${must && !opts.length ? '<div class="err">Няма свободни часове за друг ден в рамките на абонамента ти.</div>' : ''}
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="cdo" data-bid="${bid}" ${must && !opts.length ? 'disabled' : ''}>Потвърди</button></div>`);
+}
+async function clientCancel(bid) {
+  const ns = $('#re-sel').value || null;
+  const { error } = await sb.rpc('cancel_booking', { p_booking: bid, p_new_session: ns });
+  if (error) return fail(error, 'Отказът не успя'); modal.close(); toast('Готово'); clientApp();
+}
+
+/* ═════════════════ събития ═════════════════ */
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act;
+  if (act === 'ov') { if (e.target === el) modal.close(); return; }
+  if (act === 'slot') {
+    if (e.target.closest('.ev')) return;
+    const r = el.getBoundingClientRect(); const y = e.clientY - r.top;
+    const tt = fromMins(Math.floor((y / HH * 60) / 30) * 30 + (+el.dataset.h0) * 60);
+    if (S.waitPick) return quickBook(S.waitPick, el.dataset.date, tt);
+    return newSessionDialog(el.dataset.date, tt);
+  }
+  e.preventDefault();
+  try {
+    switch (act) {
+      case 'close': modal.close(); break;
+      case 'login': await doLogin(); break;
+      case 'sendcode': await doSendCode(); break;
+      case 'verifycode': await doVerifyCode(); break;
+      case 'pwmode': S.otpEmail = ($('#em')?.value || '').trim(); loginView('', 'pw'); break;
+      case 'codemode': loginView(); break;
+      case 'othermail': S.otpEmail = ''; loginView(); break;
+      case 'cscroll': document.getElementById('c-book')?.scrollIntoView({ behavior: 'smooth' }); break;
+      case 'forgot': await doForgot(); break;
+      case 'setpw': await doSetPw(); break;
+      case 'logout': await sb.auth.signOut(); S.me = null; loginView(); break;
+      case 'tab': S.tab = el.dataset.t; renderStaff(); break;
+      case 'wk': S.week = el.dataset.d === '0' ? monday(new Date()) : addDays(S.week, +el.dataset.d); weekView(); break;
+      case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
+      case 'newsess': newSessionDialog(); break;
+      case 'nsave': await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked }); break;
+      case 'ssave': await saveSession(); break;
+      case 'mv': await moveSession(+el.dataset.dm); break;
+      case 'scancel': { const { data: s } = await sb.from('sessions').select('cancelled').eq('id', sessId()).single(); await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', sessId()); await refreshAfter(sessId()); break; }
+      case 'sdel': if (confirm('Да се изтрие ли часът заедно със записванията?')) { const id = sessId(); const { error } = await sb.from('sessions').delete().eq('id', id); if (error) return fail(error, 'Не се изтри'); modal.close(); weekView(); } break;
+      case 'bst': await setBookingStatus(el.closest('.bk').dataset.bid, el.dataset.st); break;
+      case 'brm': { const bid = el.closest('.bk').dataset.bid; if (!confirm('Да се премахне ли записването?')) break; const bb = (await sb.from('bookings').select('client_id,sessions(date,start_time)').eq('id', bid).single()).data; await removeCharge(bid); await sb.from('bookings').delete().eq('id', bid); if (bb) logEvent('removed', `Премахнат: ${bkLabel(bb.client_id, bb.sessions.date, bb.sessions.start_time)}`); await refreshAfter(sessId()); break; }
+      case 'client': modal.show('<div class="mute">Зареждане…</div>', true); await openClient(el.dataset.id); break;
+      case 'csave': await saveClient(); break;
+      case 'cpadd': await addPackage(); break;
+      case 'cpdel': if (confirm('Да се изтрие ли пакетът?')) { await sb.from('client_packages').delete().eq('id', el.dataset.id); await afterClient(); } break;
+      case 'payadd': { const a = +$('#pay-amt').value; if (!a) return toast('Въведи сума.'); await sb.from('payments').insert({ client_id: cid(), amount: a, method: $('#pay-m').value, note: $('#pay-note').value.trim() || null }); logEvent('paid', `Плащане ${money(a)}: ${cname(cid())}`); await afterClient(); break; }
+      case 'paydel': await sb.from('payments').delete().eq('id', el.dataset.id); await afterClient(); break;
+      case 'chgadd': { const a = +$('#chg-amt').value; if (!a) return toast('Въведи сума.'); await sb.from('charges').insert({ client_id: cid(), amount: a, note: $('#chg-note').value.trim() || null }); await afterClient(); break; }
+      case 'chdel': await sb.from('charges').delete().eq('id', el.dataset.id); await afterClient(); break;
+      case 'newclient': newClientDialog(); break;
+      case 'ncsave': { const name = $('#nc-name').value.trim(); if (!name) return toast('Въведи име.');
+        const { data, error } = await sb.from('clients').insert({ name, phone: $('#nc-phone').value.trim() || null, email: $('#nc-email').value.trim() || null, location: $('#nc-loc').value }).select().single();
+        if (error) return fail(error, 'Не се създаде'); S.clients.push(data); S.clients.sort((a, b) => a.name.localeCompare(b.name, 'bg')); modal.close(); drawClients(); await openClient(data.id); break; }
+      case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
+      case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); dashView(); break;
+      case 'afilter': D.filter = el.dataset.v; dashView(); break;
+      case 'ptab': D.tab = el.dataset.v; dashView(); break;
+      case 'ctab': D.chart = el.dataset.v; dashView(); break;
+      case 'quickpay': { const a = Math.round(+el.dataset.amt * 100) / 100; await sb.from('payments').insert({ client_id: el.dataset.id, amount: a, method: 'В брой', note: 'Плащане на дължимо' }); logEvent('paid', `Плащане ${money(a)}: ${cname(el.dataset.id)}`); dashView(); break; }
+      case 'pkgnew': pkgDialog('new'); break;
+      case 'pkgedit': pkgDialog(el.dataset.id); break;
+      case 'pkgtoggle': S.openPkg = S.openPkg === el.dataset.id ? null : el.dataset.id; drawPackages(); break;
+      case 'pkgsave': await savePkg(); break;
+      case 'pkgdel': if (confirm('Да се изтрие ли пакетът? Вече зададените на клиенти пакети остават.')) { const { error } = await sb.from('packages').delete().eq('id', $('#pkd').dataset.id); if (error) return fail(error, 'Не се изтри'); S.packages = (await sb.from('packages').select('*').order('sort_order')).data; modal.close(); drawPackages(); } break;
+      case 'trnew': trainerDialog('new'); break;
+      case 'tredit': trainerDialog(el.dataset.id); break;
+      case 'trsave': await saveTrainer(); break;
+      case 'trdel': if (confirm('Да се изтрие ли служителят? Ако има часове, по-добре го направи неактивен.')) { const { error } = await sb.from('staff').delete().eq('id', $('#trd').dataset.id); if (error) return fail(error, 'Не се изтри (има свързани часове — направи го неактивен)'); S.staff = (await sb.from('staff').select('*').order('name')).data; modal.close(); teamView(); } break;
+      case 'sub': S.sub = el.dataset.v; settingsView(); break;
+      case 'policysave': await savePolicy(); break;
+      case 'cvsave': await saveCv(); break;
+      case 'wtoggle': S.waitOpen = !S.waitOpen; $('#wbtn').innerHTML = waitHtml(); break;
+      case 'wpick': S.waitPick = S.waitPick === el.dataset.id ? null : el.dataset.id; $('#wbtn').innerHTML = waitHtml(); break;
+      case 'wclear': S.waitPick = null; $('#wbtn').innerHTML = waitHtml(); break;
+      case 'ics': downloadIcs(el.dataset.id); break;
+      case 'cbook': await clientBook(el.dataset.id); break;
+      case 'ccancel': clientCancelDialog(el.closest('.bk').dataset.bid, el.closest('.bk').dataset.sid); break;
+      case 'cdo': await clientCancel(el.dataset.bid); break;
+      case 'blate': break;
+    }
+  } catch (err) { fail(err, 'Грешка'); }
+});
+document.addEventListener('change', async e => {
+  const el = e.target.closest('[data-act=blate]');
+  if (el) { const bid = el.closest('.bk').dataset.bid; await sb.from('bookings').update({ late: el.checked }).eq('id', bid); await refreshAfter(sessId()); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id !== 'add-q') return;
+  const q = e.target.value.trim().toLowerCase(), box = $('#add-res');
+  if (q.length < 2) { box.classList.add('hide'); return; }
+  const m = S.clients.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8);
+  box.innerHTML = m.map(c => `<div data-pick="${c.id}">${esc(c.name)} <span class="mute">${esc(c.phone || '')}</span></div>`).join('') || '<div class="mute">Няма резултат</div>';
+  box.classList.remove('hide');
+});
+document.addEventListener('click', async e => {
+  const p = e.target.closest('[data-pick]'); if (!p) return;
+  $('#add-res').classList.add('hide'); $('#add-q').value = '';
+  await addClientToSession(p.dataset.pick);
+});
+document.addEventListener('dragstart', e => {
+  const ev = e.target.closest?.('.ev'), w = e.target.closest?.('.wi');
+  if (ev) { S.dragOff = e.clientY - ev.getBoundingClientRect().top; e.dataTransfer.setData('text/plain', 'ev:' + ev.dataset.id); e.dataTransfer.effectAllowed = 'move'; }
+  else if (w) e.dataTransfer.setData('text/plain', 'wait:' + w.dataset.id);
+});
+document.addEventListener('dragover', e => { if (e.target.closest?.('.body')) e.preventDefault(); });
+document.addEventListener('drop', e => { dropOnGrid(e); });
+document.addEventListener('input', e => { if (e.target.id === 'wq') { S.wq = e.target.value; const pos = e.target.selectionStart; $('#wbtn').innerHTML = waitHtml(); const n = $('#wq'); n.focus(); n.setSelectionRange(pos, pos); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.open()) modal.close(); });
+
+if (location.hash.includes('type=recovery')) loginView('', 'recovery'); else boot();
+</script>
+</body>
+</html>
