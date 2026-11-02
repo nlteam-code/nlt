@@ -361,7 +361,7 @@ async function boot() {
   if (!session) return loginView();
   const uid = session.user.id;
   const { data: st } = await sb.from('staff').select('*').eq('user_id', uid).eq('active', true).maybeSingle();
-  if (st) { S.me = { role: 'staff', row: st }; S.owner = st.role === 'admin' && (session.user.email || '').toLowerCase() === OWNER_EMAIL; return staffApp(); }
+  if (st) { S.me = { role: 'staff', row: st }; S.owner = S.realOwner = st.role === 'admin' && (session.user.email || '').toLowerCase() === OWNER_EMAIL; S.real = S.me; S.view = null; return staffApp(); }
   const { data: cl } = await sb.from('clients').select('*').eq('user_id', uid).maybeSingle();
   if (cl) { S.me = { role: 'client', row: cl }; return clientApp(); }
   $('#app').innerHTML = `<div class="login"><div class="card"><div class="logo">NLT</div><div>Акаунтът ти още не е свързан с клиент или служител. Свържи се с клуба.</div><button data-act="logout">Изход</button></div></div>`;
@@ -391,8 +391,14 @@ function renderStaff() {
       ${[['dash', 'Обобщение'], ['week', 'График'], ['clients', 'Клиенти'], ['packages', 'Пакети'], ['team', 'Служители']].concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <select id="loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
-    <span class="mute">${esc(S.me.row.name)}</span><button class="sm" data-act="logout">Изход</button></div>
+    ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}</select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
+  ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
   <div class="wrap" id="main"></div>`;
+  const as = $('#asel'); if (as) as.onchange = e => {
+    const t = S.staff.find(x => x.id === e.target.value);
+    S.view = t || null; S.me = t ? { role: 'staff', row: t } : S.real; S.owner = S.realOwner && !t;
+    if (t && S.tab === 'settings') S.tab = 'week'; D.ploc = null; renderStaff();
+  };
   $('#loc').onchange = e => { S.loc = e.target.value; store.set('nlt-loc', S.loc); D.ploc = null; renderTab(); };
   renderTab();
 }
@@ -745,7 +751,7 @@ async function trainerDash() {
   const [bal, soon] = await Promise.all([sb.rpc('my_debtors'), nextClients()]);
   if (bal.error) return fail(bal.error, 'Обобщението не се зареди (изпълнен ли е 06_finansi_samo_sobstvenik.sql?)');
   S.pstat = S.pstat || await loadPstat();
-  D.bal = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c);
+  D.bal = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c && (!S.view || (S.view.locations || []).includes(r.c.location)));
   $('#main').innerHTML = `
     <div class="card" style="margin-bottom:12px">${soon}</div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>`;
@@ -1227,7 +1233,7 @@ document.addEventListener('click', async e => {
       case 'cprofile': clientProfile(); break;
       case 'forgot': await doForgot(); break;
       case 'setpw': await doSetPw(); break;
-      case 'logout': closeSheet(); await sb.auth.signOut(); S.me = null; loginView(); break;
+      case 'logout': closeSheet(); await sb.auth.signOut(); S.me = null; S.view = null; loginView(); break;
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
       case 'wk': S.week = el.dataset.d === '0' ? monday(new Date()) : addDays(S.week, +el.dataset.d); weekView(); break;
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
