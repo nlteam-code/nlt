@@ -451,7 +451,7 @@ function renderStaff() {
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
     <div class="tabs">
-      ${[['dash', 'Обобщение'], ['week', 'График'], ['clients', 'Клиенти'], ['packages', 'Пакети'], ['team', 'Служители']].concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
+      ${[['dash', 'Обобщение'], ['kpi', 'KPI'], ['week', 'График'], ['clients', 'Клиенти'], ['packages', 'Пакети'], ['team', 'Служители']].concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <select id="loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
@@ -467,7 +467,58 @@ function renderStaff() {
   renderTab();
 }
 function renderTab() {
-  ({ dash: S.owner ? dashView : trainerDash, week: weekView, clients: clientsView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
+  ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
+}
+
+
+/* ── KPI: клиенти, треньори, бизнес (треньорите — без пари) ── */
+function kpiRange() {
+  const n = new Date(), p = D.kper || '28';
+  if (p === 'm') return [ymd(new Date(n.getFullYear(), n.getMonth(), 1)), ymd(n), 'Този месец'];
+  if (p === 'pm') return [ymd(new Date(n.getFullYear(), n.getMonth() - 1, 1)), ymd(new Date(n.getFullYear(), n.getMonth(), 0)), 'Миналия месец'];
+  return [ymd(addDays(n, -27)), ymd(n), 'Последни 28 дни'];
+}
+const pbar = v => `<div class="bar2" style="min-width:70px"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></div>`;
+async function kpiView() {
+  const [from, to, label] = kpiRange();
+  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  const [st, cl, bz] = await Promise.all([sb.rpc('kpi_staff', { p_from: from, p_to: to }), sb.rpc('kpi_clients'), S.owner ? sb.rpc('kpi_business') : Promise.resolve({ data: null })]);
+  if (st.error || cl.error) return fail(st.error || cl.error, 'KPI не се зареди (изпълнен ли е 09_kpi.sql?)');
+  const myId = S.me.row.id;
+  D.kc = cl.data || [];
+  if (!S.owner) { const locs = S.me.row.locations || []; D.kc = locs.length ? D.kc.filter(c => locs.includes(c.location)) : D.kc; }
+  const rows = (st.data || []).filter(r => S.owner || r.staff_id === myId);
+  const b = bz.data && bz.data[0];
+  const kpi = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
+  const delta = (a, p) => { const d = a - p; return (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '= ') + Math.abs(d) + ' спрямо предишните 28 дни'; };
+  const own = !S.owner && rows[0];
+  $('#main').innerHTML = `
+    <div class="row" style="margin-bottom:12px"><b style="font-size:18px">KPI</b><span class="mute">${esc(label)} · ${fmt(from)} – ${fmt(to)}</span><span class="sp"></span>
+      ${[['28', '28 дни'], ['m', 'Този месец'], ['pm', 'Миналия месец']].map(([k, l]) => `<button class="sm ${(D.kper || '28') === k ? 'pri' : ''}" data-act="kper" data-p="${k}">${l}</button>`).join('')}</div>
+    ${b ? `<h3>Бизнес · последни 28 дни</h3><div class="kpis">
+      ${kpi('Активни клиенти', b.active_28, delta(b.active_28, b.active_prev))}${kpi('Нови клиенти', b.new_28, 'първо посещение')}${kpi('Изгубени', b.lost, 'ходили преди, сега не')}
+      ${kpi('Посещения', b.visits_28, delta(b.visits_28, b.visits_prev))}${kpi('Запълненост', b.fill_pct + '%', 'на часовете')}${kpi('Приход', eur(b.revenue_28), eur(b.rev_per_active) + ' на активен клиент')}</div>` : ''}
+    ${own ? `<h3>Моите показатели</h3><div class="kpis">
+      ${kpi('Часове', own.hours, own.sessions + ' тренировки')}${kpi('Посещения', own.visits, own.avg_per_session ? own.avg_per_session + ' средно на час' : '')}${kpi('Запълненост', own.fill_pct + '%', own.uniq_clients + ' различни клиенти')}
+      ${kpi('Отказани', own.cancels, own.late_cancels + ' късни')}${kpi('Неотбелязани', own.unmarked, 'часове без отбелязване')}${kpi('Подновени', own.renewals, 'абонамента на мои клиенти')}</div>` : ''}
+    ${S.owner ? `<div class="card" style="margin-bottom:14px;overflow:auto"><h3 style="margin-top:0">Треньори</h3><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Ср. на час</th><th>Запълненост</th><th>Клиенти</th><th>Отказани</th><th>Неотм.</th><th>Подновени</th><th>Приход</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td><b>${esc(r.name)}</b></td><td>${r.hours}</td><td>${r.visits}</td><td>${r.avg_per_session ?? '–'}</td><td><div class="row" style="gap:8px">${pbar(r.fill_pct)}<span>${r.fill_pct}%</span></div></td><td>${r.uniq_clients}</td><td>${r.cancels}${r.late_cancels ? ` <span class="mute">(${r.late_cancels} късни)</span>` : ''}</td><td>${r.unmarked ? `<span class="chip warn">${r.unmarked}</span>` : 0}</td><td>${r.renewals}</td><td>${r.revenue != null ? eur(r.revenue) : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="mute">Няма данни.</td></tr>'}</tbody></table></div>` : ''}
+    <div class="card" style="overflow:auto"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Клиенти</h3><span class="sp"></span><button class="sm ${D.krisk ? 'pri' : ''}" data-act="krisk">⚠ Само в риск</button></div>
+      <div class="mute" style="margin-bottom:8px">В риск: активен клиент, без посещение от 14+ дни и без записан час напред.</div>
+      <div id="kcl"></div></div>`;
+  drawKpiClients();
+}
+function drawKpiClients() {
+  const el = $('#kcl'); if (!el) return;
+  let l = (D.kc || []).filter(c => c.status === 'Active' && (c.last_visit || c.done_28));
+  if (D.krisk) l = l.filter(c => c.at_risk);
+  l.sort((a, b) => (b.at_risk - a.at_risk) || ((b.days_since ?? -1) - (a.days_since ?? -1)));
+  const risk = (D.kc || []).filter(c => c.at_risk).length;
+  el.innerHTML = `<div class="mute" style="margin-bottom:6px">${risk} клиенти в риск</div><table><thead><tr><th>Клиент</th><th>Посещения 4 седм.</th><th>Последно</th><th>Отказани 90д</th><th>Остават</th><th>Следващо</th><th></th></tr></thead><tbody>
+    ${l.slice(0, 200).map(c => `<tr class="click" data-act="client" data-id="${c.client_id}"><td><b>${esc(c.name)}</b><br><span class="mute">${esc(c.location || '')}</span></td>
+      <td>${c.done_28} <span class="mute">(преди ${c.done_prev_28})</span></td><td>${c.last_visit ? fmt(c.last_visit) + ` <span class="mute">· ${c.days_since} дни</span>` : '–'}</td>
+      <td>${c.cancels_90}${c.late_90 ? ` <span class="mute">(${c.late_90} късни)</span>` : ''}</td><td>${c.pkg_left}${c.pkg_end ? ` <span class="mute">до ${fmt(c.pkg_end)}</span>` : ''}</td>
+      <td>${c.next_visit ? fmt(c.next_visit) : '–'}</td><td>${c.at_risk ? '<span class="chip warn">⚠ риск</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="mute">Няма клиенти за показване.</td></tr>'}</tbody></table>`;
 }
 
 /* ── седмичен график ── */
@@ -1346,6 +1397,8 @@ document.addEventListener('click', async e => {
       case 'exitpreview': exitPreview(); break;
       case 'logout': if (S.previewClient) { closeSheet(); exitPreview(); break; } closeSheet(); await sb.auth.signOut(); S.me = null; S.view = null; loginView(); break;
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
+      case 'kper': D.kper = el.dataset.p; kpiView(); break;
+      case 'krisk': D.krisk = !D.krisk; drawKpiClients(); break;
       case 'wk': S.week = el.dataset.d === '0' ? monday(new Date()) : addDays(S.week, +el.dataset.d); weekView(); break;
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
       case 'newsess': newSessionDialog(); break;
