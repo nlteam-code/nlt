@@ -391,10 +391,11 @@ function renderStaff() {
       ${[['dash', 'Обобщение'], ['week', 'График'], ['clients', 'Клиенти'], ['packages', 'Пакети'], ['team', 'Служители']].concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <select id="loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
-    ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}</select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
+    ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
   <div class="wrap" id="main"></div>`;
   const as = $('#asel'); if (as) as.onchange = e => {
+    if (e.target.value === '__client') { e.target.value = S.view?.id || ''; return pickClientPreview(); }
     const t = S.staff.find(x => x.id === e.target.value);
     S.view = t || null; S.me = t ? { role: 'staff', row: t } : S.real; S.owner = S.realOwner && !t;
     if (t && S.tab === 'settings') S.tab = 'week'; D.ploc = null; renderStaff();
@@ -744,6 +745,13 @@ async function quickPay(btn) {
   redrawPay(); toast(`Платено ${money(a)} · ${cname(id)}`);
 }
 
+/* ── Преглед като клиент (само за четене) ── */
+function pickClientPreview() {
+  const draw = q => $('#cpl').innerHTML = S.clients.filter(c => !q || c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 60).map(c => `<button class="sm" style="display:block;width:100%;text-align:left;margin:3px 0" data-act="cpreview" data-id="${c.id}">${esc(c.name)} <span class="mute">${esc(c.location || '')}${c.email ? '' : ' · без имейл'}</span></button>`).join('') || '<div class="mute">Няма.</div>';
+  modal.show('<h2>Преглед като клиент</h2><p class="mute">Виждаш приложението така, както го вижда клиентът. Само за четене — записването е изключено.</p><input id="cpq" placeholder="Търси клиент…" autofocus><div id="cpl" style="max-height:50vh;overflow:auto;margin-top:8px"></div>');
+  draw(''); $('#cpq').oninput = e => draw(e.target.value);
+}
+function exitPreview() { S.previewClient = null; S.me = S.view || S.real; S.owner = S.realOwner && !S.view; document.body.classList.remove('cm'); renderStaff(); }
 /* ── Обобщение за треньор: кой дължи + кой идва скоро (без приходи и отчети) ── */
 async function trainerDash() {
   $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
@@ -1177,16 +1185,17 @@ function renderClient() {
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
   const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : clientHome(me, t, act);
   const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент']];
-  $('#app').innerHTML = `<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
+  $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
     <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
 }
 async function clientBook(sid) {
-  closeSheet();
+  closeSheet(); if (S.previewClient) return toast('Само преглед — записването е изключено.');
   const { error } = await sb.rpc('book_session', { p_session: sid });
   if (error) return fail(error, 'Записването не успя'); toast('Записан си!'); clientApp();
 }
 function clientCancelDialog(bid, sid) {
+  if (S.previewClient) return toast('Само преглед — промените са изключени.');
   const b = C.bookings.find(x => x.id === bid); if (!b) return;
   const must = C.policy.mustResched !== false;
   const pk = C.pkgs.find(p => p.kind === 'group' && p.start_date <= b.sessions.date && p.end_date >= b.sessions.date);
@@ -1233,7 +1242,9 @@ document.addEventListener('click', async e => {
       case 'cprofile': clientProfile(); break;
       case 'forgot': await doForgot(); break;
       case 'setpw': await doSetPw(); break;
-      case 'logout': closeSheet(); await sb.auth.signOut(); S.me = null; S.view = null; loginView(); break;
+      case 'cpreview': { const c = S.clients.find(x => x.id === el.dataset.id); modal.close(); S.previewClient = c; S.me = { role: 'client', row: c }; C.tab = 'home'; await clientApp(); break; }
+      case 'exitpreview': exitPreview(); break;
+      case 'logout': if (S.previewClient) { closeSheet(); exitPreview(); break; } closeSheet(); await sb.auth.signOut(); S.me = null; S.view = null; loginView(); break;
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
       case 'wk': S.week = el.dataset.d === '0' ? monday(new Date()) : addDays(S.week, +el.dataset.d); weekView(); break;
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
