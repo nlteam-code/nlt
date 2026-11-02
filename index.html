@@ -6,8 +6,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,600;0,700;0,800;0,900;1,900&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <title>NLT Personal Training Club</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--ink:#16202a;--mute:#6b7785;--line:#e3e7ec;--acc:#1f6feb;--acc-ink:#fff;--grp:#dbe8ff;--grp-b:#7aa7f5;--solo:#d7f3df;--solo-b:#5dbb78;--warn:#b54708;--warn-bg:#fff2e0;--bad:#c0262d;--ok:#12794b;--shadow:0 8px 30px rgba(0,0,0,.18)}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1318;--card:#171d24;--ink:#e8edf2;--mute:#8a96a3;--line:#27303a;--acc:#4c8dff;--acc-ink:#07101f;--grp:#1d3358;--grp-b:#3e6bb8;--solo:#1b3a28;--solo-b:#3a8a56;--warn:#ffb866;--warn-bg:#3a2a12;--bad:#ff7b81;--ok:#58d39b;--shadow:0 8px 30px rgba(0,0,0,.6)}}
+:root{--bg:#f2f3f7;--card:#fff;--ink:#1d2430;--mute:#6a7482;--line:#e8ebf0;--acc:#eb4c51;--acc-ink:#fff;--navy:#262d38;--org:#f48460;--grp:rgba(38,45,56,.07);--grp-b:#262d38;--solo:rgba(235,76,81,.11);--solo-b:#eb4c51;--warn:#b4531d;--warn-bg:#fff0e6;--bad:#d1363c;--ok:#0f8a5f;--shadow:0 1px 2px rgba(20,28,40,.05),0 12px 32px rgba(20,28,40,.10);--sh:0 1px 2px rgba(20,28,40,.04),0 8px 24px rgba(20,28,40,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#11151b;--card:#1a1f27;--ink:#f3f5f8;--mute:#97a1af;--line:rgba(255,255,255,.09);--acc:#f0575c;--acc-ink:#fff;--grp:rgba(255,255,255,.08);--grp-b:#9aa6b8;--solo:rgba(240,87,92,.18);--solo-b:#f0575c;--warn:#ffb27d;--warn-bg:#3a2417;--bad:#ff7b81;--ok:#58d39b;--shadow:0 12px 36px rgba(0,0,0,.5);--sh:0 8px 24px rgba(0,0,0,.35)}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -103,6 +103,70 @@ label.f input,label.f select{color:var(--ink)}
 svg text{fill:var(--mute);font-size:11px}svg .bar{fill:var(--acc)}svg .gl{stroke:var(--line)}
 @media (max-width:640px){.day{min-width:110px}}
 
+
+/* ───── администраторски екран · NLT бранд, Apple-стил ───── */
+body{font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+h2,h3,.kpi .kv,.tab,.logo{font-family:Montserrat,Roboto,sans-serif}
+h2{font-size:17px;font-weight:800;letter-spacing:-.01em;margin-bottom:12px}
+h3{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+.card,.kpi,.tw,.week{border:0;border-radius:22px;box-shadow:var(--sh)}
+.card{padding:20px}
+.tw{border-radius:16px;box-shadow:none;border:1px solid var(--line)}
+.bar{background:color-mix(in srgb,var(--card) 80%,transparent);-webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px);border-bottom:1px solid var(--line);padding-top:10px;padding-bottom:10px}
+.bar .logo{font-weight:900;font-style:italic;font-size:20px;letter-spacing:.03em;color:var(--ink);padding-right:6px}
+.tabs{background:var(--bg);padding:4px;border-radius:14px;gap:2px;flex-wrap:nowrap}
+.tab{border-radius:11px;padding:7px 14px;font-weight:600;font-size:13px;color:var(--mute);transition:.18s}
+.tab:hover{border:0;color:var(--ink)}
+.tab.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(20,28,40,.12)}
+.bar select{border-radius:12px;border:0;background:var(--bg);padding:8px 12px;font-weight:500}
+button,input,select,textarea{border-radius:12px}
+input,select,textarea{border:1px solid var(--line);padding:9px 12px;background:var(--card)}
+input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--acc) 45%,transparent);outline-offset:1px;border-color:var(--acc)}
+button{border:1px solid var(--line);transition:.15s}
+button:hover{border-color:var(--acc);color:var(--acc)}
+button.pri{background:linear-gradient(135deg,var(--acc),var(--org));border:0;color:#fff;font-weight:700;box-shadow:0 4px 14px color-mix(in srgb,var(--acc) 35%,transparent)}
+button.pri:hover{color:#fff;filter:brightness(1.06)}
+button.sm{border-radius:99px;padding:4px 11px;font-weight:500}
+.chips button.on,.seg button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .chips button.on,:root:not([data-theme=light]) .seg button.on{background:#fff;color:#11151b;border-color:#fff}}
+.chip{border:0;background:var(--bg);color:var(--mute);font-weight:500;padding:2px 10px}
+.chip.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.chip.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+th{text-transform:uppercase;letter-spacing:.06em;font-size:11px;font-weight:700;color:var(--mute);background:transparent;padding:10px 12px}
+td{padding:11px 12px;border-bottom:1px solid var(--line)}
+tbody tr:last-child td{border-bottom:0}
+tr.click:hover,tbody tr:hover{background:color-mix(in srgb,var(--bg) 70%,transparent)}
+td b{font-weight:600}
+.kpis{gap:14px;margin-bottom:16px}
+.kpi{padding:18px 20px;position:relative;overflow:hidden}
+.kpi .kl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.kpi .kv{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:4px 0 2px}
+.kpis>.kpi:first-child .kv{background:linear-gradient(135deg,var(--acc),var(--org));-webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi .spark{position:absolute;right:12px;bottom:12px;width:96px;height:34px;opacity:.9}
+.cols{gap:16px;margin-bottom:16px}
+.stat2{gap:16px}.stat2 b{font-family:Montserrat,sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.fe{border-bottom:1px solid var(--line);padding:8px 0}
+.wrap{padding-top:20px}
+.md{border-radius:26px;padding:24px}
+.ov{background:rgba(14,18,26,.5);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.bk,.pk{border-bottom:1px solid var(--line)}
+.bar2{height:8px;border-radius:99px}.bar2 i{background:linear-gradient(90deg,var(--acc),var(--org));border-radius:99px}
+.toast{border-radius:99px;padding:11px 20px;box-shadow:var(--shadow)}
+/* график */
+.dh{font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);height:38px}
+.dh.today{color:var(--acc)}
+.hl{border-top-color:var(--line)}
+.ev{border:0;border-left:4px solid var(--grp-b);border-radius:10px;padding:4px 7px;box-shadow:0 1px 2px rgba(20,28,40,.06);transition:transform .12s,box-shadow .12s}
+.ev:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(20,28,40,.14);z-index:3}
+.ev.solo{border-left-color:var(--solo-b)}
+.ev b{font-weight:700}
+.times div{font-variant-numeric:tabular-nums}
+/* диаграми */
+svg .bar{fill:url(#gbar)}
+svg .gl{stroke:var(--line);stroke-dasharray:2 4}
+svg text{font-family:Roboto,sans-serif;font-size:11px}
+svg .bcol{transition:opacity .15s}
+.chartw:hover .bcol{opacity:.45}.chartw .bcol:hover{opacity:1}
 /* ───── клиентски екран · NLT бранд ───── */
 :root{--c-bg:#f2f3f7;--c-card:#fff;--c-ink:#1d2430;--c-mute:#6a7482;--c-line:#e4e7ed;--c-navy:#262d38;--c-coral:#eb4c51;--c-orange:#f48460;--c-ringbg:rgba(38,45,56,.09);--c-nav:rgba(255,255,255,.82);--c-shadow:0 1px 2px rgba(20,28,40,.05),0 8px 24px rgba(20,28,40,.06)}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--c-bg:#11151b;--c-card:#1a1f27;--c-ink:#f3f5f8;--c-mute:#97a1af;--c-line:rgba(255,255,255,.09);--c-ringbg:rgba(255,255,255,.1);--c-nav:rgba(26,31,39,.78);--c-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px rgba(0,0,0,.35)}}
@@ -636,7 +700,7 @@ async function openClient(id, tab) {
   const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`]].concat(S.owner ? [['pays', 'Плащания']] : []);
   modal.show(`<div id="cl" data-cid="${x.id}">
     <h2>${esc(x.name)}</h2>
-    <div class="chips" style="margin-bottom:10px">${tabs.map(([k, l]) => `<button class="sm ${T === k ? 'on' : ''}" data-act="ctab" data-t="${k}">${l}</button>`).join('')}</div>
+    <div class="chips" style="margin-bottom:10px">${tabs.map(([k, l]) => `<button class="sm ${T === k ? 'on' : ''}" data-act="cltab" data-t="${k}">${l}</button>`).join('')}</div>
 
     <div class="cpane" data-p="profile" ${T === 'profile' ? '' : 'hidden'}>
     <div class="grid2">
@@ -726,6 +790,12 @@ const D = { month: firstOf(today()), tab: 'due', chart: 'pay', day: today(), fil
 function logEvent(type, text) { sb.from('activity').insert({ type, text, actor: S.me?.row?.user_id || null }).then(() => {}, () => {}); }
 const bkLabel = (cid, date, time) => `${cname(cid)} · ${dmm(date)} ${hm(time)}`;
 
+function spark(v) {
+  const W = 96, H = 34, mx = Math.max(1, ...v), mn = Math.min(...v), r = (mx - mn) || 1, st = W / (v.length - 1 || 1);
+  const pts = v.map((x, i) => [i * st, H - 4 - (x - mn) / r * (H - 10)]), d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const l = pts[pts.length - 1];
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="gsp" x1="0" x2="1"><stop offset="0" stop-color="#eb4c51" stop-opacity=".35"/><stop offset="1" stop-color="#f48460"/></linearGradient></defs><path d="${d}" fill="none" stroke="url(#gsp)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${l[0]}" cy="${l[1]}" r="3" fill="#f48460"/></svg>`;
+}
 /* ── плащания: филтър по обект, без презареждане ── */
 const payLoc = () => D.ploc || S.loc;
 const inPayLoc = c => payLoc() === 'all' || c.location === payLoc() || !c.location;
@@ -814,7 +884,7 @@ async function dashView() {
   D.bal = balances;
   const due = balances.filter(r => r.bal > 0).sort((a, z) => z.bal - a.bal), cred = balances.filter(r => r.bal < 0).sort((a, z) => a.bal - z.bal), even = balances.filter(r => r.bal === 0);
   const sum = l => l.reduce((a, r) => a + Math.abs(r.bal), 0);
-  const kpi = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
+  const kpi = (l, v, sub, sp) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div>${sp || ''}</div>`;
   const cr = row(cur), st = row(D.month), pv = row(shiftM(D.month, -1));
   const diff = pv.proj ? Math.round((st.proj - pv.proj) / pv.proj * 100) : null;
   const list = D.tab === 'due' ? due : D.tab === 'credit' ? cred : even;
@@ -822,14 +892,14 @@ async function dashView() {
   // графика
   const cm = [...Array(12)].map((_, i) => shiftM(cur, i - 9));
   const vals = cm.map(x => { const r = row(x); return +(D.chart === 'pay' ? r.pay : D.chart === 'chg' ? r.chg : r.proj); });
-  const mx = Math.max(1, ...vals), W = 720, H = 240, ml = 50, mt = 18, mb = 26, pw = W - ml - 8, ph = H - mt - mb, slot = pw / 12, bw = Math.min(34, slot * .62);
-  const y = v => mt + ph - v / mx * ph;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">`;
-  for (let i = 0; i <= 4; i++) { const v = mx / 4 * i; svg += `<line class="gl" x1="${ml}" x2="${W - 8}" y1="${y(v)}" y2="${y(v)}"/><text x="${ml - 6}" y="${y(v) + 4}" text-anchor="end">${v >= 1000 ? Math.round(v / 100) / 10 + 'к' : Math.round(v)}</text>`; }
-  cm.forEach((x, j) => { const cx = ml + slot * (j + .5), v = vals[j], by = y(v);
-    if (v > 0) svg += `<rect class="bar" opacity="${x === cur ? 1 : .55}" x="${cx - bw / 2}" y="${by}" width="${bw}" height="${mt + ph - by}" rx="3"><title>${mLabel(x)}: ${eur(v)}</title></rect>`;
-    if (v > 0 && x === cur) svg += `<text x="${cx}" y="${by - 5}" text-anchor="middle" style="fill:var(--ink)">${Math.round(v)}</text>`;
-    svg += `<text x="${cx}" y="${H - 8}" text-anchor="middle">${MSHORT[+x.slice(5, 7) - 1]}</text>`; });
+  const mx = Math.max(1, ...vals), W = 760, H = 260, ml = 44, mt = 26, mb = 28, pw = W - ml - 6, ph = H - mt - mb, slot = pw / 12, bw = Math.min(30, slot * .56);
+  const y = v => mt + ph - v / mx * ph, fk = v => v >= 1000 ? (Math.round(v / 100) / 10) + 'к' : Math.round(v);
+  let svg = `<svg class="chartw" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><defs><linearGradient id="gbar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eb4c51"/><stop offset="1" stop-color="#f48460"/></linearGradient></defs>`;
+  for (let i = 0; i <= 4; i++) { const v = mx / 4 * i; svg += `<line class="gl" x1="${ml}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}"/><text x="${ml - 8}" y="${y(v) + 4}" text-anchor="end">${fk(v)}</text>`; }
+  cm.forEach((x, j) => { const cx = ml + slot * (j + .5), v = vals[j], by = y(v), h = Math.max(0, mt + ph - by), r = Math.min(8, bw / 2, h);
+    if (v > 0) svg += `<g class="bcol"><rect x="${cx - slot / 2}" y="${mt}" width="${slot}" height="${ph + mb}" fill="transparent"/><path fill="${x === cur ? 'url(#gbar)' : 'var(--ink)'}" opacity="${x === cur ? 1 : .16}" d="M${cx - bw / 2} ${mt + ph}V${by + r}Q${cx - bw / 2} ${by} ${cx - bw / 2 + r} ${by}H${cx + bw / 2 - r}Q${cx + bw / 2} ${by} ${cx + bw / 2} ${by + r}V${mt + ph}Z"/><title>${mLabel(x)}: ${eur(v)}</title></g>`;
+    if (v > 0 && x === cur) svg += `<text x="${cx}" y="${by - 8}" text-anchor="middle" style="fill:var(--ink);font-weight:700;font-size:12px;font-family:Montserrat,sans-serif">${fk(v)}</text>`;
+    svg += `<text x="${cx}" y="${H - 8}" text-anchor="middle" ${x === cur ? 'style="fill:var(--ink);font-weight:700"' : ''}>${MSHORT[+x.slice(5, 7) - 1]}</text>`; });
   svg += '</svg>';
   // дневна активност
   const FEEDS = { cancel: 'Отказан', change: 'Сменен', paid: 'Платен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит' };
@@ -839,7 +909,7 @@ async function dashView() {
   // КПД
   const trows = tr.data.map(r => ({ ...r, t: S.staff.find(x => x.id === r.trainer_id) })).filter(r => r.t).sort((a, z) => a.t.name.localeCompare(z.t.name, 'bg'));
   $('#main').innerHTML = `
-    <div class="kpis">${kpi('Приход', eur(cr.pay), 'този месец')}${kpi('Часове', cr.n, 'посещения този месец')}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
+    <div class="kpis">${kpi('Приход', eur(cr.pay), 'този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
     <div class="cols">
       <div class="card"><h2>Дневна активност</h2>
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
@@ -1278,7 +1348,7 @@ document.addEventListener('click', async e => {
       case 'sdel': if (confirm('Да се изтрие ли часът заедно със записванията?')) { const id = sessId(); const { error } = await sb.from('sessions').delete().eq('id', id); if (error) return fail(error, 'Не се изтри'); modal.close(); weekView(); } break;
       case 'bst': await setBookingStatus(el.closest('.bk').dataset.bid, el.dataset.st); break;
       case 'brm': { const bid = el.closest('.bk').dataset.bid; if (!confirm('Да се премахне ли записването?')) break; const bb = (await sb.from('bookings').select('client_id,sessions(date,start_time)').eq('id', bid).single()).data; await removeCharge(bid); await sb.from('bookings').delete().eq('id', bid); if (bb) logEvent('removed', `Премахнат: ${bkLabel(bb.client_id, bb.sessions.date, bb.sessions.start_time)}`); await refreshAfter(sessId()); break; }
-      case 'ctab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=ctab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; break; }
+      case 'cltab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=cltab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; break; }
       case 'client': S.ctab = 'profile'; modal.show('<div class="mute">Зареждане…</div>', true); await openClient(el.dataset.id); break;
       case 'csave': await saveClient(); break;
       case 'cpadd': await addPackage(); break;
