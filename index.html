@@ -391,7 +391,7 @@ function renderStaff() {
     <select id="loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
     <span class="mute">${esc(S.me.row.name)}</span><button class="sm" data-act="logout">Изход</button></div>
   <div class="wrap" id="main"></div>`;
-  $('#loc').onchange = e => { S.loc = e.target.value; store.set('nlt-loc', S.loc); renderTab(); };
+  $('#loc').onchange = e => { S.loc = e.target.value; store.set('nlt-loc', S.loc); D.ploc = null; renderTab(); };
   renderTab();
 }
 function renderTab() {
@@ -695,6 +695,46 @@ const D = { month: firstOf(today()), tab: 'due', chart: 'pay', day: today(), fil
 function logEvent(type, text) { sb.from('activity').insert({ type, text, actor: S.me?.row?.user_id || null }).then(() => {}, () => {}); }
 const bkLabel = (cid, date, time) => `${cname(cid)} · ${dmm(date)} ${hm(time)}`;
 
+/* ── плащания: филтър по обект, без презареждане ── */
+const payLoc = () => D.ploc || S.loc;
+const inPayLoc = c => payLoc() === 'all' || c.location === payLoc() || !c.location;
+const kpiHtml = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
+function payLists() {
+  const bal = (D.bal || []).filter(r => inPayLoc(r.c));
+  return { due: bal.filter(r => r.bal > 0).sort((a, z) => z.bal - a.bal), cred: bal.filter(r => r.bal < 0).sort((a, z) => a.bal - z.bal), even: bal.filter(r => r.bal === 0) };
+}
+const sumAbs = l => l.reduce((a, r) => a + Math.abs(r.bal), 0);
+function dueKpi() { const { due, cred } = payLists(); return kpiHtml('Дължимо', eur(sumAbs(due)), eur(sumAbs(cred)) + ' преплатено'); }
+function payCard() {
+  const { due, cred, even } = payLists(), list = D.tab === 'due' ? due : D.tab === 'credit' ? cred : even;
+  const ch = (act, v, l, cur2, extra = '') => `<button class="sm ${cur2 === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}${extra}</button>`;
+  const locs = [['all', 'Всички обекти'], ...LOCS.map(l => [l, l])];
+  const cnt = l => (D.bal || []).filter(r => r.bal > 0 && (l === 'all' || r.c.location === l || !r.c.location)).length;
+  return `<h2>Плащания</h2>
+    <div class="chips" style="margin-bottom:6px">${locs.map(([v, l]) => ch('ploc', v, l, payLoc(), ` <span class="mute">${cnt(v)}</span>`)).join('')}</div>
+    <div class="chips">${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}</div>
+    <div class="tw" id="paytw" style="max-height:340px;overflow:auto"><table><thead><tr><th>Клиент</th><th>${D.tab === 'due' ? 'Дължимо' : D.tab === 'credit' ? 'В кредит' : 'Баланс'}</th><th>Обект</th><th>Пакет</th><th></th></tr></thead><tbody>
+    ${list.slice(0, 150).map(r => `<tr data-cid="${r.c.id}"><td><b>${esc(r.c.name)}</b></td><td>${D.tab === 'due' ? `<span class="neg">−${eur(r.bal)}</span>` : D.tab === 'credit' ? `<span class="pos">+${eur(-r.bal)}</span>` : eur(0)}</td><td class="mute">${esc(r.c.location || '—')}</td><td>${pkgChip(curPkg(r.c.id))}</td>
+    <td style="white-space:nowrap">${D.tab === 'due' ? `<button class="sm pri" data-act="quickpay" data-id="${r.c.id}" data-amt="${r.bal}">Платено</button> ` : ''}<button class="sm" data-act="client" data-id="${r.c.id}">Отвори</button></td></tr>`).join('') || '<tr><td colspan="5" class="mute">Няма.</td></tr>'}</tbody></table></div>
+    <p class="mute">Дължимото = цени на пакетите + такси − плащания. Клиенти без пакети, такси и плащания не се показват.</p>`;
+}
+function redrawPay() {
+  const tw = document.getElementById('paytw'), top = tw ? tw.scrollTop : 0, card = document.getElementById('paycard');
+  if (!card) return;
+  card.innerHTML = payCard();
+  const n = document.getElementById('paytw'); if (n) n.scrollTop = top;
+  const k = document.getElementById('kpidue'); if (k) k.innerHTML = dueKpi();
+}
+async function quickPay(btn) {
+  const id = btn.dataset.id, a = Math.round(+btn.dataset.amt * 100) / 100;
+  btn.disabled = true; btn.textContent = '…';
+  const { error } = await sb.from('payments').insert({ client_id: id, amount: a, method: 'В брой', note: 'Плащане на дължимо' });
+  if (error) { btn.disabled = false; btn.textContent = 'Платено'; return fail(error, 'Плащането не се записа'); }
+  logEvent('paid', `Плащане ${money(a)}: ${cname(id)}`);
+  const r = (D.bal || []).find(x => x.c.id === id); if (r) r.bal = Math.round((r.bal - a) * 100) / 100;
+  redrawPay(); toast(`Платено ${money(a)} · ${cname(id)}`);
+}
+
 /* ── Обобщение ── */
 async function dashView() {
   $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
@@ -709,6 +749,7 @@ async function dashView() {
   S.pstat = await loadPstat();
   const months = m.data, row = mm => months.find(x => x.m === mm) || { n: 0, n_done: 0, proj: 0, done: 0, pay: 0, chg: 0 };
   const balances = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c);
+  D.bal = balances;
   const due = balances.filter(r => r.bal > 0).sort((a, z) => z.bal - a.bal), cred = balances.filter(r => r.bal < 0).sort((a, z) => a.bal - z.bal), even = balances.filter(r => r.bal === 0);
   const sum = l => l.reduce((a, r) => a + Math.abs(r.bal), 0);
   const kpi = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
@@ -736,7 +777,7 @@ async function dashView() {
   // КПД
   const trows = tr.data.map(r => ({ ...r, t: S.staff.find(x => x.id === r.trainer_id) })).filter(r => r.t).sort((a, z) => a.t.name.localeCompare(z.t.name, 'bg'));
   $('#main').innerHTML = `
-    <div class="kpis">${kpi('Приход', eur(cr.pay), 'този месец')}${kpi('Часове', cr.n, 'посещения този месец')}${kpi('Дължимо', eur(sum(due)), eur(sum(cred)) + ' преплатено')}${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active').length)}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
+    <div class="kpis">${kpi('Приход', eur(cr.pay), 'този месец')}${kpi('Часове', cr.n, 'посещения този месец')}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
     <div class="cols">
       <div class="card"><h2>Дневна активност</h2>
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
@@ -747,12 +788,7 @@ async function dashView() {
         <div class="stat2"><div><b>${eur(st.proj)}</b><span>Прогнозен приход</span></div><div><b>${eur(st.done)}</b><span>Реализиран до момента</span></div><div><b>${st.n_done} / ${st.n}</b><span>Проведени / всички посещения</span></div><div><b>${eur(st.n ? st.proj / st.n : 0)}</b><span>Средна цена на посещение</span></div></div>
         <p class="mute">${diff === null ? 'Няма данни за предишния месец.' : `Спрямо ${mLabel(shiftM(D.month, -1))}: ${diff >= 0 ? '+' : ''}${diff}% (${eur(pv.proj)}).`} Цената на пакета ÷ броя посещения в него; еднократните — по тяхната цена. Отказаните не се броят.</p></div>
     </div>
-    <div class="card" style="margin-bottom:12px"><h2>Плащания</h2>
-      <div class="chips">${chip('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sum(due))}`)}${chip('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sum(cred))}`)}${chip('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}</div>
-      <div class="tw" style="max-height:340px;overflow:auto"><table><thead><tr><th>Клиент</th><th>${D.tab === 'due' ? 'Дължимо' : D.tab === 'credit' ? 'В кредит' : 'Баланс'}</th><th>Пакет</th><th></th></tr></thead><tbody>
-      ${list.slice(0, 100).map(r => `<tr><td><b>${esc(r.c.name)}</b></td><td>${D.tab === 'due' ? `<span class="neg">−${eur(r.bal)}</span>` : D.tab === 'credit' ? `<span class="pos">+${eur(-r.bal)}</span>` : eur(0)}</td><td>${pkgChip(curPkg(r.c.id))}</td>
-      <td style="white-space:nowrap">${D.tab === 'due' ? `<button class="sm pri" data-act="quickpay" data-id="${r.c.id}" data-amt="${r.bal}">Платено</button> ` : ''}<button class="sm" data-act="client" data-id="${r.c.id}">Отвори</button></td></tr>`).join('') || '<tr><td colspan="4" class="mute">Няма.</td></tr>'}</tbody></table></div>
-      <p class="mute">Дължимото = цени на пакетите + такси − плащания. Клиенти без пакети, такси и плащания не се показват.</p></div>
+    <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div class="card" style="margin-bottom:12px"><h2>Финансова графика по месеци</h2>
       <div class="chips">${chip('ctab', 'pay', 'Плащания', D.chart)}${chip('ctab', 'chg', 'Такси', D.chart)}${chip('ctab', 'proj', 'Прогноза по посещения', D.chart)}</div>${svg}</div>
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
@@ -1191,9 +1227,10 @@ document.addEventListener('click', async e => {
       case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
       case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); dashView(); break;
       case 'afilter': D.filter = el.dataset.v; dashView(); break;
-      case 'ptab': D.tab = el.dataset.v; dashView(); break;
+      case 'ptab': D.tab = el.dataset.v; redrawPay(); break;
+      case 'ploc': D.ploc = el.dataset.v; redrawPay(); {const k = document.getElementById('kpidue'); if (k) k.innerHTML = dueKpi();} break;
       case 'ctab': D.chart = el.dataset.v; dashView(); break;
-      case 'quickpay': { const a = Math.round(+el.dataset.amt * 100) / 100; await sb.from('payments').insert({ client_id: el.dataset.id, amount: a, method: 'В брой', note: 'Плащане на дължимо' }); logEvent('paid', `Плащане ${money(a)}: ${cname(el.dataset.id)}`); dashView(); break; }
+      case 'quickpay': await quickPay(el); break;
       case 'pkgnew': pkgDialog('new'); break;
       case 'pkgedit': pkgDialog(el.dataset.id); break;
       case 'pkgtoggle': S.openPkg = S.openPkg === el.dataset.id ? null : el.dataset.id; drawPackages(); break;
