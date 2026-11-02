@@ -289,11 +289,11 @@ const cname = id => S.clients.find(c => c.id === id)?.name || '—';
 /* ───────── вход ───────── */
 function loginView(msg, mode) {
   closeSheet(); document.body.classList.add('cm');
-  const rec = mode === 'recovery', pw = mode === 'pw', otp = mode === 'otp';
+  const rec = mode === 'recovery' || mode === 'setpw', pw = mode === 'pw' || !mode, otp = mode === 'otp';
   $('#app').innerHTML = `<div class="login"><div class="card">
     <div class="logo" style="font-size:20px">NLT Personal Training Club</div>${logoHtml(64)}
-    ${rec ? `<div>Въведи нова парола</div><input id="pw" type="password" placeholder="Нова парола (мин. 8 знака)" autocomplete="new-password">
-      <button class="pri" data-act="setpw">Запази паролата</button>` :
+    ${rec ? `<div>${mode === 'setpw' ? 'Кодът е верен. <b>Задай парола</b>, с която ще влизаш занапред.' : 'Въведи нова парола'}</div><input id="pw" type="password" placeholder="Нова парола (мин. 8 знака)" autocomplete="new-password">
+      <button class="pri" data-act="setpw">Запази паролата</button>${mode === 'setpw' ? '<button class="sm" data-act="skippw" style="border:0;background:none;color:var(--mute)">По-късно</button>' : ''}` :
     otp ? `<div>Изпратихме имейл до <b>${esc(S.otpEmail || '')}</b>.<br><span class="mute">Въведи кода от имейла или натисни линка в него.</span></div>
       <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Код от имейла" style="letter-spacing:4px;font-size:18px;text-align:center">
       <button class="pri" data-act="verifycode">Вход</button>
@@ -301,12 +301,11 @@ function loginView(msg, mode) {
       <button class="sm" data-act="othermail" style="border:0;background:none;color:var(--mute)">Друг имейл</button>` :
     pw ? `<input id="em" type="email" placeholder="Имейл" autocomplete="username" value="${esc(S.otpEmail || '')}"><input id="pw" type="password" placeholder="Парола" autocomplete="current-password">
       <button class="pri" data-act="login">Вход</button>
-      <button class="sm" data-act="forgot" style="border:0;background:none;color:var(--mute)">Забравена парола</button>
-      <button class="sm" data-act="codemode" style="border:0;background:none;color:var(--mute)">Вход с код по имейл</button>` :
-    `<div class="mute">Въведи имейла си и ще ти изпратим код за вход. Не е нужна парола.</div>
+      <button class="sm" data-act="codemode" style="border:0;background:none;color:var(--mute)">Първо влизане или забравена парола</button>` :
+    `<div class="mute">Първо влизане или забравена парола: въведи имейла си, ще ти изпратим код и после ще зададеш парола.</div>
       <input id="em" type="email" placeholder="Имейл" autocomplete="username" value="${esc(S.otpEmail || '')}">
       <button class="pri" data-act="sendcode">Изпрати код</button>
-      <button class="sm" data-act="pwmode" style="border:0;background:none;color:var(--mute)">Вход с парола</button>`}
+      <button class="sm" data-act="pwmode" style="border:0;background:none;color:var(--mute)">← Вход с парола</button>`}
     <div class="err" id="lerr">${esc(msg || '')}</div></div></div>`;
   $('#pw')?.addEventListener('keydown', e => { if (e.key === 'Enter') $(rec ? '[data-act=setpw]' : '[data-act=login]').click(); });
   $('#em')?.addEventListener('keydown', e => { if (e.key === 'Enter') $(pw ? '[data-act=login]' : '[data-act=sendcode]').click(); });
@@ -333,7 +332,7 @@ async function doVerifyCode() {
   let r = await sb.auth.verifyOtp({ email: S.otpEmail, token, type: 'email' });
   if (r.error) r = await sb.auth.verifyOtp({ email: S.otpEmail, token, type: 'signup' });
   if (r.error) { $('#lerr').textContent = 'Грешен или изтекъл код. Изпрати нов.'; return; }
-  boot();
+  loginView('', 'setpw');
 }
 async function doLogin() {
   const email = $('#em').value.trim(), password = $('#pw').value;
@@ -1233,8 +1232,9 @@ document.addEventListener('click', async e => {
       case 'sendcode': await doSendCode(); break;
       case 'verifycode': await doVerifyCode(); break;
       case 'pwmode': S.otpEmail = ($('#em')?.value || '').trim(); loginView('', 'pw'); break;
-      case 'codemode': loginView(); break;
-      case 'othermail': S.otpEmail = ''; loginView(); break;
+      case 'codemode': S.otpEmail = ($('#em')?.value || '').trim(); loginView('', 'code'); break;
+      case 'skippw': boot(); break;
+      case 'othermail': S.otpEmail = ''; loginView('', 'code'); break;
       case 'cnav': C.tab = el.dataset.t; renderClient(); window.scrollTo(0, 0); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
       case 'cask': clientAsk(el.dataset.id); break;
