@@ -482,7 +482,8 @@ const pbar = v => `<div class="bar2" style="min-width:70px"><i style="width:${Ma
 async function kpiView() {
   const [from, to, label] = kpiRange();
   $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
-  const [st, cl, bz] = await Promise.all([sb.rpc('kpi_staff', { p_from: from, p_to: to }), sb.rpc('kpi_clients'), S.owner ? sb.rpc('kpi_business') : Promise.resolve({ data: null })]);
+  D.ktr = D.ktr || 'month';
+  const [st, cl, bz, tr] = await Promise.all([sb.rpc('kpi_staff', { p_from: from, p_to: to }), sb.rpc('kpi_clients'), S.owner ? sb.rpc('kpi_business') : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_trend', { p_unit: D.ktr, p_n: D.ktr === 'week' ? 12 : 7 }) : Promise.resolve({ data: null })]);
   if (st.error || cl.error) return fail(st.error || cl.error, 'KPI не се зареди (изпълнен ли е 09_kpi.sql?)');
   const myId = S.me.row.id;
   D.kc = cl.data || [];
@@ -501,12 +502,36 @@ async function kpiView() {
     ${own ? `<h3>Моите показатели</h3><div class="kpis">
       ${kpi('Часове', own.hours, own.sessions + ' тренировки')}${kpi('Посещения', own.visits, own.avg_per_session ? own.avg_per_session + ' средно на час' : '')}${kpi('Запълненост', own.fill_pct + '%', own.uniq_clients + ' различни клиенти')}
       ${kpi('Отказани', own.cancels, own.late_cancels + ' късни')}${kpi('Неотбелязани', own.unmarked, 'часове без отбелязване')}${kpi('Подновени', own.renewals, 'абонамента на мои клиенти')}</div>` : ''}
+    ${S.owner && tr.data ? trendCard(tr.data) : ''}
     ${S.owner ? `<div class="card" style="margin-bottom:14px;overflow:auto"><h3 style="margin-top:0">Треньори</h3><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Ср. на час</th><th>Запълненост</th><th>Клиенти</th><th>Отказани</th><th>Неотм.</th><th>Подновени</th><th>Приход</th></tr></thead><tbody>
       ${rows.map(r => `<tr><td><b>${esc(r.name)}</b></td><td>${r.hours}</td><td>${r.visits}</td><td>${r.avg_per_session ?? '–'}</td><td><div class="row" style="gap:8px">${pbar(r.fill_pct)}<span>${r.fill_pct}%</span></div></td><td>${r.uniq_clients}</td><td>${r.cancels}${r.late_cancels ? ` <span class="mute">(${r.late_cancels} късни)</span>` : ''}</td><td>${r.unmarked ? `<span class="chip warn">${r.unmarked}</span>` : 0}</td><td>${r.renewals}</td><td>${r.revenue != null ? eur(r.revenue) : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="mute">Няма данни.</td></tr>'}</tbody></table></div>` : ''}
     <div class="card" style="overflow:auto"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Клиенти</h3><span class="sp"></span><button class="sm ${D.krisk ? 'pri' : ''}" data-act="krisk">⚠ Само в риск</button></div>
       <div class="mute" style="margin-bottom:8px">В риск: активен клиент, без посещение от 14+ дни и без записан час напред.</div>
       <div id="kcl"></div></div>`;
   drawKpiClients();
+}
+
+const TRC = { 'Боян Петров': '#eb4c51', 'Лерин': '#4f7cac' };
+function trendCard(rows) {
+  const wk = D.ktr === 'week', locs = ['Боян Петров', 'Лерин'];
+  const per = [...new Set(rows.map(r => r.period))].sort();
+  const val = (p, l, k = 'visits') => (rows.find(r => r.period === p && r.location === l) || {})[k] || 0;
+  const lab = p => { const d = parse(p); return wk ? `${d.getDate()}.${d.getMonth() + 1}` : ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'][d.getMonth()]; };
+  const mx = Math.max(4, Math.ceil(Math.max(...rows.map(r => r.visits)) / 4) * 4), W = 720, H = 220, pl = 34, pb = 26, pt = 12, cw = (W - pl) / per.length, bw = Math.min(26, cw / 2 - 4);
+  const ticks = [0, .5, 1].map(f => Math.round(mx * f));
+  const bars = per.map((p, i) => locs.map((l, j) => { const v = val(p, l); if (!v) return ''; const h = v / mx * (H - pb - pt), x = pl + i * cw + cw / 2 + (j - 1) * (bw + 3) + 1.5, y = H - pb - h;
+    return `<path d="M${x} ${H - pb}V${y + 4}Q${x} ${y} ${x + 4} ${y}H${x + bw - 4}Q${x + bw} ${y} ${x + bw} ${y + 4}V${H - pb}Z" fill="${TRC[l]}" opacity="${i === per.length - 1 ? .55 : 1}"><title>${l}: ${v} посещения · ${wk ? 'седмица от ' : ''}${fmt(p)}${i === per.length - 1 ? ' (до днес)' : ''}</title></path>`; }).join('')).join('');
+  const lastI = per.length - 1, cur = per[lastI], prv = per[lastI - 1], pp = per[lastI - 2];
+  const dl = (a, b) => { const d = a - b; return `<span style="color:var(--${d >= 0 ? 'ok' : 'bad'})">${d >= 0 ? '▲' : '▼'} ${Math.abs(d)}</span>`; };
+  return `<div class="card" style="margin-bottom:14px"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Посещения по обекти</h3><span class="sp"></span>
+    ${[['month', 'По месеци'], ['week', 'По седмици']].map(([k, l]) => `<button class="sm ${D.ktr === k ? 'pri' : ''}" data-act="ktr" data-u="${k}">${l}</button>`).join('')}</div>
+    <div class="row" style="gap:14px;margin-bottom:6px">${locs.map(l => `<span class="mute"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]};margin-right:5px"></i>${l}</span>`).join('')}<span class="mute">Последният период е непълен (до днес).</span></div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:260px" role="img" aria-label="Посещения по обекти">
+      ${ticks.map(t => { const y = H - pb - t / mx * (H - pb - pt); return `<line x1="${pl}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--mute)">${t}</text>`; }).join('')}
+      ${bars}${per.map((p, i) => `<text x="${pl + i * cw + cw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--mute)">${lab(p)}</text>`).join('')}</svg>
+    <div style="overflow:auto"><table><thead><tr><th>Обект</th><th>${wk ? 'Тази седмица' : 'Този месец'}</th><th>${wk ? 'Миналата' : 'Миналия'}</th><th>Промяна</th><th>${wk ? 'Преди 2 седмици' : 'Преди 2 месеца'}</th><th>Клиенти (последен период)</th></tr></thead><tbody>
+      ${locs.map(l => `<tr><td><b>${l}</b></td><td>${val(cur, l)}</td><td>${val(prv, l)}</td><td>${dl(val(cur, l), val(prv, l))}</td><td>${val(pp, l)}</td><td>${val(cur, l, 'clients')}</td></tr>`).join('')}
+      <tr><td><b>Общо</b></td><td><b>${val(cur, locs[0]) + val(cur, locs[1])}</b></td><td>${val(prv, locs[0]) + val(prv, locs[1])}</td><td>${dl(val(cur, locs[0]) + val(cur, locs[1]), val(prv, locs[0]) + val(prv, locs[1]))}</td><td>${val(pp, locs[0]) + val(pp, locs[1])}</td><td></td></tr></tbody></table></div></div>`;
 }
 function drawKpiClients() {
   const el = $('#kcl'); if (!el) return;
@@ -1398,6 +1423,7 @@ document.addEventListener('click', async e => {
       case 'logout': if (S.previewClient) { closeSheet(); exitPreview(); break; } closeSheet(); await sb.auth.signOut(); S.me = null; S.view = null; loginView(); break;
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
       case 'kper': D.kper = el.dataset.p; kpiView(); break;
+      case 'ktr': D.ktr = el.dataset.u; kpiView(); break;
       case 'krisk': D.krisk = !D.krisk; drawKpiClients(); break;
       case 'wk': S.week = el.dataset.d === '0' ? monday(new Date()) : addDays(S.week, +el.dataset.d); weekView(); break;
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
