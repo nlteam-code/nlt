@@ -287,6 +287,13 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-prof{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0 10px;font-size:15px}
 .c-prof b{font:800 20px Montserrat,sans-serif}
 @media (prefers-reduced-motion:reduce){.c-main,.c-sheet,.c-sheet-ov,.c-arc,.c-live{animation:none}}
+
+.seg{display:inline-flex;gap:2px;background:var(--line);padding:3px;border-radius:12px}.seg button{border:0;background:transparent;padding:7px 14px;border-radius:9px;font-weight:600;color:var(--mute);cursor:pointer}.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.cracks{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:14px}
+.crack{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--ok);border-radius:14px;padding:14px 16px}.crack.warn{border-left-color:#e8a33d}.crack.bad{border-left-color:var(--bad)}
+.crack .ct{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);font-weight:600}.crack .cv{font-size:26px;font-weight:700;margin:2px 0 4px}.crack .cd{color:var(--mute);font-size:13px;line-height:1.4}.crack .ca{margin-top:8px;font-size:13px;font-weight:600}
+.brief{border-left:5px solid var(--acc)}
+
 </style>
 </head>
 <body>
@@ -479,7 +486,7 @@ function kpiRange() {
   return [ymd(addDays(n, -27)), ymd(n), 'Последни 28 дни'];
 }
 const pbar = v => `<div class="bar2" style="min-width:70px"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></div>`;
-async function kpiView() {
+async function kpiTrainer() {
   const [from, to, label] = kpiRange();
   $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
   D.ktr = D.ktr || 'month';
@@ -513,6 +520,129 @@ async function kpiView() {
       <div class="mute" style="margin-bottom:8px">В риск: активен клиент, без посещение от 14+ дни и без записан час напред.</div>
       <div id="kcl"></div></div>`;
   drawKpiClients();
+}
+
+
+/* ── KPI за собственика: по обект, накратко, къде се пропукваме ── */
+const KLOCS = [['all', 'Двата обекта'], ['Боян Петров', 'Боян Петров'], ['Лерин', 'Лерин']];
+const pct = (a, b) => b ? Math.round((a - b) / b * 100) : 0;
+const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
+async function kpiView() { return S.owner ? kpiOwner() : kpiTrainer(); }
+async function kpiOwner() {
+  D.kloc = D.kloc || 'all'; D.kchart = D.kchart || 'visits'; D.ktr = D.ktr || 'month'; D.klist = D.klist || 'lost';
+  const L = D.kloc, loc = L === 'all' ? null : L, locs = L === 'all' ? ['Боян Петров', 'Лерин'] : [L];
+  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  const [from, to] = [ymd(addDays(new Date(), -27)), ymd(new Date())];
+  const [trW, trM, cl, st, rv, ht, sr] = await Promise.all([sb.rpc('kpi_trend', { p_unit: 'week', p_from: '2026-06-01' }), sb.rpc('kpi_trend', { p_unit: 'month', p_from: '2026-06-01' }), sb.rpc('kpi_clients'),
+    sb.rpc('kpi_staff', { p_from: from, p_to: to }), sb.rpc('kpi_revenue', { p_loc: loc }), sb.rpc('kpi_heat', { p_loc: loc }), sb.rpc('kpi_sources')]);
+  const err = [trW, trM, cl, st, rv, ht].find(x => x.error); if (err) return fail(err.error, 'KPI не се зареди (изпълнени ли са SQL файловете 09–15?)');
+  const kc = (cl.data || []).filter(c => !loc || c.location === loc); D.kc = kc;
+  const inL = r => locs.includes(r.location);
+  // седмици: последните 4 пълни срещу предишните 4
+  const wk = [...new Set((trW.data || []).map(r => r.period))].sort(), full = wk.slice(0, -1);
+  const sumW = (ps, k = 'visits') => (trW.data || []).filter(r => ps.includes(r.period) && inL(r)).reduce((s, r) => s + r[k], 0);
+  const w4 = full.slice(-4), p4 = full.slice(-8, -4);
+  const v4 = sumW(w4), vp = sumW(p4), vPct = pct(v4, vp);
+  const dSolo = sumW(w4, 'solo') - sumW(p4, 'solo'), dGrp = sumW(w4, 'grp') - sumW(p4, 'grp');
+  const byLoc = Object.fromEntries(['Боян Петров', 'Лерин'].map(l => { const a = (trW.data || []).filter(r => r.location === l && w4.includes(r.period)).reduce((s, r) => s + r.visits, 0), b = (trW.data || []).filter(r => r.location === l && p4.includes(r.period)).reduce((s, r) => s + r.visits, 0); return [l, { a, b, p: pct(a, b) }]; }));
+  const act = kc.filter(c => c.status === 'Active');
+  const active = act.filter(c => c.done_28 > 0), prevActive = act.filter(c => c.done_prev_28 > 0);
+  const lost = act.filter(c => c.done_prev_28 > 0 && c.done_28 === 0).sort((a, b) => b.done_prev_28 - a.done_prev_28);
+  const back = act.filter(c => c.done_28 > 0 && c.done_prev_28 === 0);
+  const risk = act.filter(c => c.at_risk).sort((a, b) => (b.days_since || 0) - (a.days_since || 0));
+  const noPkg = act.filter(c => c.done_28 > 0 && !c.pkg_end).sort((a, b) => b.done_28 - a.done_28);
+  const lostBy = l => lost.filter(c => c.location === l).length;
+  const churn = pct(lost.length, prevActive.length || 1) * (prevActive.length ? 1 : 0);
+  const churnPct = prevActive.length ? Math.round(lost.length / prevActive.length * 100) : 0;
+  // слаби часове (групови)
+  const gh = (ht.data || []).filter(r => r.gevents >= 6).map(r => ({ ...r, a: r.gvisits / r.gevents })).sort((a, b) => a.a - b.a);
+  const dn = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'], hh = h => String(h).padStart(2, '0') + ':00';
+  const weak = gh.filter(r => r.a <= 2).slice(0, 4);
+  // приход
+  const rvr = rv.data || [], rc = rvr[rvr.length - 1], rp = rvr[rvr.length - 2];
+  const rPct = rp && +rp.amount ? pct(+rc.projected || 0, +rp.amount) : 0;
+  // карти „къде се пропукваме“
+  const lvl = (v, bad, warn) => v >= bad ? 'bad' : v >= warn ? 'warn' : 'ok';
+  const cards = [
+    { l: vPct <= -10 ? 'bad' : vPct < -3 ? 'warn' : 'ok', t: 'Посещенията', v: sgn(vPct) + '%', d: `${v4} срещу ${vp} (последни 4 седмици срещу предишните 4). Групови ${sgn(dGrp)}, индивидуални ${sgn(dSolo)}.`, a: vPct < -3 ? 'Виж слабите часове и клиентите в риск по-долу.' : 'Продължавай така; следи отказващите се.' },
+    { l: lvl(churnPct, 15, 8), t: 'Отказали се клиенти', v: lost.length, d: `${churnPct}% от ходилите преди. ${L === 'all' ? `Боян Петров ${lostBy('Боян Петров')}, Лерин ${lostBy('Лерин')}. ` : ''}Ходили са миналите 4 седмици, сега — нито веднъж.`, a: 'Обади се на първите от списъка долу (най-редовните преди).' },
+    { l: lvl(risk.length, 25, 10), t: 'В риск', v: risk.length, d: 'Без посещение от 14+ дни и без записан час напред.', a: 'Пиши им преди да станат „отказали се“.' },
+    { l: lvl(noPkg.length, 15, 5), t: 'Идват без активен абонамент', v: noPkg.length, d: 'Ходили са последния месец, но абонаментът им е изтекъл или липсва.', a: 'Предложи им подновяване — тук се губят приходи.' },
+    { l: weak.length >= 3 ? 'warn' : 'ok', t: 'Слаби групови часове', v: weak.length, d: weak.length ? weak.map(r => `${dn[r.dow]} ${hh(r.hr)} (${r.a.toFixed(1)} души)`).join(' · ') : 'Няма часове с трайно ниска посещаемост.', a: weak.length ? 'Обедини, премести или промотирай тези часове.' : '' },
+    { l: rPct <= -10 ? 'bad' : rPct < -3 ? 'warn' : 'ok', t: 'Приход (прогноза за месеца)', v: eur(rc ? rc.projected : 0), d: rp ? `${sgn(rPct)}% спрямо миналия месец (${eur(rp.amount)}).` : '', a: rPct < -3 ? 'Провери неподновените абонаменти.' : '' }
+  ];
+  const dir = vPct > 3 ? '▲ напред' : vPct < -3 ? '▼ назад' : '■ без промяна';
+  const why = Math.abs(dGrp) >= Math.abs(dSolo) ? `основно от груповите часове (${sgn(dGrp)})` : `основно от индивидуалните (${sgn(dSolo)})`;
+  const now = new Date().toTimeString().slice(0, 5);
+  const brief = `<div class="card brief" style="margin-bottom:14px"><div class="row" style="margin-bottom:6px"><b style="font-size:16px">Днес накратко</b><span class="sp"></span><span class="mute">обновено ${fmt(ymd(new Date()))}, ${now}</span></div>
+    <div style="font-size:15px;line-height:1.5">Посещенията вървят <b>${dir}</b> (${sgn(vPct)}%, ${v4} срещу ${vp}) — ${vPct === 0 ? 'без видима причина' : why}.
+    ${L === 'all' ? `<br>По обекти: <b>Боян Петров</b> ${sgn(byLoc['Боян Петров'].p)}%, <b>Лерин</b> ${sgn(byLoc['Лерин'].p)}%.` : ''}
+    <br>Отказват се <b>${lost.length}</b> клиента${L === 'all' ? ` (Боян Петров ${lostBy('Боян Петров')}, Лерин ${lostBy('Лерин')})` : ''}; ${back.length} са нови или върнали се. Нетно: <b style="color:var(--${back.length - lost.length >= 0 ? 'ok' : 'bad'})">${sgn(back.length - lost.length)}</b>.</div></div>`;
+  const kpiB = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
+  const top = `<div class="kpis">${kpiB('Посещения', v4, `${sgn(vPct)}% · 4 седмици`)}${kpiB('Активни клиенти', active.length, `${sgn(active.length - prevActive.length)} срещу предишните 4 седм.`)}${kpiB('Отказали се', lost.length, `${churnPct}% от ходилите`)}${kpiB('Приход (месец)', eur(rc ? rc.projected : 0), 'прогноза')}</div>`;
+  const crack = `<h3>Къде се пропукваме</h3><div class="cracks">${cards.map(c => `<div class="crack ${c.l}"><div class="ct">${c.t}</div><div class="cv">${c.v}</div><div class="cd">${c.d}</div>${c.a ? `<div class="ca">→ ${c.a}</div>` : ''}</div>`).join('')}</div>`;
+  // графика
+  const trD = D.ktr === 'week' ? trW.data : trM.data;
+  const chartTabs = `<div class="row" style="margin-bottom:8px;gap:6px">${[['visits', 'Посещения'], ['hours', 'Часове'], ['revenue', 'Приход']].map(([k, l]) => `<button class="sm ${D.kchart === k ? 'pri' : ''}" data-act="kchart" data-k="${k}">${l}</button>`).join('')}<span class="sp"></span>${D.kchart !== 'revenue' ? [['month', 'Месеци'], ['week', 'Седмици']].map(([k, l]) => `<button class="sm ${D.ktr === k ? 'pri' : ''}" data-act="ktr" data-u="${k}">${l}</button>`).join('') : ''}</div>`;
+  const chart = D.kchart === 'revenue' ? revenueCard2(rvr) : stackChart(trD, locs, D.kchart === 'hours' ? 'hours' : 'visits', D.ktr);
+  const charts = `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 8px">Тенденция <span class="mute" style="font-weight:400">· от юни до днес</span></h3>${chartTabs}${chart}</div>`;
+  // треньори
+  const sidLoc = id => (S.staff.find(x => x.id === id) || {}).locations || [];
+  const trn = (st.data || []).filter(r => !loc || sidLoc(r.staff_id).includes(loc)).filter(r => r.sessions > 0 || r.hours > 0);
+  const trainers = `<div class="card" style="margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 8px">Треньори <span class="mute" style="font-weight:400">· последни 28 дни</span></h3><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Ср. на час</th><th>Приход</th></tr></thead><tbody>
+    ${trn.map(r => `<tr><td><b>${esc(r.name)}</b></td><td>${r.hours}</td><td>${r.visits}</td><td>${r.avg_per_session ?? '–'}</td><td>${eur(r.revenue || 0)}</td></tr>`).join('') || '<tr><td colspan="5" class="mute">Няма данни.</td></tr>'}</tbody></table></div>`;
+  // клиенти за действие
+  const lists = { lost: ['Отказали се', lost], risk: ['В риск', risk], nopkg: ['Без абонамент', noPkg] }, cur = lists[D.klist] || lists.lost;
+  const list = `<div class="card" style="margin-bottom:14px;overflow:auto"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Клиенти за действие</h3><span class="sp"></span>${Object.entries(lists).map(([k, [l, a]]) => `<button class="sm ${D.klist === k ? 'pri' : ''}" data-act="klist" data-k="${k}">${l} · ${a.length}</button>`).join('')}</div>
+    <table><thead><tr><th>Клиент</th><th>Обект</th><th>Преди (4 седм.)</th><th>Сега</th><th>Последно</th><th>Абонамент</th></tr></thead><tbody>
+    ${cur[1].slice(0, 40).map(c => `<tr class="click" data-act="client" data-id="${c.client_id}"><td><b>${esc(c.name)}</b></td><td>${esc(c.location || '')}</td><td>${c.done_prev_28}</td><td>${c.done_28}</td><td>${c.last_visit ? fmt(c.last_visit) + ` <span class="mute">· ${c.days_since} дни</span>` : '–'}</td><td>${c.pkg_end ? 'до ' + fmt(c.pkg_end) + ` · ${c.pkg_left} ост.` : '<span class="chip warn">няма</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="mute">Няма клиенти в този списък.</td></tr>'}</tbody></table>
+    ${cur[1].length > 40 ? `<div class="mute" style="margin-top:6px">Показани са първите 40 от ${cur[1].length}.</div>` : ''}</div>`;
+  const more = `<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:600">Още показатели · най-заети часове, честота, източник</summary>${heatGrid(ht.data || [])}${freqBlock(kc, locs)}${sourcesBlock(sr.data)}</details>`;
+  $('#main').innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">KPI</b><span class="sp"></span>
+    <div class="seg">${KLOCS.map(([k, l]) => `<button class="${L === k ? 'on' : ''}" data-act="kloc" data-l="${k}">${l}</button>`).join('')}</div></div>
+    ${brief}${top}${crack}${charts}${list}${trainers}${more}`;
+}
+function stackChart(rows, locs, key, unit) {
+  const wk = unit === 'week', per = [...new Set(rows.map(r => r.period))].sort(), W = 720, H = 220, pl = 36, pb = 26, pt = 10, cw = (W - pl) / per.length, bw = Math.max(6, Math.min(34, cw - 6));
+  const val = (p, l) => (rows.find(r => r.period === p && r.location === l) || {})[key] || 0;
+  const tot = p => locs.reduce((s, l) => s + val(p, l), 0), mxr = Math.max(...per.map(tot), 1), mx = Math.max(4, Math.ceil(mxr / 4) * 4);
+  const lab = p => { const d = parse(p); return wk ? `${d.getDate()}.${d.getMonth() + 1}` : ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'][d.getMonth()]; };
+  const bars = per.map((p, i) => { let y0 = H - pb; const x = pl + i * cw + (cw - bw) / 2, last = i === per.length - 1;
+    return locs.map(l => { const v = val(p, l); if (!v) return ''; const h = v / mx * (H - pb - pt), y = y0 - h; y0 = y - 2; return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" fill="${TRC[l]}" opacity="${last ? .55 : 1}"><title>${l}: ${v}${last ? ' (до днес)' : ''}</title></rect>`; }).join(''); }).join('');
+  const prv = per[per.length - 2], cur = per[per.length - 1];
+  const ticks = [0, .5, 1].map(f => Math.round(mx * f));
+  const what = key === 'hours' ? 'проведени часа' : 'посещения';
+  return `<div class="row" style="gap:14px;margin-bottom:4px">${locs.map(l => `<span class="mute"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]};margin-right:5px"></i>${l}</span>`).join('')}<span class="mute">${what} · последният период е непълен</span></div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:250px" role="img" aria-label="Тенденция">
+    ${ticks.map(t => { const y = H - pb - t / mx * (H - pb - pt); return `<line x1="${pl}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--mute)">${t}</text>`; }).join('')}
+    ${bars}${per.map((p, i) => per.length > 14 && i % 2 ? '' : `<text x="${pl + i * cw + cw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--mute)">${lab(p)}</text>`).join('')}</svg>
+    <div class="mute">${wk ? 'Тази седмица' : 'Този месец'}: <b style="color:var(--ink)">${tot(cur)}</b> до днес · ${wk ? 'миналата' : 'миналия'}: <b style="color:var(--ink)">${tot(prv)}</b></div>`;
+}
+function revenueCard2(rows) {
+  if (!rows.length) return '';
+  const W = 720, H = 220, pl = 44, pb = 26, pt = 14, cw = (W - pl) / rows.length, bw = Math.min(54, cw - 18), mn = ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'];
+  const mx = Math.max(1000, Math.ceil(Math.max(...rows.map(r => Math.max(+r.amount, +r.projected || 0))) / 4000) * 4000), ticks = [0, .5, 1].map(f => Math.round(mx * f));
+  const bar = (x, v, op, tip) => { const h = v / mx * (H - pb - pt), y = H - pb - h; return v > 0 ? `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" fill="var(--acc)" opacity="${op}"><title>${tip}</title></rect>` : ''; };
+  return `<div class="mute" style="margin-bottom:4px">Плащания от PT Minder до 2.11 и от приложението след това. Бледият стълб е прогнозата за текущия месец.</div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:250px" role="img" aria-label="Приход">
+    ${ticks.map(t => { const y = H - pb - t / mx * (H - pb - pt); return `<line x1="${pl}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--mute)">${t >= 1000 ? (t / 1000) + 'k' : t}</text>`; }).join('')}
+    ${rows.map((r, i) => { const x = pl + i * cw + (cw - bw) / 2, last = i === rows.length - 1; return bar(x, +r.projected || 0, .2, 'Прогноза: ' + eur(r.projected || 0)) + bar(x, +r.amount, last ? .6 : 1, eur(r.amount)) + `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--mute)">${mn[parse(r.month).getMonth()]}</text>`; }).join('')}</svg>`;
+}
+function heatGrid(rows) {
+  if (!rows.length) return '';
+  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'], hrs = [...new Set(rows.map(r => r.hr))].sort((a, b) => a - b), g = {}; rows.forEach(r => { g[r.dow + '_' + r.hr] = r; });
+  const avg = r => r ? r.visits / 12 : 0, mxv = Math.max(0.01, ...rows.map(avg)), hh = h => String(h).padStart(2, '0') + ':00';
+  return `<h3>Най-заети часове <span class="mute" style="font-weight:400">· посещения на седмица</span></h3><div style="overflow:auto"><table style="min-width:420px"><thead><tr><th></th>${days.map(d => `<th style="text-align:center">${d}</th>`).join('')}</tr></thead><tbody>
+    ${hrs.map(h => `<tr><td class="mute">${hh(h)}</td>${days.map((d, i) => { const r = g[i + '_' + h], v = avg(r), a = v / mxv; return `<td style="text-align:center;padding:4px;${r ? `background:color-mix(in srgb,var(--acc) ${Math.round(a * 85)}%,transparent);` : ''}">${r ? v.toFixed(1) : ''}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function freqBlock(kc, locs) {
+  const rows = locs.map(l => { const a = kc.filter(c => c.location === l && c.status === 'Active' && c.done_28 > 0), n = a.length, tot = a.reduce((s, c) => s + c.done_28, 0), b1 = a.filter(c => c.done_28 / 4 < 1.5).length, b2 = a.filter(c => c.done_28 / 4 >= 1.5 && c.done_28 / 4 < 2.5).length;
+    return `<tr><td><b>${l}</b></td><td>${n}</td><td>${n ? (tot / n / 4).toFixed(1) : '–'}</td><td>${b1}</td><td>${b2}</td><td>${n - b1 - b2}</td></tr>`; }).join('');
+  return `<h3>Честота на посещенията <span class="mute" style="font-weight:400">· 4 седмици</span></h3><div style="overflow:auto"><table><thead><tr><th>Обект</th><th>Активни</th><th>Посещ./седм. на клиент</th><th>~1 път</th><th>~2 пъти</th><th>3+</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function sourcesBlock(src) {
+  const sr = src || [], smax = Math.max(1, ...sr.map(x => x.clients)); if (!sr.length) return '';
+  return `<h3>Откъде идват клиентите <span class="mute" style="font-weight:400">· активни (променя се в профила на клиента)</span></h3>${sr.map(x => `<div class="row" style="gap:10px;margin:4px 0"><span style="min-width:110px">${esc(x.source)}</span>${pbar(x.clients / smax * 100)}<b>${x.clients}</b></div>`).join('')}`;
 }
 
 const TRC = { 'Боян Петров': '#eb4c51', 'Лерин': '#4f7cac' };
@@ -1470,6 +1600,9 @@ document.addEventListener('click', async e => {
       case 'kper': D.kper = el.dataset.p; kpiView(); break;
       case 'ktr': D.ktr = el.dataset.u; kpiView(); break;
       case 'kheat': D.kheat = el.dataset.l || null; kpiView(); break;
+      case 'kloc': D.kloc = el.dataset.l; kpiView(); break;
+      case 'kchart': D.kchart = el.dataset.k; kpiView(); break;
+      case 'klist': D.klist = el.dataset.k; kpiView(); break;
       case 'krisk': D.krisk = !D.krisk; drawKpiClients(); break;
       case 'wk': S.week = el.dataset.d === '0' ? monday(new Date()) : addDays(S.week, +el.dataset.d); weekView(); break;
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
