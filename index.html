@@ -676,13 +676,15 @@ function drawClients() {
   $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
 }
 async function openClient(id, tab) {
-  const [c, cp, pay, chg, bk, hist] = await Promise.all([
+  const [c, cp, pay, chg, bk, hist, hv, hm2] = await Promise.all([
     sb.from('clients').select('*').eq('id', id).single(),
     sb.from('package_status').select('*').eq('client_id', id).order('end_date', { ascending: false }),
     S.owner ? sb.from('payments').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     S.owner ? sb.from('charges').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').order('date', { foreignTable: 'sessions' }).limit(30),
-    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).lt('sessions.date', today()).order('date', { foreignTable: 'sessions', ascending: false }).limit(500)
+    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).lt('sessions.date', today()).order('date', { foreignTable: 'sessions', ascending: false }).limit(500),
+    sb.from('hist_visits').select('date,time,title,location,status').eq('client_id', id).order('date', { ascending: false }).limit(1000),
+    S.owner ? sb.from('hist_money').select('date,amount,method,category,note').eq('client_id', id).order('date', { ascending: false }).limit(500) : Promise.resolve({ data: [] })
   ]);
   if (c.error) return fail(c.error, 'Клиентът не се отвори');
   const x = c.data, pk = cp.data || [], pays = pay.data || [], chs = chg.data || [], t0 = today();
@@ -693,7 +695,8 @@ async function openClient(id, tab) {
   const chosen = S.packages.filter(p => p.active);
   const tn = id2 => S.staff.find(t => t.id === id2)?.name || '';
   const st = b => b.status === 'done' ? '<span class="chip" style="color:var(--ok)">Проведен</span>' : b.status === 'cancelled' ? (b.late ? '<span class="chip bad">Късен отказ</span>' : '<span class="chip">Отказан</span>') : '<span class="chip warn">Не е отбелязан</span>';
-  const nDone = past.filter(b => b.status === 'done').length, nCan = past.filter(b => b.status === 'cancelled').length, nLate = past.filter(b => b.late).length;
+  const arch = (hv.data || []).map(h => ({ ...h, a: true, t: String(h.time || ''), bad: /cancel|no.?show|late/i.test(h.status || '') })), archMoney = hm2.data || [];
+  const nDone = past.filter(b => b.status === 'done').length + arch.filter(h => !h.bad).length, nCan = past.filter(b => b.status === 'cancelled').length, nLate = past.filter(b => b.late).length;
   const pstate = p => p.end_date < t0 || p.used >= p.total ? '<span class="chip">Изтекъл</span>' : p.start_date > t0 ? '<span class="chip warn">Предстоящ</span>' : '<span class="chip" style="color:var(--ok)">Активен</span>';
   const ledger = [...pays.map(p => ({ d: p.date, plus: true, a: p.amount, t: `${esc(p.method || '')} ${esc(p.note || '')}`, id: p.id, act: 'paydel' })), ...chs.map(p => ({ d: p.date, plus: false, a: p.amount, t: esc(p.note || 'Такса'), id: p.id, act: 'chdel' }))].sort((a, b) => String(b.d).localeCompare(String(a.d)));
   const T = tab || 'profile';
@@ -720,23 +723,25 @@ async function openClient(id, tab) {
     ${pk.map(p => { const left = p.total - p.used; return `<div class="pk"><div style="min-width:180px"><b>${esc(p.package_name || (p.kind === 'solo' ? 'Персонални' : 'Групови'))}</b> ${pstate(p)}<br><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}${S.owner ? ' · ' + money(p.price) : ''}</span></div>
       <div class="bar2"><i style="width:${Math.min(100, p.used / p.total * 100)}%"></i></div><span>${p.used}/${p.total}${left <= 0 ? ' · изчерпан' : ''}</span>
       <button class="sm danger" data-act="cpdel" data-id="${p.id}">✕</button></div>`; }).join('') || '<div class="mute">Няма абонаменти.</div>'}
+    ${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).length ? `<h3>Платени абонаменти · PT Minder</h3>${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).map(p => `<div class="bk"><div class="nm">${fmt(p.date)} · ${esc(p.category)} · <b>${money(p.amount)}</b></div></div>`).join('')}` : ''}
     <h3>Назначи услуга</h3>
     <div class="row"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
       <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
     </div>
 
     <div class="cpane" data-p="visits" ${T === 'visits' ? '' : 'hidden'}>
-    <div class="mute" style="margin-bottom:6px">Проведени ${nDone} · Отказани ${nCan}${nLate ? ` (късни ${nLate})` : ''}${past.length >= 500 ? ' · показани са последните 500' : ''}</div>
+    <div class="mute" style="margin-bottom:6px">Проведени ${nDone} · Отказани ${nCan + arch.filter(h => h.bad).length}${nLate ? ` (късни ${nLate})` : ''}${arch.length ? ` · включени ${arch.length} от PT Minder (от май 2026)` : ''}</div>
     <h3>Предстоящи</h3>
     ${upcoming.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])}${b.sessions.location !== S.loc ? ' · ' + esc(b.sessions.location) : ''}</div></div>`).join('') || '<div class="mute">Няма.</div>'}
     <h3>История</h3>
-    <div style="max-height:320px;overflow:auto">${past.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])} <span class="mute">${esc(b.sessions.location)}${tn(b.sessions.trainer_id) ? ' · ' + esc(tn(b.sessions.trainer_id)) : ''}</span> ${st(b)}${b.use_plan ? '' : ' <span class="chip warn">еднократно</span>'}</div></div>`).join('') || '<div class="mute">Още няма записани посещения в приложението. Старите от PT Minder са отчетени в „използвани" при абонаментите.</div>'}</div>
+    <div style="max-height:320px;overflow:auto">${arch.map(h => `<div class="bk"><div class="nm">${fmt(h.date)} ${esc(h.t)} · ${esc(h.title || '')} <span class="mute">${esc(h.location || '')}</span> ${h.bad ? '<span class="chip">Отказан</span>' : '<span class="chip" style="color:var(--ok)">Проведен</span>'} <span class="chip">PT Minder</span></div></div>`).join('')}${past.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])} <span class="mute">${esc(b.sessions.location)}${tn(b.sessions.trainer_id) ? ' · ' + esc(tn(b.sessions.trainer_id)) : ''}</span> ${st(b)}${b.use_plan ? '' : ' <span class="chip warn">еднократно</span>'}</div></div>`).join('') || '<div class="mute">Още няма записани посещения.</div>'}</div>
     </div>
 
     ${S.owner ? `<div class="cpane" data-p="pays" ${T === 'pays' ? '' : 'hidden'}>
     <h3>История на плащанията</h3>
     <div class="mute" style="margin-bottom:6px">Платено ${money(sumPay)} · Абонаменти ${money(sumPk)} · Такси ${money(sumCh)}</div>
     <div style="max-height:300px;overflow:auto">${ledger.map(l => `<div class="bk"><div class="nm"><b style="color:${l.plus ? 'var(--ok)' : 'var(--bad)'}">${l.plus ? '+' : '−'} ${money(l.a)}</b> · ${fmt(l.d)} · ${l.t}</div><button class="sm danger" data-act="${l.act}" data-id="${l.id}">✕</button></div>`).join('') || '<div class="mute">Няма плащания.</div>'}</div>
+    ${archMoney.length ? `<h3>Архив от PT Minder · ${archMoney.length} плащания · ${money(archMoney.reduce((a, p) => a + Number(p.amount || 0), 0))}</h3><div class="mute" style="margin-bottom:6px">Само за справка — не влиза в баланса.</div><div style="max-height:220px;overflow:auto">${archMoney.map(p => `<div class="bk"><div class="nm"><b style="color:var(--ok)">+ ${money(p.amount)}</b> · ${fmt(p.date)} · ${esc(p.category || '')} ${esc(p.method || '')} ${esc(p.note || '')}</div></div>`).join('')}</div>` : ''}
     <div class="row" style="margin-top:8px"><input type="number" id="pay-amt" placeholder="Сума" style="width:90px" step="0.01">
       <select id="pay-m"><option>В брой</option><option>Карта</option><option>Банков път</option></select><input id="pay-note" placeholder="Бележка" style="flex:1;min-width:120px">
       <button data-act="payadd">+ Плащане</button></div>
