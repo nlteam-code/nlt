@@ -450,6 +450,7 @@ async function staffApp() {
   ]);
   if (c.error || p.error || s.error) return fail(c.error || p.error || s.error, 'Грешка при зареждане');
   S.clients = c.data; S.packages = p.data; S.staff = s.data;
+  try { const rr = await sb.rpc('auto_renew_sync'); if (!rr.error && rr.data > 0) S.pstat = null; } catch (e) { }
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
   renderStaff();
@@ -472,7 +473,7 @@ function renderStaff() {
     S.view = t || null; S.me = t ? { role: 'staff', row: t } : S.real; S.owner = S.realOwner && !t;
     if (t && S.tab === 'settings') S.tab = 'week'; D.ploc = null; renderStaff();
   };
-  $('#loc').onchange = e => { S.loc = e.target.value; store.set('nlt-loc', S.loc); D.ploc = null; renderTab(); };
+  $('#loc').onchange = e => { S.loc = e.target.value; S.cloc = S.loc; store.set('nlt-loc', S.loc); D.ploc = null; renderTab(); };
   renderTab();
 }
 function renderTab() {
@@ -912,7 +913,7 @@ async function clientsView() {
   drawClients();
 }
 function drawClients() {
-  const q = S.q.toLowerCase(); S.cst = S.cst || 'all'; S.cloc = S.cloc || 'all';
+  const q = S.q.toLowerCase(); S.cst = S.cst || 'all'; if (S.cloc === undefined) S.cloc = S.loc;
   const base = S.clients.filter(c => (!q || (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q)) && (S.cloc === 'all' || c.location === S.cloc));
   const cnt = k => base.filter(c => cstat(c) === k).length;
   const list = base.filter(c => {
@@ -1320,20 +1321,14 @@ async function saveCv() {
 /* ── чакащи клиенти и влачене ── */
 function waitHtml() {
   if (!S.waitOpen) return '';
-  S.wst = S.wst || 'all';
   const q = (S.wq || '').toLowerCase();
-  const pool = S.clients.filter(c => { const k = cstat(c); return (k === 'active' || k === 'wait') && (S.wall || c.location === S.loc || !c.location); });
-  const all = pool.filter(c => S.wst === 'all' || cstat(c) === S.wst);
+  const all = S.clients.filter(c => cstat(c) === 'wait' && (c.location === S.loc || !c.location));
   const list = (q ? all.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)) : all).sort((a, b) => a.name.localeCompare(b.name, 'bg'));
   const pc = S.waitPick && S.clients.find(c => c.id === S.waitPick);
-  const nA = pool.filter(c => cstat(c) === 'active').length, nW = pool.length - nA;
-  const chip = (k, l) => `<button class="sm ${S.wst === k ? 'pri' : ''}" data-act="wst" data-k="${k}">${l}</button>`;
-  return `<div class="card wcard"><div class="row" style="margin-bottom:6px"><b>Клиенти (${all.length})</b><span class="sp"></span><button class="sm" data-act="wtoggle" title="Скрий">✕</button></div>
+  return `<div class="card wcard"><div class="row" style="margin-bottom:6px"><b>Чакащи (${all.length})</b><span class="mute" style="font-size:12px">${esc(S.loc)}</span><span class="sp"></span><button class="sm" data-act="wtoggle" title="Скрий">✕</button></div>
     <input id="wq" placeholder="Търси…" value="${esc(S.wq || '')}" style="width:100%;margin-bottom:6px">
-    <div class="row" style="gap:4px;margin-bottom:6px;flex-wrap:wrap">${chip('all', 'Всички')}${chip('active', 'Активни ' + nA)}${chip('wait', 'Чакащи ' + nW)}</div>
-    <label class="mute" style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:6px"><input type="checkbox" data-act="wall" ${S.wall ? 'checked' : ''}> и от другия обект</label>
-    <div class="wait">${list.map(c => { const p = curPkg(c.id), left = p ? p.total - p.used : 0; return `<div class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="true" data-act="wpick" data-id="${c.id}" title="${esc(c.name)}"><span class="wn">${esc(c.name)}</span><span class="wm">${S.wall ? esc(c.location || '') + ' · ' : ''}${p ? left + ' ост.' : 'без абонамент'}</span></div>`; }).join('') || '<span class="mute">Няма клиенти.</span>'}</div>
-    ${pc ? `<div style="margin-top:6px;font-size:13px">Избран: <b>${esc(pc.name)}</b>. Натисни час или го завлачи върху графика. <button class="sm" data-act="wclear">Откажи</button></div>` : '<div class="mute" style="margin-top:6px;font-size:12px">Избери клиент и натисни час (записва се при Аксел), или го завлачи върху графика.</div>'}</div>`;
+    <div class="wait">${list.map(c => `<div class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="true" data-act="wpick" data-id="${c.id}" title="${esc(c.name)}"><span class="wn">${esc(c.name)}</span></div>`).join('') || '<span class="mute">Няма чакащи (клиенти без абонамент) в този обект.</span>'}</div>
+    ${pc ? `<div style="margin-top:6px;font-size:13px">Избран: <b>${esc(pc.name)}</b>. Натисни час или го завлачи върху графика. <button class="sm" data-act="wclear">Откажи</button></div>` : '<div class="mute" style="margin-top:6px;font-size:12px">Избери клиент и натисни час (записва се при Аксел), или го завлачи върху графика. Работи и за вечерните часове.</div>'}</div>`;
 }
 async function quickBook(cid, date, time) {
   const tr = S.staff.find(t => t.active && t.name.startsWith('Аксел'));
