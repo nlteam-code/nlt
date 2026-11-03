@@ -895,7 +895,7 @@ async function loadPstat() {
   return data;
 }
 const CST = { active: 'Активни', wait: 'Чакащи', pause: 'Пауза', inactive: 'Неактивни' };
-function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 'Inactive') return 'inactive'; return curPkg(c.id) ? 'active' : 'wait'; }
+function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 'Inactive') return 'inactive'; if (curPkg(c.id)) return 'active'; const t = today(); return (S.pstat || []).some(p => p.client_id === c.id && p.start_date > t) ? 'active' : 'wait'; }
 function curPkg(cid) {
   const t = today();
   const list = (S.pstat || []).filter(p => p.client_id === cid);
