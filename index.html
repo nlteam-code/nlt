@@ -1663,13 +1663,21 @@ async function mbSlots(d) {
     cSheet(`<h3 class="c-sheet-t">${esc(dayWord(d, today()))}</h3><div class="c-note">${esc(MB.svc.name)} · свободни часове</div>${times.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${times.map(x => `<button class="c-btn outline sm" data-act="mtime" data-t="${x}">${x}</button>`).join('')}</div>` : '<div class="c-empty">Няма свободни часове този ден.</div>'}<button class="c-btn plain wide" data-act="msvc" data-id="${MB.svc.id}">Друг ден</button>`);
   } catch (e) { mbFail(e); }
 }
+function normPh(p) {
+  let d = String(p || '').replace(/[^\d+]/g, '');
+  if (d.startsWith('00')) d = '+' + d.slice(2); else if (d.startsWith('0')) d = '+359' + d.slice(1); else if (d.startsWith('359')) d = '+' + d; else if (!d.startsWith('+') && d.length === 9) d = '+359' + d;
+  return /^\+\d{8,15}$/.test(d) ? d : '';
+}
 function mbConfirm(t) {
-  MB.time = t;
-  cSheet(`<h3 class="c-sheet-t">Потвърди масажа</h3><div class="c-ask"><div class="c-ct">${t}</div><div><div class="c-st">${esc(MB.svc.name)}</div><div class="c-ss">${esc(dayWord(MB.date, today()))} · Лерин · плащане на място</div></div></div><div class="c-note">Отказ през приложението е възможен до 4 часа преди масажа.</div><button class="c-btn solid wide" data-act="mgo">Запази</button><button class="c-btn plain wide" data-act="csheetx">Отказ</button>`);
+  MB.time = t; const needPh = !normPh(S.me.row.phone);
+  cSheet(`<h3 class="c-sheet-t">Потвърди масажа</h3><div class="c-ask"><div class="c-ct">${t}</div><div><div class="c-st">${esc(MB.svc.name)}</div><div class="c-ss">${esc(dayWord(MB.date, today()))} · Лерин · плащане на място</div></div></div>${needPh ? `<label class="f" style="display:block;margin:10px 0"><span class="c-note" style="display:block">Телефон за връзка (иска се само първия път и се запазва в профила ти)</span><input id="mb-ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="+359 88 123 4567" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--c-line,#ccc);font-size:16px"></label>` : ''}<div class="c-note">Отказ през приложението е възможен до 4 часа преди масажа.</div><button class="c-btn solid wide" data-act="mgo">Запази</button><button class="c-btn plain wide" data-act="csheetx">Отказ</button>`);
 }
 async function mbGo() {
+  let phone = '';
+  const inp = document.getElementById('mb-ph');
+  if (inp) { phone = normPh(inp.value); if (!phone) return toast('Въведи валиден телефон, например +359 88 123 4567'); }
   cSheet('<h3 class="c-sheet-t">Записване…</h3>');
-  try { await mbCall({ action: 'book', event: MB.svc.id, date: MB.date, time: MB.time }); closeSheet(); toast('Масажът е записан!'); clientApp(); }
+  try { await mbCall({ action: 'book', event: MB.svc.id, date: MB.date, time: MB.time, phone }); if (phone) S.me.row.phone = phone; closeSheet(); toast('Масажът е записан!'); clientApp(); }
   catch (e) { mbFail(e); }
 }
 const massageOk = x => x.status === 'booked' && new Date(x.date + 'T' + x.start_time) - Date.now() >= 4 * 36e5;
