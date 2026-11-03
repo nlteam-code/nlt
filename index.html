@@ -1631,11 +1631,54 @@ function clientBookTab(me, t, act) {
   }).join('') : '<div class="c-empty">Няма часове за този ден.</div>'}`;
 }
 
+
+/* запис на масаж от приложението (Edge Function → SimplyBook) */
+const MB = { svc: null, date: null };
+async function mbCall(body) {
+  const { data, error } = await sb.functions.invoke('massage-booking', { body });
+  let msg = data && data.error;
+  if (!msg && error) { try { const j = await error.context.json(); msg = j.error; } catch (e) { msg = error.message; } }
+  if (msg) throw new Error(msg);
+  return data;
+}
+function mbFail(e) { cSheet(`<h3 class="c-sheet-t">Записването не е достъпно</h3><div class="c-note">${esc(e.message || e)}</div><a class="c-btn outline wide" style="text-align:center;text-decoration:none;display:block" href="${SB_URL}" target="_blank" rel="noopener">Запази в страницата на студиото</a><button class="c-btn plain wide" data-act="csheetx">Затвори</button>`); }
+async function mbStart() {
+  if (S.previewClient) return toast('Само преглед — записването е изключено.');
+  cSheet('<h3 class="c-sheet-t">Масаж · Лерин</h3><div class="c-note">Зареждане…</div>');
+  try {
+    const r = await mbCall({ action: 'services' }); MB.list = r.services;
+    cSheet(`<h3 class="c-sheet-t">Избери масаж</h3><div class="c-note">Само обект Лерин · плащане на място</div>${r.services.map(x => `<button class="c-btn outline wide" style="text-align:left" data-act="msvc" data-id="${x.id}">${esc(x.name)} · ${x.minutes} мин${x.price ? ' · ' + x.price + ' €' : ''}</button>`).join('')}<button class="c-btn plain wide" data-act="csheetx">Отказ</button>`);
+  } catch (e) { mbFail(e); }
+}
+function mbDays(id) {
+  MB.svc = MB.list.find(x => String(x.id) === String(id)); if (!MB.svc) return;
+  const t = today(); const days = [...Array(14)].map((_, i) => ymd(addDays(parse(t), i)));
+  cSheet(`<h3 class="c-sheet-t">${esc(MB.svc.name)}</h3><div class="c-note">Избери ден</div><div style="display:flex;flex-wrap:wrap;gap:8px">${days.map(d => `<button class="c-btn outline sm" data-act="mday" data-d="${d}">${esc(dayWord(d, t))}</button>`).join('')}</div><button class="c-btn plain wide" data-act="mbook">Назад</button>`);
+}
+async function mbSlots(d) {
+  MB.date = d; cSheet(`<h3 class="c-sheet-t">${esc(MB.svc.name)}</h3><div class="c-note">Зареждане на свободните часове…</div>`);
+  try {
+    const r = await mbCall({ action: 'slots', event: MB.svc.id, date: d }); const now = new Date();
+    const times = r.times.filter(x => new Date(d + 'T' + x) > now);
+    cSheet(`<h3 class="c-sheet-t">${esc(dayWord(d, today()))}</h3><div class="c-note">${esc(MB.svc.name)} · свободни часове</div>${times.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${times.map(x => `<button class="c-btn outline sm" data-act="mtime" data-t="${x}">${x}</button>`).join('')}</div>` : '<div class="c-empty">Няма свободни часове този ден.</div>'}<button class="c-btn plain wide" data-act="msvc" data-id="${MB.svc.id}">Друг ден</button>`);
+  } catch (e) { mbFail(e); }
+}
+function mbConfirm(t) {
+  MB.time = t;
+  cSheet(`<h3 class="c-sheet-t">Потвърди масажа</h3><div class="c-ask"><div class="c-ct">${t}</div><div><div class="c-st">${esc(MB.svc.name)}</div><div class="c-ss">${esc(dayWord(MB.date, today()))} · Лерин · плащане на място</div></div></div><div class="c-note">Отказ през приложението е възможен до 4 часа преди масажа.</div><button class="c-btn solid wide" data-act="mgo">Запази</button><button class="c-btn plain wide" data-act="csheetx">Отказ</button>`);
+}
+async function mbGo() {
+  cSheet('<h3 class="c-sheet-t">Записване…</h3>');
+  try { await mbCall({ action: 'book', event: MB.svc.id, date: MB.date, time: MB.time }); closeSheet(); toast('Масажът е записан!'); clientApp(); }
+  catch (e) { mbFail(e); }
+}
 const massageOk = x => x.status === 'booked' && new Date(x.date + 'T' + x.start_time) - Date.now() >= 4 * 36e5;
+const SB_URL = 'https://newleveltraining.secure.simplybook.it/v2/';
 function clientMassages() {
   const m = (C.massages || []).filter(x => x.status === 'booked');
-  if (!m.length) return '';
-  return `<h3 class="c-h">Масажи · само обект Лерин</h3><section class="c-card c-list">${m.map(x => `<div class="c-class"><div class="c-ct">${hm(x.start_time)}</div><div class="c-cinfo"><div class="c-st">${esc(x.service)}</div><div class="c-ss">${fmt(x.date)} · Лерин · плащане на място</div></div>
+  const book = `<button class="c-btn solid wide" data-act="mbook">Запази масаж (Лерин)</button>`;
+  if (!m.length) return `<h3 class="c-h">Масажи · само обект Лерин</h3>${book}`;
+  return `<h3 class="c-h">Масажи · само обект Лерин</h3>${book}<section class="c-card c-list">${m.map(x => `<div class="c-class"><div class="c-ct">${hm(x.start_time)}</div><div class="c-cinfo"><div class="c-st">${esc(x.service)}</div><div class="c-ss">${fmt(x.date)} · Лерин · плащане на място</div></div>
     ${massageOk(x) ? `<button class="c-btn outline sm" data-act="mcancelme" data-id="${x.id}">Откажи</button>` : `<span class="c-mute" style="font-size:12px">под 4 ч.</span>`}</div>`).join('')}</section>
     <div class="c-note">Отказ през приложението е възможен до 4 часа преди масажа.</div>`;
 }
@@ -2234,6 +2277,11 @@ document.addEventListener('click', async e => {
       case 'mtoggle': S.massage = !S.massage; weekView(); break;
       case 'mcancel': if (confirm('Да откажа ли масажа?')) massageCancelStaff(el.dataset.id); break;
       case 'mdone': massageDone(el.dataset.id); break;
+      case 'mbook': mbStart(); break;
+      case 'msvc': mbDays(el.dataset.id); break;
+      case 'mday': mbSlots(el.dataset.d); break;
+      case 'mtime': mbConfirm(el.dataset.t); break;
+      case 'mgo': mbGo(); break;
       case 'mcancelme': clientMassageCancel(el.dataset.id); break;
       case 'wtoggle': S.waitOpen = !S.waitOpen; $('#wbtn').innerHTML = waitHtml(); break;
       case 'wpick': S.waitPick = S.waitPick === el.dataset.id ? null : el.dataset.id; $('#wbtn').innerHTML = waitHtml(); break;
