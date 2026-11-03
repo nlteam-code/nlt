@@ -598,11 +598,44 @@ async function kpiTrainer() {
 }
 
 
+
+/* ── KPI на масажното студио (само Лерин). Пари — само за собственика ── */
+async function massageKpi() {
+  const main = $('#main'); if (!main) return;
+  const [mb, ms] = await Promise.all([sb.from('massage_bookings').select('client_id,guest_email,guest_name,date,service,status,cancelled_by').limit(5000), S.owner ? sb.from('massage_services').select('name,price') : Promise.resolve({ data: [] })]);
+  if (mb.error) return;
+  const t = today(), d28 = ymd(addDays(parse(t), -28)), d56 = ymd(addDays(parse(t), -56)), d90 = ymd(addDays(parse(t), -90)), d7 = ymd(addDays(parse(t), 7));
+  const price = Object.fromEntries((ms.data || []).map(x => [x.name, Number(x.price || 0)]));
+  const all = mb.data || [], key = x => x.client_id || x.guest_email || x.guest_name;
+  const done = all.filter(x => x.status === 'booked' && x.date < t), can = all.filter(x => x.status === 'cancelled');
+  const inR = (x, a, b) => x.date >= a && x.date < b;
+  const d28n = done.filter(x => inR(x, d28, t)), dPrev = done.filter(x => inR(x, d56, d28));
+  const c28 = can.filter(x => inR(x, d28, t)), cc28 = c28.filter(x => x.cancelled_by === 'client').length;
+  const firstSeen = {}; done.forEach(x => { const k = key(x); if (!firstSeen[k] || x.date < firstSeen[k]) firstSeen[k] = x.date; });
+  const active = new Set(d28n.map(key)), neu = [...active].filter(k => firstSeen[k] >= d28).length;
+  const cnt90 = {}; done.filter(x => x.date >= d90).forEach(x => { const k = key(x); cnt90[k] = (cnt90[k] || 0) + 1; });
+  const c90 = Object.values(cnt90), repeat = c90.length ? Math.round(c90.filter(n => n >= 2).length / c90.length * 100) : 0;
+  const cancelPct = (d28n.length + c28.length) ? Math.round(c28.length / (d28n.length + c28.length) * 100) : 0;
+  const upc = all.filter(x => x.status === 'booked' && x.date >= t && x.date < d7).length;
+  const delta = (a, b) => b ? `${a >= b ? '+' : '−'}${Math.abs(Math.round((a - b) / b * 100))}% срещу предишните 28 дни` : '&nbsp;';
+  const svc = {}; d28n.forEach(x => { svc[x.service] = (svc[x.service] || 0) + 1; });
+  const svcRows = Object.entries(svc).sort((a, b) => b[1] - a[1]).map(([n, c]) => `<tr><td>${esc(n)}</td><td>${c}</td></tr>`).join('');
+  const weeks = [...Array(12)].map((_, i) => { const a = ymd(addDays(monday(parse(t)), -7 * (11 - i))), b = ymd(addDays(parse(a), 7)); return { a, n: done.filter(x => inR(x, a, b)).length }; });
+  const mx = Math.max(1, ...weeks.map(w => w.n));
+  const rev28 = d28n.reduce((a, x) => a + (price[x.service] || 0), 0), revPrev = dPrev.reduce((a, x) => a + (price[x.service] || 0), 0);
+  const k = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
+  main.insertAdjacentHTML('beforeend', `<h3 style="margin-top:22px">Масажно студио · Лерин · последни 28 дни</h3>
+    <div class="kpis">${k('Масажи', d28n.length, delta(d28n.length, dPrev.length))}${k('Клиенти', active.size, neu + ' нови')}${k('Повтарящи се', repeat + '%', 'с 2+ масажа за 90 дни')}
+    ${k('Отказани', cancelPct + '%', c28.length + ' часа · ' + cc28 + ' от приложението')}${k('Следващи 7 дни', upc, 'записани масажа')}${S.owner ? k('Приход (по ценоразпис)', eur(rev28), delta(rev28, revPrev)) : ''}</div>
+    <div class="row" style="align-items:flex-start;gap:16px;flex-wrap:wrap">
+      <div class="card" style="flex:1;min-width:260px"><b>Масажи по седмици</b><div style="display:flex;align-items:flex-end;gap:5px;height:90px;margin-top:10px">${weeks.map(w => `<div title="${fmt(w.a)}: ${w.n}" style="flex:1;text-align:center;font-size:10px"><div style="height:${Math.round(w.n / mx * 64) + 2}px;background:var(--acc);border-radius:4px 4px 0 0"></div>${w.n}</div>`).join('')}</div></div>
+      <div class="card" style="flex:1;min-width:260px"><b>Услуги</b><table><tbody>${svcRows || '<tr><td class="mute">Няма данни</td></tr>'}</tbody></table></div></div>`);
+}
 /* ── KPI за собственика: по обект, накратко, къде се пропукваме ── */
 const KLOCS = [['all', 'Двата обекта'], ['Боян Петров', 'Боян Петров'], ['Лерин', 'Лерин']];
 const pct = (a, b) => b ? Math.round((a - b) / b * 100) : 0;
 const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
-async function kpiView() { return S.owner ? kpiOwner() : kpiTrainer(); }
+async function kpiView() { await (S.owner ? kpiOwner() : kpiTrainer()); if (S.tab === 'kpi') massageKpi(); }
 async function kpiOwner() {
   D.kloc = D.kloc || 'all'; D.kchart = D.kchart || 'visits'; D.ktr = D.ktr || 'month'; D.klist = D.klist || 'lost';
   const L = D.kloc, loc = L === 'all' ? null : L, locs = L === 'all' ? ['Боян Петров', 'Лерин'] : [L];
