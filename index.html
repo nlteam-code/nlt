@@ -795,6 +795,44 @@ function drawKpiClients() {
       <td>${c.next_visit ? fmt(c.next_visit) : '–'}</td><td>${c.at_risk ? '<span class="chip warn">⚠ риск</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="mute">Няма клиенти за показване.</td></tr>'}</tbody></table>`;
 }
 
+
+/* ── масажно студио (SimplyBook, само Лерин) ── */
+const MLOC = 'Лерин';
+const weekBar = (a, b) => `<div class="row" style="margin-bottom:10px">
+    <button data-act="wk" data-d="-7">←</button><button data-act="wk" data-d="0">Днес</button><button data-act="wk" data-d="7">→</button>
+    <b id="wlabel">${fmt(a)} – ${fmt(b)}</b><span class="sp"></span>
+    <button class="sm pri" data-act="mtoggle">Масажно</button></div>`;
+async function massageView() {
+  const { data, error } = await sb.from('massage_bookings').select('*').order('date').order('start_time').limit(2000);
+  if (error) return fail(error, 'Масажите не се заредиха');
+  S.mb = data;
+  const box = $('#mbox'); if (!box) return;
+  const a = ymd(S.week), b = ymd(addDays(S.week, 6)), t = today();
+  const stBadge = x => x.status === 'cancelled' ? `<span class="chip">${x.cancelled_by === 'client' ? 'отказан от клиента' : x.cancelled_by === 'staff' ? 'отказан' : 'отказан (SimplyBook)'}</span>` : (x.date < t ? '<span class="chip ok">проведен</span>' : '<span class="chip warn">предстои</span>');
+  const row = x => `<tr><td>${fmt(x.date)}</td><td>${hm(x.start_time)}–${hm(x.end_time)}</td><td>${esc(x.client_id ? cname(x.client_id) : x.guest_name || '—')}</td><td>${esc(x.service)}</td><td>${stBadge(x)}</td><td>${x.status === 'booked' && x.date >= t ? `<button class="sm" data-act="mcancel" data-id="${x.id}">Откажи</button>` : ''}</td></tr>`;
+  const wk = S.mb.filter(x => x.date >= a && x.date <= b);
+  const pend = S.mb.filter(x => x.sb_cancel_pending && x.date >= t);
+  const per = {};
+  S.mb.forEach(x => { const k = x.client_id || x.guest_email || x.guest_name; (per[k] = per[k] || { id: x.client_id, name: x.guest_name, n: 0, done: 0, next: null, last: null }); const r = per[k]; if (x.status === 'booked') { r.n++; if (x.date < t) { r.done++; r.last = x.date; } else if (!r.next) r.next = x.date; } });
+  const cl = Object.values(per).filter(r => r.n).sort((x, y) => (y.next || '').localeCompare(x.next || '') || y.done - x.done);
+  box.className = '';
+  box.innerHTML = `<div class="card" style="margin-bottom:10px;border-left:4px solid var(--acc)"><b>Масажно студио · само обект ${MLOC}</b><div class="mute" style="font-size:12px;margin-top:3px">Графикът се обновява от SimplyBook. Плащането е на място. Клиентите могат да отказват през приложението до 4 часа преди часа.</div></div>
+    ${pend.length ? `<div class="card" style="margin-bottom:10px;border-left:4px solid #eb4c51"><b>Отказани в приложението — да се отменят и в SimplyBook (${pend.length})</b>
+      <table><tbody>${pend.map(x => `<tr><td>${fmt(x.date)} ${hm(x.start_time)}</td><td>${esc(x.client_id ? cname(x.client_id) : x.guest_name)}</td><td>${esc(x.service)}</td><td><button class="sm" data-act="mdone" data-id="${x.id}">Отменено в SimplyBook</button></td></tr>`).join('')}</tbody></table></div>` : ''}
+    <h3>Тази седмица · масажи: ${wk.filter(x => x.status === 'booked').length}</h3>
+    <div class="tw"><table><thead><tr><th>Дата</th><th>Час</th><th>Клиент</th><th>Услуга</th><th>Статус</th><th></th></tr></thead><tbody>${wk.map(row).join('') || '<tr><td colspan="6" class="mute">Няма масажи тази седмица.</td></tr>'}</tbody></table></div>
+    <h3 style="margin-top:16px">Клиенти с масажи (${cl.length})</h3>
+    <div class="tw"><table><thead><tr><th>Клиент</th><th>Проведени</th><th>Последен</th><th>Следващ</th></tr></thead><tbody>${cl.map(r => `<tr class="${r.id ? 'click' : ''}" ${r.id ? `data-act="client" data-id="${r.id}"` : ''}><td>${esc(r.id ? cname(r.id) : r.name)}</td><td>${r.done}</td><td>${r.last ? fmt(r.last) : '–'}</td><td>${r.next ? fmt(r.next) : '–'}</td></tr>`).join('')}</tbody></table></div>`;
+}
+async function massageCancelStaff(id) {
+  const { error } = await sb.from('massage_bookings').update({ status: 'cancelled', cancelled_by: 'staff', cancelled_at: new Date().toISOString(), sb_cancel_pending: true, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) return fail(error, 'Отказът не успя'); toast('Отказан. Отмени го и в SimplyBook.'); massageView();
+}
+async function massageDone(id) {
+  const { error } = await sb.from('massage_bookings').update({ sb_cancel_pending: false }).eq('id', id);
+  if (error) return fail(error, 'Не се записа'); massageView();
+}
+
 /* ── седмичен график ── */
 const H0 = 6, H1 = 21, HH = 48;
 async function weekView() {
@@ -802,10 +840,11 @@ async function weekView() {
   if (!S.pstat || !S.pstat.length) S.pstat = await loadPstat();
   const a = ymd(S.week), b = ymd(addDays(S.week, 6));
   const main = $('#main');
+  if (S.massage) { main.innerHTML = weekBar(a, b) + `<div id="mbox" class="mute">Зареждане…</div>`; return massageView(); }
   main.innerHTML = `<div class="row" style="margin-bottom:10px">
     <button data-act="wk" data-d="-7">←</button><button data-act="wk" data-d="0">Днес</button><button data-act="wk" data-d="7">→</button>
     <b id="wlabel">${fmt(a)} – ${fmt(b)}</b><span class="sp"></span>
-    <button class="sm" data-act="wtoggle">Клиенти</button><button class="pri" data-act="newsess">+ Нов час</button></div><div class="wkl"><aside id="wbtn">${waitHtml()}</aside><div id="grid" class="mute">Зареждане…</div></div>`;
+    <button class="sm ${S.massage ? 'pri' : ''}" data-act="mtoggle" title="Масажно студио (само Лерин)">Масажно</button><button class="sm" data-act="wtoggle">Клиенти</button><button class="pri" data-act="newsess">+ Нов час</button></div><div class="wkl"><aside id="wbtn">${waitHtml()}</aside><div id="grid" class="mute">Зареждане…</div></div>`;
   const { data, error } = await sb.from('sessions')
     .select('*,bookings(id,status,client_id,use_plan)').eq('location', S.loc).gte('date', a).lte('date', b).order('start_time');
   if (error) return fail(error, 'Графикът не се зареди');
@@ -986,7 +1025,7 @@ async function clientsView() {
 }
 function drawClients() {
   const q = S.q.toLowerCase(); S.cst = S.cst || 'all'; if (S.cloc === undefined) S.cloc = S.loc;
-  const base = S.clients.filter(c => (!q || (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q)) && (S.cloc === 'all' || c.location === S.cloc));
+  const base = S.clients.filter(c => (S.cfilter === 'mo' ? c.massage_only : !c.massage_only) && (!q || (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q)) && (S.cloc === 'all' || c.location === S.cloc));
   const cnt = k => base.filter(c => cstat(c) === k).length;
   const list = base.filter(c => {
     if (S.cst !== 'all' && cstat(c) !== S.cst) return false;
@@ -998,7 +1037,7 @@ function drawClients() {
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
     <select id="cs"><option value="all">Всички (${base.length})</option>${Object.entries(CST).map(([k, l]) => `<option value="${k}" ${S.cst === k ? 'selected' : ''}>${l} (${cnt(k)})</option>`).join('')}</select>
     <select id="cl"><option value="all">Двата обекта</option>${LOCS.map(l => `<option ${S.cloc === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
-    <select id="cf"><option value="all">Без друг филтър</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option></select>
+    <select id="cf"><option value="all">Без друг филтър</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option><option value="mo" ${S.cfilter === 'mo' ? 'selected' : ''}>Само масажи</option></select>
     <button class="pri" data-act="newclient">+ Нов клиент</button></div>
     <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.cst !== 'all' ? ' · ' + CST[S.cst] : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
     <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Телефон</th><th>Пакет</th></tr></thead><tbody>
@@ -1479,12 +1518,15 @@ function downloadIcs(bid) {
 const C = { pkgs: [], bookings: [], classes: [], policy: {}, cv: {} };
 async function clientApp() {
   const me = S.me.row, t = today(), to = ymd(addDays(new Date(), 28));
-  const [pk, bk, cl, set] = await Promise.all([
+  const mq = sb.from('massage_bookings').select('*').eq('client_id', me.id).gte('date', t).order('date').order('start_time');
+  const [pk, bk, cl, set, mm] = await Promise.all([
     sb.from('package_status').select('*').eq('client_id', me.id).order('end_date', { ascending: false }),
     sb.from('bookings').select('id,status,late,session_id,sessions!inner(id,date,start_time,duration_min,kind,title,location,cancelled)').eq('client_id', me.id).gte('sessions.date', t).order('date', { foreignTable: 'sessions' }),
     sb.from('sessions').select('id,date,start_time,title,location,capacity,kind,cancelled').eq('kind', 'group').eq('cancelled', false).gte('date', t).lte('date', to).order('date').order('start_time'),
-    sb.from('settings').select('*')
+    sb.from('settings').select('*'),
+    mq
   ]);
+  C.massages = (mm && mm.data) || [];
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
   C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {};
   const ids = (cl.data || []).map(s => s.id);
@@ -1588,11 +1630,29 @@ function clientBookTab(me, t, act) {
       ${s.mine ? `<span class="c-done">${ic('check', 18)}Записан</span>` : `<button class="c-btn solid sm" data-act="cask" data-id="${s.id}" ${full || !hasGroup ? 'disabled' : ''}>${full ? 'Пълен' : 'Запиши'}</button>`}</div>`;
   }).join('') : '<div class="c-empty">Няма часове за този ден.</div>'}`;
 }
+
+const massageOk = x => x.status === 'booked' && new Date(x.date + 'T' + x.start_time) - Date.now() >= 4 * 36e5;
+function clientMassages() {
+  const m = (C.massages || []).filter(x => x.status === 'booked');
+  if (!m.length) return '';
+  return `<h3 class="c-h">Масажи · само обект Лерин</h3><section class="c-card c-list">${m.map(x => `<div class="c-class"><div class="c-ct">${hm(x.start_time)}</div><div class="c-cinfo"><div class="c-st">${esc(x.service)}</div><div class="c-ss">${fmt(x.date)} · Лерин · плащане на място</div></div>
+    ${massageOk(x) ? `<button class="c-btn outline sm" data-act="mcancelme" data-id="${x.id}">Откажи</button>` : `<span class="c-mute" style="font-size:12px">под 4 ч.</span>`}</div>`).join('')}</section>
+    <div class="c-note">Отказ през приложението е възможен до 4 часа преди масажа.</div>`;
+}
+async function clientMassageCancel(id) {
+  if (S.previewClient) return toast('Само преглед — промените са изключени.');
+  const x = (C.massages || []).find(m => m.id === id); if (!x) return;
+  if (!massageOk(x)) return toast('Остават по-малко от 4 часа — обади се в студиото.');
+  if (!confirm('Да откажа ли масажа на ' + fmt(x.date) + ' в ' + hm(x.start_time) + '?')) return;
+  const { error } = await sb.rpc('cancel_massage', { p_id: id });
+  if (error) return fail(error, 'Отказът не успя'); toast('Масажът е отказан.'); clientApp();
+}
 function clientMine(t) {
   return `<h2 class="c-title">Моите тренировки</h2>
   ${C.bookings.length ? `<section class="c-card c-list">${C.bookings.map(b => cSession(b, t)).join('')}</section>
     <button class="c-btn outline wide" data-act="ics" data-id="">${ic('calplus', 18)}Всички в календара (.ics)</button>`
-    : `<div class="c-empty">Нямаш предстоящи тренировки.<br><button class="c-btn solid" style="margin-top:14px" data-act="cnav" data-t="book">Запиши се</button></div>`}`;
+    : `<div class="c-empty">Нямаш предстоящи тренировки.<br><button class="c-btn solid" style="margin-top:14px" data-act="cnav" data-t="book">Запиши се</button></div>`}
+  ${clientMassages()}`;
 }
 function clientPkg(t, act) {
   const old = C.pkgs.filter(p => p.end_date < t);
@@ -2171,6 +2231,10 @@ document.addEventListener('click', async e => {
       case 'sub': S.sub = el.dataset.v; settingsView(); break;
       case 'policysave': await savePolicy(); break;
       case 'cvsave': await saveCv(); break;
+      case 'mtoggle': S.massage = !S.massage; weekView(); break;
+      case 'mcancel': if (confirm('Да откажа ли масажа?')) massageCancelStaff(el.dataset.id); break;
+      case 'mdone': massageDone(el.dataset.id); break;
+      case 'mcancelme': clientMassageCancel(el.dataset.id); break;
       case 'wtoggle': S.waitOpen = !S.waitOpen; $('#wbtn').innerHTML = waitHtml(); break;
       case 'wpick': S.waitPick = S.waitPick === el.dataset.id ? null : el.dataset.id; $('#wbtn').innerHTML = waitHtml(); break;
       case 'wclear': S.waitPick = null; $('#wbtn').innerHTML = waitHtml(); break;
