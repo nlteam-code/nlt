@@ -296,6 +296,77 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .crack .ct{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);font-weight:600}.crack .cv{font-size:26px;font-weight:700;margin:2px 0 4px}.crack .cd{color:var(--mute);font-size:13px;line-height:1.4}.crack .ca{margin-top:8px;font-size:13px;font-weight:600}
 .brief{border-left:5px solid var(--acc)}
 
+/* ── Прогрес ── */
+.pg{--pg-card:var(--card);--pg-ink:var(--ink);--pg-mute:var(--mute);--pg-line:var(--line);--pg-acc:var(--acc);--pg-r:12px;--pg-c1:#eb4c51;--pg-c2:#2f7fc1;--pg-c3:#2ea064;--pg-c4:#a06bd0;display:flex;flex-direction:column;gap:12px;color:var(--pg-ink);min-width:0}
+.cm .pg{--pg-card:var(--c-card);--pg-ink:var(--c-ink);--pg-mute:var(--c-mute);--pg-line:var(--c-line);--pg-acc:var(--c-coral);--pg-r:22px}
+.pg *{box-sizing:border-box}
+.pg-card{background:var(--pg-card);border:1px solid var(--pg-line);border-radius:var(--pg-r);padding:14px;min-width:0}
+.cm .pg-card{padding:18px;box-shadow:var(--c-shadow)}
+.pg-h{margin:0 0 8px;font-size:14px;font-weight:700}
+.pg-mute{color:var(--pg-mute)}.pg-sm{font-size:13px}
+.pg-empty{text-align:center;color:var(--pg-mute);padding:26px 12px}
+.pg-note{background:var(--warn-bg,#fff0e6);color:var(--warn,#b4531d);border-radius:10px;padding:8px 12px;font-size:13px}
+.pg-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}.pg-tabs::-webkit-scrollbar{display:none}
+.pg-tb{flex:none;border:1px solid var(--pg-line);background:var(--pg-card);color:var(--pg-mute);border-radius:99px;padding:8px 14px;font-weight:600;font-size:14px;cursor:pointer}
+.pg-tb.on{background:var(--pg-acc);border-color:var(--pg-acc);color:#fff}
+.pg-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:14px;border:1px solid transparent;background:var(--pg-acc);color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+.pg-btn.ghost{background:transparent;color:var(--pg-ink);border-color:var(--pg-line)}.pg-btn.danger{background:var(--bad,#d1363c)}
+.pg-btn:disabled{opacity:.45;cursor:default}
+.pg-btn:hover,.pg-tb.on:hover,.pg-opt.on:hover{color:#fff}.pg-btn.ghost:hover{color:var(--pg-acc)}.pg-tb:hover,.pg-opt:hover{color:var(--pg-ink);border-color:var(--pg-acc)}
+.pg-ico{border:0;background:none;color:var(--pg-mute);font-size:16px;min-width:36px;min-height:36px;border-radius:10px;cursor:pointer}.pg-ico.bad:hover{color:var(--bad,#d1363c)}
+.pg-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.pg-sp{flex:1}
+.pg-wf{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px}
+.pg-wf input,.pg-f input,.pg-f select,.pg-f textarea,.pg-opts+select,.pg-row select{font:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:1px solid var(--pg-line);background:var(--pg-card);color:var(--pg-ink);width:100%;min-width:0}
+.pg-wf input:first-child{font-size:22px;font-weight:700}
+.pg-row select{width:auto}
+.pg-f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--pg-mute);margin-bottom:10px;min-width:0}
+.pg-f textarea{resize:vertical}
+.pg-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}
+.pg-val{font-weight:800;color:var(--pg-ink);margin-left:6px}
+.pg-f input[type=range]{padding:0;accent-color:var(--pg-acc)}
+.pg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.pg-stats>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pg-stats span{font-size:12px;color:var(--pg-mute)}.pg-stats b{font-size:24px;line-height:1.1}.pg-stats small{color:var(--pg-mute);font-size:12px}
+.pg-pace{margin-top:10px}
+.pg-chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:99px;border:1px solid var(--pg-line);color:var(--pg-mute);white-space:nowrap}
+.pg-chip.ok{color:var(--ok,#0f8a5f);border-color:currentColor}.pg-chip.warn{color:var(--warn,#b4531d);border-color:currentColor}.pg-chip.bad{color:var(--bad,#d1363c);border-color:currentColor}
+.pg-svg{width:100%;height:auto;display:block}
+.pg-gl{stroke:var(--pg-line);stroke-width:1}.pg-tx{fill:var(--pg-mute);font-size:10px}.pg-gt{fill:var(--pg-ink)}
+.pg-goal{stroke:var(--pg-ink);stroke-width:1.2;stroke-dasharray:4 4;opacity:.6}
+.pg-dot{stroke:var(--pg-card);stroke-width:1.5}
+.pg-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--pg-mute);margin-top:4px}
+.pg-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}.pg-leg i.gd{background:none;border-top:2px dashed var(--pg-ink);height:0;border-radius:0;width:14px}
+.pg-li{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--pg-line);flex-wrap:wrap}.pg-li:first-of-type{border-top:0}
+.pg-aud{font-size:11px;color:var(--warn,#b4531d)}
+.pg-det{margin-top:8px}.pg-det summary{cursor:pointer;color:var(--pg-mute);font-size:13px}
+.pg-tbl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.pg-tbl>div{display:flex;flex-direction:column;border:1px solid var(--pg-line);border-radius:10px;padding:8px 10px}.pg-tbl span{font-size:12px;color:var(--pg-mute)}.pg-tbl b{font-size:18px}.pg-tbl small{color:var(--pg-mute)}
+.pg-qlist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.pg-qc{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--pg-line);border-radius:14px;padding:12px;flex-wrap:wrap}
+.pg-next{margin-top:8px;font-size:14px}
+.pg-meter{height:8px;border-radius:99px;background:var(--pg-line);overflow:hidden;margin:8px 0}.pg-meter i{display:block;height:100%;background:var(--pg-acc);border-radius:99px}
+.pg-meter i.ok{background:var(--ok,#0f8a5f)}.pg-meter i.warn{background:var(--org,#f48460)}.pg-meter i.bad{background:var(--bad,#d1363c)}
+.pg-qq{border:0;padding:0;margin:14px 0 0;min-width:0}.pg-qq legend{font-weight:600;font-size:15px;padding:0;margin-bottom:8px;line-height:1.35}
+.pg-opts{display:flex;flex-wrap:wrap;gap:8px}
+.pg-opt{min-height:44px;padding:8px 16px;border-radius:14px;border:1px solid var(--pg-line);background:var(--pg-card);color:var(--pg-ink);font-size:15px;cursor:pointer;text-align:left}
+.pg-opt.on{background:var(--pg-acc);border-color:var(--pg-acc);color:#fff;font-weight:700}
+.pg-nav{margin-top:18px;position:sticky;bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+.staffpg .pg-nav{bottom:0}
+.pg-tot{font-size:16px;margin:10px 0}.pg-tot b{font-size:26px}
+.pg-sec{border-top:1px solid var(--pg-line);padding:12px 0}.pg-sech{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.pg-rec{margin:6px 0 0;font-size:14px;line-height:1.45}
+.pg-ans{display:grid;grid-template-columns:1fr auto auto;gap:8px;font-size:13px;padding:4px 0;border-top:1px dashed var(--pg-line)}
+.pg-coach{border-left:3px solid var(--pg-acc);padding:6px 12px;background:var(--pg-line);border-radius:8px;font-size:14px;margin-top:8px}.pg-coach p{margin:4px 0 0}
+.pg-scroll{overflow-x:auto}.pg-t{width:100%;border-collapse:collapse;font-size:13px}.pg-t th,.pg-t td{padding:6px 8px;border-bottom:1px solid var(--pg-line);text-align:left;vertical-align:top}.pg-t tr.tot td,.pg-t tr.tot th{border-top:2px solid var(--pg-line)}
+.pg-good{color:var(--ok,#0f8a5f)}.pg-badt{color:var(--bad,#d1363c)}
+.pg-ck{border-top:1px solid var(--pg-line);padding:10px 0}.pg-ck:first-of-type{border-top:0}
+.pg-pgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pg-pc{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.pg-ph{width:100%;aspect-ratio:3/4;border-radius:12px;background:var(--pg-line);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}.pg-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.pg-pl{font-size:12px;color:var(--pg-mute)}
+.pg-up{font-size:13px;font-weight:700;color:var(--pg-acc);cursor:pointer;padding:6px 10px}
+.pg-cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+@media(max-width:380px){.pg-wf{grid-template-columns:1fr 1fr}.pg-wf .pg-btn{grid-column:1/3}}
 </style>
 </head>
 <body>
@@ -466,7 +537,7 @@ function renderStaff() {
     <select id="loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
-  <div class="wrap" id="main"></div>`;
+  <div class="wrap" id="main"></div><div class="wrap" id="pgdash" style="padding-top:0"></div>`;
   const as = $('#asel'); if (as) as.onchange = e => {
     if (e.target.value === '__client') { e.target.value = S.view?.id || ''; return pickClientPreview(); }
     const t = S.staff.find(x => x.id === e.target.value);
@@ -477,6 +548,7 @@ function renderStaff() {
   renderTab();
 }
 function renderTab() {
+  const pd = $('#pgdash'); if (pd) { pd.innerHTML = ''; if (S.tab === 'dash') pgDashHtml().then(h => { if (S.tab === 'dash' && $('#pgdash')) $('#pgdash').innerHTML = h; }).catch(() => { }); }
   ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
 }
 
@@ -964,8 +1036,8 @@ async function openClient(id, tab) {
   const pstate = p => p.end_date < t0 || p.used >= p.total ? '<span class="chip">Изтекъл</span>' : p.start_date > t0 ? '<span class="chip warn">Предстоящ</span>' : '<span class="chip" style="color:var(--ok)">Активен</span>';
   const ledger = [...pays.map(p => ({ d: p.date, plus: true, a: p.amount, t: `${esc(p.method || '')} ${esc(p.note || '')}`, id: p.id, act: 'paydel' })), ...chs.map(p => ({ d: p.date, plus: false, a: p.amount, t: esc(p.note || 'Такса'), id: p.id, act: 'chdel' }))].sort((a, b) => String(b.d).localeCompare(String(a.d)));
   const T = tab || 'profile';
-  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`]].concat(S.owner ? [['pays', 'Плащания']] : []);
-  modal.show(`<div id="cl" data-cid="${x.id}">
+  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес']].concat(S.owner ? [['pays', 'Плащания']] : []);
+  modal.show(`<div id="cl" data-cid="${x.id}" data-uid="${x.user_id || ''}">
     <h2>${esc(x.name)}</h2>
     <div class="chips" style="margin-bottom:10px">${tabs.map(([k, l]) => `<button class="sm ${T === k ? 'on' : ''}" data-act="cltab" data-t="${k}">${l}</button>`).join('')}</div>
 
@@ -1002,6 +1074,8 @@ async function openClient(id, tab) {
     <h3>История</h3>
     <div style="max-height:320px;overflow:auto">${arch.map(h => `<div class="bk"><div class="nm">${fmt(h.date)} ${esc(h.t)} · ${esc(h.title || '')} <span class="mute">${esc(h.location || '')}</span> ${h.bad ? '<span class="chip">Отказан</span>' : '<span class="chip" style="color:var(--ok)">Проведен</span>'} <span class="chip">PT Minder</span></div></div>`).join('')}${past.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])} <span class="mute">${esc(b.sessions.location)}${tn(b.sessions.trainer_id) ? ' · ' + esc(tn(b.sessions.trainer_id)) : ''}</span> ${st(b)}${b.use_plan ? '' : ' <span class="chip warn">еднократно</span>'}</div></div>`).join('') || '<div class="mute">Още няма записани посещения.</div>'}</div>
     </div>
+
+    <div class="cpane staffpg" data-p="prog" ${T === 'prog' ? '' : 'hidden'}><div class="pg" id="pg-staff"></div></div>
 
     ${S.owner ? `<div class="cpane" data-p="pays" ${T === 'pays' ? '' : 'hidden'}>
     <h3>История на плащанията</h3>
@@ -1273,7 +1347,8 @@ async function saveTrainer() {
 /* ── Настройки ── */
 function settingsView() {
   const sub = S.sub || 'policy';
-  $('#main').innerHTML = `<div class="chips"><button class="${sub === 'policy' ? 'on' : ''}" data-act="sub" data-v="policy">Известия за клиенти</button><button class="${sub === 'cv' ? 'on' : ''}" data-act="sub" data-v="cv">Клиентска визия</button></div><div class="card" style="max-width:760px" id="sbox">${sub === 'policy' ? policyHtml() : cvHtml()}</div>`;
+  $('#main').innerHTML = `<div class="chips"><button class="${sub === 'policy' ? 'on' : ''}" data-act="sub" data-v="policy">Известия за клиенти</button><button class="${sub === 'cv' ? 'on' : ''}" data-act="sub" data-v="cv">Клиентска визия</button><button class="${sub === 'pgs' ? 'on' : ''}" data-act="sub" data-v="pgs">Прогрес</button></div><div class="card" style="max-width:760px" id="sbox">${sub === 'policy' ? policyHtml() : sub === 'cv' ? cvHtml() : 'Зареждане…'}</div>`;
+  if (sub === 'pgs') pgSettingsHtml().then(h => { const b = $('#sbox'); if (b && S.sub === 'pgs') b.innerHTML = h; }).catch(e => fail(e, 'Настройките на прогреса не се заредиха'));
 }
 function policyHtml() {
   const p = S.policy;
@@ -1430,6 +1505,7 @@ const ICO = {
   ring: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/>',
   edit: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  chart: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/>',
   pin: '<path d="M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'
 };
 const ic = (n, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]}</svg>`;
@@ -1547,11 +1623,12 @@ function clientAsk(sid) {
 function renderClient() {
   closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
-  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : clientHome(me, t, act);
-  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент']];
+  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'prog' ? '<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>' : clientHome(me, t, act);
+  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['prog', 'chart', 'Прогрес']];
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
     <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
+  if (C.tab === 'prog') pgBoot(false, me.id, 'pg', me.user_id);
 }
 async function clientBook(sid) {
   closeSheet(); if (S.previewClient) return toast('Само преглед — записването е изключено.');
@@ -1577,6 +1654,438 @@ async function clientCancel(bid) {
   if (error) return fail(error, 'Отказът не успя'); modal.close(); toast('Готово'); clientApp();
 }
 
+/* ═════════════════ ПРОГРЕС (без финанси) ═════════════════ */
+const PG = { elId: 'pg', cid: null, staff: false, tab: 'weight', D: null, st: null, q: null, urls: {}, clientUser: null, ed: {} };
+const PG_TABS = [['weight', 'Тегло'], ['meas', 'Обиколки'], ['quiz', 'Въпросник'], ['check', 'Чек-ин'], ['photos', 'Снимки'], ['profile', 'Профил']];
+const PG_GOALS = ['Отслабване', 'Покачване на мускулна маса', 'Поддържане/рекомпозиция'];
+const PG_OPEN = ['1. Опишете менюто си през работен ден.', '2. Опишете менюто си в почивен ден.', '3. Запознат/а ли си с ролята на макро- и микронутриентите в тялото?', '4. Какво очакваш от този хранителен режим?', '5. По колко пъти на ден можеш да се храниш с храна, приготвена от теб?', '6. Кои са петте основни храни, които пречат на здравето ти?', '7. Кои са трите основни навика, които ти пречат да имаш високи нива на енергия?', '8. Какви други течности приемаш освен вода и в какви количества?', '9. По колко литра вода пиеш на ден?', '10. Идваш за резултати в залата или просто искаш да спортуваш?', '11. Целта, която имаш пред себе си, отговаря ли на времето и енергията, които ще трябва да вложиш? Защо? Моля, поясни.', '12. Кое ти пречи да спазваш хранителен режим?', '13. Смяташ ли, че нямаш време да си готвиш? Защо?', '14. Колко е важно да постигнеш целта си в срока, който си си поставил/а? (0 до 100)', '15. Травми, алергии, заболявания, хранителни разстройства.', '16. Моля, посочи любимите си храни/ястия.', '17. Моля, посочи храни, които не обичаш или не би желал/а да консумираш.', '18. Какво количество течности приемаш общо на ден?'];
+const PG_M = [['arm_l', 'Ръка лява'], ['arm_r', 'Ръка дясна'], ['chest', 'Гърди'], ['waist_navel', 'Талия (пъп)'], ['waist_below5', 'Талия (5 см под пъпа)'], ['hip', 'Ханш'], ['thigh_l', 'Бедро ляво'], ['thigh_r', 'Бедро дясно']];
+const PG_HOW = 'Сантиметърът е плътно до кожата, без да притиска, успоредно на пода. Ръка – по средата между рамото и лакътя, отпусната · Гърди – през зърната · Талия (пъп) – на нивото на пъпа, след нормално издишване · Талия (5 см под пъпа) – 5 см под пъпа · Ханш – през най-широката част на седалището · Бедро – 15 см над капачката. Лява и дясна страна – всяка поотделно. Сутрин, на гладно, един и същ сантиметър.';
+const PG_CK = [['sleep_q', 'Качество на съня'], ['energy', 'Енергия'], ['stress', 'Стрес (10 = висок)'], ['appetite', 'Контрол на апетита'], ['digestion', 'Храносмилане']];
+const PG_PHOTO_HOW = 'Къси гащи / спортно бюстие · сутрин, на гладно · еднаква светлина (ден, срещу прозорец) · телефонът на височината на кръста, на 2–3 м разстояние · отпуснато тяло, ръцете встрани · еднакъв фон и поза всеки път.';
+const PG_STAGES = [[0, 'Начало'], [6, 'Седмица 6'], [12, 'Седмица 12']];
+const PG_ANG = [['profile', 'Профил'], ['front', 'Анфас'], ['back', 'Гръб']];
+const PG_PR = { 'ВИСОК': 'bad', 'СРЕДЕН': 'warn', 'НИСЪК': 'ok' };
+const PG_COL = ['var(--pg-c1)', 'var(--pg-c2)', 'var(--pg-c3)', 'var(--pg-c4)'];
+
+const pgNum = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(',', '.')); return isNaN(n) ? null : n; };
+const pgF = (n, d = 1) => n == null || isNaN(n) ? '—' : Number(n).toFixed(d).replace('.', ',');
+const pgAvg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+const pgSgn = (n, d = 1) => n == null ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + pgF(Math.abs(n), d);
+const pgMon = s => ymd(monday(parse(s)));
+const pgDm = s => s ? parse(s).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short' }) : '';
+const pgPrio = (pts, low, high) => pts >= high ? 'ВИСОК' : pts > low ? 'СРЕДЕН' : 'НИСЪК';
+const pgRo = () => { if (S.previewClient) { toast('Само преглед — промените са изключени.'); return true; } return false; };
+const pgChip = (t, c) => `<span class="pg-chip ${c || ''}">${esc(t)}</span>`;
+
+async function pgStatic() {
+  if (PG.st) return PG.st;
+  const [s, q, t] = await Promise.all([sb.from('progress_sections').select('*').order('ord'), sb.from('progress_questions').select('*').order('ord'), sb.from('progress_settings').select('*')]);
+  if (s.error || q.error) throw (s.error || q.error);
+  const set = Object.fromEntries((t.data || []).map(r => [r.section, r]));
+  const secs = s.data.map(x => ({ ...x, low: set[x.key]?.low_max ?? 0, high: set[x.key]?.high_min ?? 0, qs: q.data.filter(y => y.section === x.key) }));
+  PG.st = { secs, max: secs.reduce((a, x) => a + x.max_points, 0), low: secs.reduce((a, x) => a + x.low, 0), high: secs.reduce((a, x) => a + x.high, 0), nq: q.data.length };
+  return PG.st;
+}
+function pgScore(ans) {
+  const sc = {}; let tot = 0;
+  PG.st.secs.forEach(s => { let p = 0; s.qs.forEach(q => { const o = q.options.find(o => o.label === ans[q.id]); if (o) p += o.points; }); sc[s.key] = p; tot += p; });
+  sc.total = tot; return sc;
+}
+async function pgLoad() {
+  await pgStatic();
+  const c = PG.cid, q = t => sb.from(t).select('*').eq('client_id', c);
+  const [pf, w, m, t, k, ph] = await Promise.all([q('progress_profile').limit(1), q('weight_log').order('day'), q('measurements').order('day'), q('questionnaire_tests').order('test_no'), q('weekly_checkins').order('week_start'), q('progress_photos')]);
+  const er = [pf, w, m, t, k, ph].find(r => r.error); if (er) throw er.error;
+  PG.D = { profile: (pf.data || [])[0] || null, weights: w.data || [], meas: m.data || [], tests: t.data || [], checks: k.data || [], photos: ph.data || [] };
+}
+async function pgBoot(staff, cid, elId, clientUser) {
+  Object.assign(PG, { staff, cid, elId, clientUser: clientUser || null, q: null, ed: {} });
+  const el = document.getElementById(elId); if (el) el.innerHTML = '<div class="pg-empty">Зареждане…</div>';
+  try { await pgLoad(); } catch (e) { if (el) el.innerHTML = `<div class="pg-empty">Модулът „Прогрес“ още не е готов в базата.<br><small>${esc(e.message || e)}</small></div>`; return; }
+  pgRender();
+}
+async function pgReload() { await pgLoad(); pgRender(); }
+function pgAud(r) {
+  if (!PG.staff || !r || !r.updated_by || r.updated_by === PG.clientUser) return '';
+  const n = (S.staff.find(s => s.user_id === r.updated_by) || {}).name || 'служител';
+  return `<span class="pg-aud" title="${esc(r.updated_at || '')}">коригирано от ${esc(n)} · ${pgDm((r.updated_at || '').slice(0, 10))}</span>`;
+}
+
+/* ── графики ── */
+function pgChart(series, o = {}) {
+  const W = 320, H = o.h || 170, L = 34, R = 10, T = 10, B = 22;
+  const all = series.flatMap(s => s.pts);
+  if (!all.length) return '<div class="pg-empty">Още няма данни за графика.</div>';
+  const xs = all.map(p => parse(p.d).getTime()); let x0 = Math.min(...xs), x1 = Math.max(...xs); if (x0 === x1) { x0 -= 864e5 * 3; x1 += 864e5 * 3; }
+  const ys = all.map(p => p.v); if (o.goal != null) ys.push(o.goal);
+  let y0 = o.ymin ?? Math.min(...ys), y1 = o.ymax ?? Math.max(...ys); if (y0 === y1) { y0 -= 1; y1 += 1; }
+  const pad = (y1 - y0) * .1; if (o.ymin == null) y0 -= pad; if (o.ymax == null) y1 += pad;
+  const X = t => L + (t - x0) / (x1 - x0) * (W - L - R), Y = v => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
+  const dec = (y1 - y0) < 6 ? 1 : 0;
+  let g = '';
+  for (let i = 0; i <= 3; i++) { const v = y0 + (y1 - y0) * i / 3, y = Y(v); g += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" class="pg-gl"/><text x="${L - 4}" y="${y + 3}" text-anchor="end" class="pg-tx">${pgF(v, dec)}</text>`; }
+  g += `<text x="${L}" y="${H - 6}" class="pg-tx">${pgDm(ymd(new Date(x0)))}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" class="pg-tx">${pgDm(ymd(new Date(x1)))}</text>`;
+  if (o.goal != null) g += `<line x1="${L}" x2="${W - R}" y1="${Y(o.goal)}" y2="${Y(o.goal)}" class="pg-goal"/><text x="${W - R}" y="${Y(o.goal) - 4}" text-anchor="end" class="pg-tx pg-gt">цел ${pgF(o.goal)}</text>`;
+  series.forEach((s, i) => {
+    const c = s.color || PG_COL[i % 4], pts = s.pts.slice().sort((a, b) => a.d.localeCompare(b.d));
+    if (pts.length > 1 && !s.dotsOnly) g += `<polyline fill="none" stroke="${c}" stroke-width="${s.w || 2}" ${s.dash ? 'stroke-dasharray="5 4"' : ''} stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => X(parse(p.d).getTime()).toFixed(1) + ',' + Y(p.v).toFixed(1)).join(' ')}"/>`;
+    if (s.dots !== false) pts.forEach(p => g += `<circle cx="${X(parse(p.d).getTime()).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${s.r || 3}" fill="${c}" class="pg-dot"><title>${esc(s.name || '')} ${fmt(p.d)}: ${pgF(p.v, 1)}</title></circle>`);
+  });
+  const leg = series.length > 1 || series[0]?.name ? `<div class="pg-leg">${series.filter(s => s.name).map((s, i) => `<span><i style="background:${s.color || PG_COL[i % 4]}"></i>${esc(s.name)}</span>`).join('')}${o.goal != null ? '<span><i class="gd"></i>цел</span>' : ''}</div>` : '';
+  return `<svg viewBox="0 0 ${W} ${H}" class="pg-svg" role="img" aria-label="${esc(o.label || 'графика')}">${g}</svg>${leg}`;
+}
+function pgBars(tests) {
+  const st = PG.st, W = 320, H = 170, L = 8, B = 36, T = 8, gw = (W - L - 8) / st.secs.length;
+  const sub = tests.filter(t => t.status === 'submitted'); if (!sub.length) return '';
+  const bw = Math.min(16, (gw - 10) / sub.length);
+  let g = '';
+  [0, .5, 1].forEach(f => { const y = T + (1 - f) * (H - T - B); g += `<line x1="${L}" x2="${W - 8}" y1="${y}" y2="${y}" class="pg-gl"/><text x="${W - 6}" y="${y - 2}" text-anchor="end" class="pg-tx">${f * 100}%</text>`; });
+  st.secs.forEach((s, i) => {
+    const x = L + i * gw + (gw - bw * sub.length) / 2;
+    sub.forEach((t, j) => { const p = (t.scores || {})[s.key] ?? 0, h = Math.max(1, p / s.max_points * (H - T - B)); g += `<rect x="${(x + j * bw).toFixed(1)}" y="${(H - B - h).toFixed(1)}" width="${bw - 2}" height="${h.toFixed(1)}" rx="2" fill="${PG_COL[t.test_no - 1]}"><title>Тест ${t.test_no} · ${esc(s.title)}: ${p} т. (${Math.round(p / s.max_points * 100)}%)</title></rect>`; });
+    const lab = s.title.split(' ')[0]; g += `<text x="${L + i * gw + gw / 2}" y="${H - 20}" text-anchor="middle" class="pg-tx">${esc(lab.length > 9 ? lab.slice(0, 8) + '.' : lab)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" class="pg-svg" role="img" aria-label="Точки по раздели в % от максимума">${g}</svg><div class="pg-leg">${sub.map(t => `<span><i style="background:${PG_COL[t.test_no - 1]}"></i>Тест ${t.test_no}</span>`).join('')}<span>% от максимума</span></div>`;
+}
+
+/* ── изчисления за теглото ── */
+function pgWeightStats() {
+  const w = PG.D.weights, p = PG.D.profile || {}, t = today();
+  if (!w.length) return { n: 0 };
+  const from = ymd(addDays(parse(t), -6)), recent = w.filter(x => x.day >= from);
+  const now = recent.length ? pgAvg(recent.map(x => Number(x.weight_kg))) : Number(w[w.length - 1].weight_kg);
+  const first = w.filter(x => x.day < ymd(addDays(parse(w[0].day), 7)));
+  const start = p.start_weight != null ? Number(p.start_weight) : pgAvg(first.map(x => Number(x.weight_kg)));
+  const wk = {}; w.forEach(x => (wk[pgMon(x.day)] ||= []).push(Number(x.weight_kg)));
+  const wl = Object.keys(wk).sort().map(k => ({ k, v: pgAvg(wk[k]) }));
+  let pct = null; if (wl.length >= 2) pct = (wl[wl.length - 1].v - wl[wl.length - 2].v) / wl[wl.length - 2].v;
+  const goal = p.goal, tgt = p.target_weight != null ? Number(p.target_weight) : null;
+  let pace = null;
+  if (pct != null && goal) {
+    if (goal === 'Отслабване') pace = pct < -0.01 ? ['Твърде бързо', 'bad'] : pct <= -0.005 ? ['Оптимално', 'ok'] : pct < 0 ? ['Бавно', 'warn'] : ['Без спад', 'warn'];
+    else if (goal.startsWith('Покачване')) pace = pct > 0.005 ? ['Твърде бързо', 'bad'] : pct >= 0.0025 ? ['Оптимално', 'ok'] : pct > 0 ? ['Бавно', 'warn'] : ['Без покачване', 'warn'];
+    else pace = Math.abs(pct) <= 0.005 ? ['Стабилно', 'ok'] : ['Отклонение', 'warn'];
+  }
+  const hint = !goal ? '' : goal === 'Отслабване' ? 'Препоръчително темпо: −0,5% до −1,0% от теглото на седмица' + (start ? ` (≈ ${pgF(start * .005)}–${pgF(start * .01)} кг)` : '') : goal.startsWith('Покачване') ? 'Препоръчително темпо: +0,25% до +0,5% от теглото на седмица' + (start ? ` (≈ ${pgF(start * .0025, 2)}–${pgF(start * .005, 2)} кг)` : '') : 'Поддържане/рекомпозиция: теглото остава в ±0,5% седмично — следете обиколките, снимките и силата в залата.';
+  const ma = w.map(x => { const lo = ymd(addDays(parse(x.day), -6)); return { d: x.day, v: pgAvg(w.filter(y => y.day >= lo && y.day <= x.day).map(y => Number(y.weight_kg))) }; });
+  return { n: w.length, now, start, change: start != null ? now - start : null, left: tgt != null ? Math.abs(now - tgt) : null, tgt, pct, pace, hint, ma };
+}
+
+/* ── рендиране ── */
+function pgRender() {
+  const el = document.getElementById(PG.elId); if (!el) return;
+  const D = PG.D, consent = !!D.profile?.consent_at;
+  if (!PG.staff && !consent) { el.innerHTML = pgConsent(); return; }
+  const body = { weight: pgWeightTab, meas: pgMeasTab, quiz: pgQuizTab, check: pgCheckTab, photos: pgPhotosTab, profile: pgProfileTab }[PG.tab]();
+  el.innerHTML = `${PG.staff && !consent ? '<div class="pg-note">Клиентът още не е дал съгласие за обработка на здравни данни в приложението. Данните по-долу може да са въведени от служител.</div>' : ''}
+    <div class="pg-tabs">${PG_TABS.map(([k, l]) => `<button class="pg-tb ${PG.tab === k ? 'on' : ''}" data-act="pgtab" data-t="${k}">${l}</button>`).join('')}</div>${body}`;
+  if (PG.tab === 'photos') pgLoadPhotos();
+}
+function pgConsent() {
+  return `<section class="pg-card"><h3 class="pg-h">Прогрес и здравни данни</h3>
+    <p>В този раздел записваш тегло, обиколки, отговори на въпросник за хранене, сън и стрес, седмичен чек-ин и снимки. Това са <b>здравни данни</b>.</p>
+    <p>Виждат ги само ти и треньорите и администраторите на NLT, за да следят напредъка ти и да коригират плана. Не се споделят с трети страни. Снимките се пазят в защитено хранилище.</p>
+    <p>Можеш да изтриеш всичко по всяко време от „Профил“ → „Изтрий моите данни за прогрес“.</p>
+    <button class="pg-btn" data-act="pgconsent">Съгласен/на съм</button></section>`;
+}
+
+/* Тегло */
+function pgWeightTab() {
+  const s = pgWeightStats(), w = PG.D.weights, e = PG.ed.w || {};
+  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>средно за 7 дни</small></div><div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div><div><span>До целта</span><b>${s.left == null ? '—' : pgF(s.left) + ' кг'}</b><small>${s.tgt ? 'цел ' + pgF(s.tgt) : 'няма цел'}</small></div></div>
+    ${s.pace ? `<div class="pg-pace">Темпо: ${pgChip(s.pace[0], s.pace[1])} <span class="pg-mute">${s.pct > 0 ? '+' : ''}${pgF(s.pct * 100, 2)}% спрямо предходната седмица</span></div>` : ''}${s.hint ? `<div class="pg-mute pg-sm">${esc(s.hint)}</div>` : ''}` : '<div class="pg-empty">Въведи първото си тегло.</div>';
+  const lst = w.slice().reverse().slice(0, 14).map(x => `<div class="pg-li"><span>${fmt(x.day)}</span><b>${pgF(x.weight_kg)} кг</b>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgwedit" data-d="${x.day}" data-v="${x.weight_kg}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgwdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>`).join('');
+  return `<section class="pg-card"><h3 class="pg-h">${PG.staff ? 'Тегло' : 'Тегло днес'}</h3>
+    <div class="pg-wf"><input id="pg-wv" type="number" inputmode="decimal" step="0.1" min="30" max="300" placeholder="кг" value="${esc(e.v ?? '')}" aria-label="Тегло в кг"><input id="pg-wd" type="date" max="${today()}" value="${e.d || today()}" aria-label="Дата"><button class="pg-btn" data-act="pgwsave">Запиши</button></div>
+    <div class="pg-mute pg-sm">Сутрин, на гладно, след тоалетна, по бельо, на един и същ кантар. Един запис на ден — повторният го презаписва.</div></section>
+    <section class="pg-card">${stats}</section>
+    ${s.n ? `<section class="pg-card"><h3 class="pg-h">Графика</h3>${pgChart([{ name: 'Дневно', pts: w.map(x => ({ d: x.day, v: Number(x.weight_kg) })), dotsOnly: true, r: 2.6 }, { name: '7-дневна средна', pts: s.ma, dots: false, w: 2.6 }], { goal: s.tgt, label: 'Тегло' })}</section>
+    <section class="pg-card"><h3 class="pg-h">Последни записи</h3>${lst}</section>` : ''}`;
+}
+/* Обиколки */
+function pgMeasTab() {
+  const m = PG.D.meas, p = PG.D.profile || {}, e = PG.ed.m || {}, last = m[m.length - 1], first = m[0];
+  const ratio = () => {
+    if (!last || !last.waist_navel) return '';
+    const out = [];
+    if (p.height_cm) { const r = last.waist_navel / p.height_cm; out.push(`<div><span>Талия / ръст</span><b>${pgF(r, 2)}</b>${pgChip(r < .5 ? 'добре' : r < .6 ? 'внимание' : 'висок риск', r < .5 ? 'ok' : r < .6 ? 'warn' : 'bad')}</div>`); }
+    else out.push('<div><span>Талия / ръст</span><small>въведи ръст в „Профил“</small></div>');
+    if (last.hip) { const r = last.waist_navel / last.hip, lim = p.sex === 'Мъж' ? .9 : .85; out.push(`<div><span>Талия / ханш</span><b>${pgF(r, 2)}</b>${p.sex ? pgChip(r >= lim ? 'риск' : 'добре', r >= lim ? 'bad' : 'ok') : '<small>въведи пол в „Профил“</small>'}</div>`); }
+    return `<div class="pg-stats">${out.join('')}</div>`;
+  };
+  const ser = keys => keys.map(([k, n]) => ({ name: n, pts: m.filter(x => x[k] != null).map(x => ({ d: x.day, v: Number(x[k]) })) })).filter(s => s.pts.length);
+  const chg = (k) => last && first && last[k] != null && first[k] != null && last !== first ? pgSgn(last[k] - first[k]) : '—';
+  const f = (k, n) => `<label class="pg-f">${n}<input id="pg-m-${k}" type="number" inputmode="decimal" step="0.1" min="10" max="250" value="${esc(e[k] ?? '')}"></label>`;
+  const rows = m.slice().reverse().map(x => `<div class="pg-li"><span>${fmt(x.day)}</span><span class="pg-sm pg-mute">${PG_M.map(([k]) => pgF(x[k])).join(' · ')}</span>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgmedit" data-id="${x.id}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgmdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>`).join('');
+  return `<section class="pg-card"><h3 class="pg-h">Нови замервания <span class="pg-mute pg-sm">на всеки 2 седмици, в см</span></h3>
+    <label class="pg-f">Дата<input id="pg-m-day" type="date" max="${today()}" value="${e.day || today()}"></label>
+    <div class="pg-grid">${PG_M.map(([k, n]) => f(k, n)).join('')}</div>
+    <button class="pg-btn" data-act="pgmsave">Запази замерването</button>
+    <details class="pg-det"><summary>Как се мери</summary><p class="pg-sm">${esc(PG_HOW)}</p></details></section>
+    ${m.length ? `<section class="pg-card">${ratio()}
+      <h3 class="pg-h">Торс</h3>${pgChart(ser([['chest', 'Гърди'], ['waist_navel', 'Талия (пъп)'], ['waist_below5', 'Талия 5 см под пъпа'], ['hip', 'Ханш']]), { label: 'Торс' })}
+      <h3 class="pg-h">Ръце и бедра</h3>${pgChart(ser([['arm_l', 'Ръка лява'], ['arm_r', 'Ръка дясна'], ['thigh_l', 'Бедро ляво'], ['thigh_r', 'Бедро дясно']]), { label: 'Ръце и бедра' })}</section>
+    <section class="pg-card"><h3 class="pg-h">Промяна от старта</h3><div class="pg-tbl">${PG_M.map(([k, n]) => `<div><span>${n}</span><b>${last && last[k] != null ? pgF(last[k]) : '—'}</b><small>${chg(k)}</small></div>`).join('')}</div></section>
+    <section class="pg-card"><h3 class="pg-h">Записи</h3>${rows}</section>` : ''}`;
+}
+/* Въпросник */
+function pgTestDates() {
+  const p = PG.D.profile || {}, base = p.start_date || PG.D.weights[0]?.day || (p.consent_at || '').slice(0, 10) || today();
+  return [0, 42, 84].map(n => ymd(addDays(parse(base), n)));
+}
+function pgQuizTab() {
+  if (PG.q) return pgWizard();
+  const st = PG.st, dates = pgTestDates(), T = n => PG.D.tests.find(t => t.test_no === n);
+  const names = ['Тест 1 · Начало', 'Тест 2 · Седмица 6', 'Тест 3 · Седмица 12'];
+  const cards = [1, 2, 3].map(n => {
+    const t = T(n), done = t?.status === 'submitted', cnt = t ? Object.keys(t.answers || {}).length : 0, ok = n === 1 || T(n - 1)?.status === 'submitted' || PG.staff;
+    const act = done ? `<button class="pg-btn ghost" data-act="pgqview" data-n="${n}">Виж резултата</button>` : ok ? `<button class="pg-btn" data-act="pgqopen" data-n="${n}">${t ? 'Продължи' : 'Започни'}</button>` : '<span class="pg-mute pg-sm">След предишния тест</span>';
+    return `<div class="pg-qc"><div><b>${names[n - 1]}</b><div class="pg-mute pg-sm">${done ? 'Изпратен ' + fmt((t.submitted_at || '').slice(0, 10)) : t ? `Чернова · ${cnt} от ${st.nq}` : 'Препоръчан срок: ' + fmt(dates[n - 1])}</div></div>${act}</div>`;
+  }).join('');
+  const subs = PG.D.tests.filter(t => t.status === 'submitted');
+  const nextN = [1, 2, 3].find(n => T(n)?.status !== 'submitted');
+  return `<section class="pg-card"><h3 class="pg-h">Анализ на качеството на живот</h3>
+    <div class="pg-mute pg-sm">${st.nq} въпроса в ${st.secs.length} раздела. Прави се 3 пъти: в началото, на седмица 6 и на седмица 12. Повече точки = по-голяма нужда от промяна.</div>
+    ${nextN ? `<div class="pg-next">Следващ: <b>${names[nextN - 1]}</b> — до ${fmt(dates[nextN - 1])}</div>` : '<div class="pg-next">Всички тестове са попълнени.</div>'}
+    <div class="pg-qlist">${cards}</div></section>${subs.length ? pgCompare(subs) : ''}`;
+}
+function pgCompare(subs) {
+  const st = PG.st, tn = [1, 2, 3].filter(n => subs.some(t => t.test_no === n)), by = n => subs.find(t => t.test_no === n);
+  const cell = (t, key, max, low, high) => { if (!t) return '<td>—</td>'; const p = (t.scores || {})[key] ?? 0; return `<td><b>${p}</b> <small>${Math.round(p / max * 100)}%</small><br>${pgChip(pgPrio(p, low, high), PG_PR[pgPrio(p, low, high)])}</td>`; };
+  const first = by(tn[0]), lastT = by(tn[tn.length - 1]);
+  const rows = st.secs.map(s => `<tr><th>${esc(s.title)}</th>${tn.map(n => cell(by(n), s.key, s.max_points, s.low, s.high)).join('')}<td>${tn.length > 1 ? pgDelta((lastT.scores || {})[s.key] - (first.scores || {})[s.key]) : '—'}</td></tr>`).join('')
+    + `<tr class="tot"><th>Общо</th>${tn.map(n => cell(by(n), 'total', st.max, st.low, st.high)).join('')}<td>${tn.length > 1 ? pgDelta((lastT.scores || {}).total - (first.scores || {}).total) : '—'}</td></tr>`;
+  return `<section class="pg-card"><h3 class="pg-h">Сравнение на тестовете</h3><div class="pg-scroll"><table class="pg-t"><tr><th></th>${tn.map(n => `<th>Тест ${n}</th>`).join('')}<th>Промяна</th></tr>${rows}</table></div>
+    <div class="pg-mute pg-sm">Промяната е спрямо първия тест: отрицателно число (зелено) = подобрение.</div>${pgBars(subs)}</section>`;
+}
+const pgDelta = d => d == null || isNaN(d) ? '—' : `<b class="${d < 0 ? 'pg-good' : d > 0 ? 'pg-badt' : ''}">${d > 0 ? '+' : d < 0 ? '−' : ''}${Math.abs(d)}</b>`;
+function pgResult(n) {
+  const st = PG.st, t = PG.D.tests.find(x => x.test_no === n); if (!t) return '';
+  const sc = t.scores || {};
+  const secs = st.secs.map(s => {
+    const p = sc[s.key] ?? 0, pr = pgPrio(p, s.low, s.high);
+    const det = PG.staff ? `<details class="pg-det"><summary>Отговори (${s.qs.length})</summary>${s.qs.map(q => { const lab = (t.answers || {})[q.id], o = q.options.find(o => o.label === lab); return `<div class="pg-ans"><span>${esc(q.text)}</span><b>${esc(lab ?? '—')}</b><small>${o ? o.points + ' т.' : ''}</small></div>`; }).join('')}</details>` : '';
+    return `<div class="pg-sec"><div class="pg-sech"><b>${esc(s.title)}</b>${pgChip(pr, PG_PR[pr])}</div>
+      <div class="pg-meter"><i style="width:${Math.min(100, p / s.max_points * 100)}%" class="${PG_PR[pr]}"></i></div>
+      <div class="pg-mute pg-sm">${p} от ${s.max_points} т. (${Math.round(p / s.max_points * 100)}%)</div><p class="pg-rec">${esc(s.recs[pr] || '')}</p>${det}</div>`;
+  }).join('');
+  const tot = sc.total ?? 0, tp = pgPrio(tot, st.low, st.high);
+  const note = PG.staff ? `<label class="pg-f">Бележка на треньора<textarea id="pg-qn" rows="3">${esc(t.coach_note || '')}</textarea></label><div class="pg-row"><button class="pg-btn" data-act="pgqnote" data-n="${n}">Запази бележката</button><button class="pg-btn ghost" data-act="pgqopen" data-n="${n}">Коригирай отговорите</button></div>${pgAud(t)}` : (t.coach_note ? `<div class="pg-coach"><b>Бележка от треньора</b><p>${esc(t.coach_note)}</p></div>` : '');
+  return `<section class="pg-card"><div class="pg-row"><button class="pg-ico" data-act="pgqback" aria-label="Назад">←</button><h3 class="pg-h" style="margin:0">Тест ${n} · резултат</h3></div>
+    <div class="pg-tot">Общо <b>${tot}</b> от ${st.max} т. ${pgChip(tp, PG_PR[tp])}</div>${secs}${note}</section>`;
+}
+function pgWizard() {
+  const q = PG.q, st = PG.st;
+  if (q.view) return pgResult(q.n) + pgCompare(PG.D.tests.filter(t => t.status === 'submitted'));
+  const s = st.secs[q.si], answered = st.secs.reduce((a, x) => a + x.qs.filter(y => q.ans[y.id] != null).length, 0);
+  const done = PG.D.tests.find(t => t.test_no === q.n)?.status === 'submitted';
+  const last = q.si === st.secs.length - 1, secDone = s.qs.every(y => q.ans[y.id] != null);
+  return `<section class="pg-card"><div class="pg-row"><button class="pg-ico" data-act="pgqback" aria-label="Назад">←</button><b>Тест ${q.n}</b><span class="pg-sp"></span><span class="pg-mute pg-sm">${answered} / ${st.nq}</span></div>
+    <div class="pg-meter"><i style="width:${answered / st.nq * 100}%"></i></div>
+    <h3 class="pg-h">Раздел ${q.si + 1} от ${st.secs.length} · ${esc(s.title)}</h3>
+    ${s.qs.map((y, i) => `<fieldset class="pg-qq"><legend>${i + 1}. ${esc(y.text)}</legend><div class="pg-opts">${y.options.map((o, j) => `<button class="pg-opt ${q.ans[y.id] === o.label ? 'on' : ''}" data-act="pgqpick" data-q="${y.id}" data-j="${j}">${esc(o.label)}</button>`).join('')}</div></fieldset>`).join('')}
+    <div class="pg-row pg-nav">${q.si > 0 ? '<button class="pg-btn ghost" data-act="pgqprev">Назад</button>' : ''}<span class="pg-sp"></span>
+      <button class="pg-btn ghost" data-act="pgqsave">Запази и продължи по-късно</button>
+      ${last ? `<button class="pg-btn" data-act="pgqsend" ${answered < st.nq && !PG.staff ? 'disabled' : ''}>${done ? 'Запази корекциите' : 'Изпрати'}</button>` : `<button class="pg-btn" data-act="pgqnext" ${secDone ? '' : 'disabled'}>Напред</button>`}</div>
+    ${last && answered < st.nq && !PG.staff ? '<div class="pg-mute pg-sm">Отговори на всички въпроси, за да изпратиш теста.</div>' : ''}</section>`;
+}
+/* Чек-ин */
+const pgWeekDef = () => { const t = parse(today()), mon = monday(t); return ymd(t.getDay() === 0 ? mon : addDays(mon, -7)); };
+function pgCheckTab() {
+  const ks = PG.D.checks, wk = PG.ed.cw || pgWeekDef(), cur = ks.find(k => k.week_start === wk) || {};
+  const weeks = []; for (let i = 0; i < 14; i++) weeks.push(ymd(addDays(monday(new Date()), -7 * i)));
+  if (!weeks.includes(wk)) weeks.push(wk);
+  const sl = (id, l, v, lo, hi, step) => `<label class="pg-f">${l} <output id="o-${id}" class="pg-val">${v ?? '—'}</output><input type="range" id="${id}" min="${lo}" max="${hi}" step="${step || 1}" value="${v ?? Math.round((lo + hi) / 2)}" data-pgsl="o-${id}" data-set="${v != null ? 1 : 0}"></label>`;
+  const nf = (id, l, v, step, max) => `<label class="pg-f">${l}<input id="${id}" type="number" inputmode="decimal" step="${step}" min="0" max="${max}" value="${esc(v ?? '')}"></label>`;
+  const ser = ks.length ? pgChart(PG_CK.map(([k, n]) => ({ name: n, pts: ks.filter(x => x[k] != null).map(x => ({ d: x.week_start, v: x[k] })) })).filter(s => s.pts.length), { ymin: 1, ymax: 10, label: 'Чек-ин' }) : '';
+  const adh = ks.filter(x => x.adherence != null).length ? pgChart([{ name: 'Придържане към плана %', pts: ks.filter(x => x.adherence != null).map(x => ({ d: x.week_start, v: Number(x.adherence) })) }], { ymin: 0, ymax: 100, label: 'Придържане' }) : '';
+  const list = ks.slice().reverse().slice(0, 12).map(x => `<div class="pg-ck"><div class="pg-row"><b>${pgDm(x.week_start)} – ${pgDm(ymd(addDays(parse(x.week_start), 6)))}</b>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgcedit" data-w="${x.week_start}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgcdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>
+      <div class="pg-sm pg-mute">сън ${pgF(x.sleep_h)} ч (${x.sleep_q ?? '—'}/10) · енергия ${x.energy ?? '—'} · стрес ${x.stress ?? '—'} · апетит ${x.appetite ?? '—'} · храносмилане ${x.digestion ?? '—'} · план ${x.adherence != null ? pgF(x.adherence, 0) + '%' : '—'} · тренировки ${x.workouts ?? '—'} · стъпки ${x.steps ?? '—'} · вода ${pgF(x.water_l)} л</div>
+      ${x.note ? `<p class="pg-sm">${esc(x.note)}</p>` : ''}${PG.staff ? `<label class="pg-f">Бележка на треньора<textarea id="pg-cn-${x.id}" rows="2">${esc(x.coach_note || '')}</textarea></label><button class="pg-btn ghost" data-act="pgcnote" data-id="${x.id}">Запази бележката</button>` : (x.coach_note ? `<div class="pg-coach"><b>Треньор:</b> ${esc(x.coach_note)}</div>` : '')}</div>`).join('');
+  return `<section class="pg-card"><h3 class="pg-h">Седмичен чек-ин <span class="pg-mute pg-sm">всяка неделя</span></h3>
+    <label class="pg-f">Седмица<select id="pg-cw" data-pgch="cweek">${weeks.sort().reverse().map(w => `<option value="${w}" ${w === wk ? 'selected' : ''}>${pgDm(w)} – ${pgDm(ymd(addDays(parse(w), 6)))}${ks.some(k => k.week_start === w) ? ' ✓' : ''}</option>`).join('')}</select></label>
+    <div class="pg-grid">${nf('pg-c-sleep_h', 'Сън (ч/нощ)', cur.sleep_h, .25, 24)}${nf('pg-c-workouts', 'Тренировки (бр.)', cur.workouts, 1, 21)}${nf('pg-c-steps', 'Стъпки (ср./ден)', cur.steps, 100, 100000)}${nf('pg-c-water_l', 'Вода (л/ден)', cur.water_l, .1, 15)}</div>
+    ${sl('pg-c-sleep_q', 'Качество на съня (1–10)', cur.sleep_q, 1, 10)}${sl('pg-c-energy', 'Енергия (1–10)', cur.energy, 1, 10)}${sl('pg-c-stress', 'Стрес (1–10, 10 = много висок)', cur.stress, 1, 10)}${sl('pg-c-appetite', 'Контрол на апетита (1–10)', cur.appetite, 1, 10)}${sl('pg-c-digestion', 'Храносмилане (1–10)', cur.digestion, 1, 10)}${sl('pg-c-adherence', 'Придържане към плана (%)', cur.adherence != null ? Number(cur.adherence) : null, 0, 100, 5)}
+    <label class="pg-f">Бележки (победи, трудности)<textarea id="pg-c-note" rows="3">${esc(cur.note || '')}</textarea></label>
+    <button class="pg-btn" data-act="pgcsave">Запази чек-ина</button></section>
+    ${ks.length ? `<section class="pg-card"><h3 class="pg-h">Тенденция (1–10)</h3>${ser}${adh ? '<h3 class="pg-h">Придържане към плана</h3>' + adh : ''}</section><section class="pg-card"><h3 class="pg-h">Предишни седмици</h3>${list}</section>` : ''}`;
+}
+/* Снимки */
+function pgPhotosTab() {
+  const ph = PG.D.photos, get = (s, a) => ph.find(x => x.stage === s && x.angle === a);
+  const cell = (s, a, n) => { const x = get(s, a); return `<div class="pg-pc"><div class="pg-ph" data-ph="${x ? esc(x.path) : ''}">${x ? '<span class="pg-mute pg-sm">…</span>' : '<span class="pg-mute pg-sm">няма снимка</span>'}</div><div class="pg-pl">${n}</div>
+    <label class="pg-up">${x ? 'Смени' : 'Качи'}<input type="file" accept="image/*" data-pgch="photo" data-s="${s}" data-a="${a}" hidden></label>${x ? `<button class="pg-ico bad" data-act="pgpdel" data-id="${x.id}" data-p="${esc(x.path)}" aria-label="Изтрий снимка">✕</button>` : ''}</div>`; };
+  const sel = (id, v) => `<select id="${id}" data-pgch="cmp">${PG_STAGES.map(([s, n]) => `<option value="${s}" ${+v === s ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
+  const c = PG.ed.cmp || { a: 0, b: 12, ang: 'front' };
+  const sx = x => `<div class="pg-ph big" data-ph="${x ? esc(x.path) : ''}">${x ? '' : '<span class="pg-mute pg-sm">няма снимка</span>'}</div>`;
+  return `<section class="pg-card"><h3 class="pg-h">Как да снимаме</h3><p class="pg-sm">${esc(PG_PHOTO_HOW)}</p></section>
+    ${PG_STAGES.map(([s, n]) => `<section class="pg-card"><h3 class="pg-h">${n}</h3><div class="pg-pgrid">${PG_ANG.map(([a, an]) => cell(s, a, an)).join('')}</div></section>`).join('')}
+    <section class="pg-card"><h3 class="pg-h">Преди / след</h3><div class="pg-row">${sel('pg-ca', c.a)} <span>→</span> ${sel('pg-cb', c.b)}
+      <select id="pg-cang" data-pgch="cmp">${PG_ANG.map(([a, n]) => `<option value="${a}" ${c.ang === a ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div class="pg-cmp">${sx(get(+c.a, c.ang))}${sx(get(+c.b, c.ang))}</div></section>`;
+}
+async function pgLoadPhotos() {
+  const els = [...document.querySelectorAll(`#${PG.elId} [data-ph]`)].filter(e => e.dataset.ph); if (!els.length) return;
+  const paths = [...new Set(els.map(e => e.dataset.ph))], need = paths.filter(p => !PG.urls[p] || PG.urls[p].exp < Date.now());
+  if (need.length) {
+    const { data, error } = await sb.storage.from('progress-photos').createSignedUrls(need, 3600);
+    if (error) { els.forEach(e => e.innerHTML = '<span class="pg-mute pg-sm">няма достъп</span>'); return; }
+    (data || []).forEach(r => { if (r.signedUrl) PG.urls[r.path] = { u: r.signedUrl, exp: Date.now() + 3000e3 }; });
+  }
+  els.forEach(e => { const u = PG.urls[e.dataset.ph]; e.innerHTML = u ? `<img src="${esc(u.u)}" alt="Снимка на прогреса" loading="lazy">` : '<span class="pg-mute pg-sm">—</span>'; });
+}
+function pgResize(file, max = 1600) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(b => b ? res(b) : rej(new Error('Снимката не се обработи')), 'image/jpeg', .85); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Файлът не е изображение')); };
+    img.src = url;
+  });
+}
+/* Профил */
+function pgProfileTab() {
+  const p = PG.D.profile || {}, oa = p.open_answers || {};
+  const sel = (id, v, opts) => `<select id="${id}"><option value="">—</option>${opts.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+  const nf = (id, l, v, mn, mx, st) => `<label class="pg-f">${l}<input id="${id}" type="number" inputmode="decimal" step="${st || 1}" min="${mn}" max="${mx}" value="${esc(v ?? '')}"></label>`;
+  return `<section class="pg-card"><h3 class="pg-h">Профил за прогрес</h3>
+    <div class="pg-grid"><label class="pg-f">Пол${sel('pg-p-sex', p.sex, ['Жена', 'Мъж'])}</label>${nf('pg-p-age', 'Години', p.age, 10, 100)}${nf('pg-p-height_cm', 'Ръст (см)', p.height_cm, 120, 230, .5)}${nf('pg-p-start_weight', 'Начално тегло (кг)', p.start_weight, 30, 300, .1)}
+      <label class="pg-f">Начална дата<input id="pg-p-start_date" type="date" value="${p.start_date || ''}"></label><label class="pg-f">Основна цел${sel('pg-p-goal', p.goal, PG_GOALS)}</label>${nf('pg-p-target_weight', 'Целево тегло (кг)', p.target_weight, 30, 300, .1)}</div>
+    <label class="pg-f">Тренировъчен опит<textarea id="pg-p-training_exp" rows="2">${esc(p.training_exp || '')}</textarea></label>
+    <label class="pg-f">Травми и контузии<textarea id="pg-p-injuries" rows="2">${esc(p.injuries || '')}</textarea></label>
+    <label class="pg-f">Хранителни разстройства<textarea id="pg-p-eating_disorders" rows="2">${esc(p.eating_disorders || '')}</textarea></label>
+    <details class="pg-det" ${Object.keys(oa).length ? '' : 'open'}><summary>18 въпроса за навиците и мотивацията</summary>${PG_OPEN.map((q, i) => `<label class="pg-f">${esc(q)}<textarea id="pg-o-${i}" rows="2">${esc(oa['q' + (i + 1)] || '')}</textarea></label>`).join('')}</details>
+    <button class="pg-btn" data-act="pgpsave">Запази профила</button>${pgAud(p)}</section>
+    ${PG.staff ? '' : `<section class="pg-card"><h3 class="pg-h">Твоите данни</h3><p class="pg-sm pg-mute">Съгласие от ${fmt((p.consent_at || '').slice(0, 10))}. Можеш да изтриеш всичко за прогреса си — тегло, обиколки, въпросници, чек-ини и снимки. Действието е окончателно.</p>
+    ${PG.ed.del ? `<div class="pg-row"><button class="pg-btn danger" data-act="pgdelmine">Да, изтрий всичко</button><button class="pg-btn ghost" data-act="pgdelcancel">Отказ</button></div>` : '<button class="pg-btn ghost" data-act="pgdelask">Изтрий моите данни за прогрес</button>'}</section>`}`;
+}
+
+/* ── действия ── */
+async function pgAct(act, el) {
+  const c = PG.cid, D = PG.D;
+  const need = fn => { if (!PG.staff && pgRo()) return; return fn(); };
+  const up = async (t, row, conf) => { const { error } = await sb.from(t).upsert({ client_id: c, ...row }, { onConflict: conf }); if (error) throw error; };
+  switch (act) {
+    case 'pgtab': PG.tab = el.dataset.t; PG.q = null; return pgRender();
+    case 'pgconsent': return need(async () => { await up('progress_profile', { consent_at: new Date().toISOString() }, 'client_id'); await pgReload(); });
+    case 'pgwsave': return need(async () => {
+      const v = pgNum($('#pg-wv').value), d = $('#pg-wd').value;
+      if (v == null || v < 30 || v > 300) return toast('Въведи тегло между 30 и 300 кг');
+      if (!d || d > today()) return toast('Избери валидна дата (не в бъдещето)');
+      await up('weight_log', { day: d, weight_kg: Math.round(v * 10) / 10 }, 'client_id,day'); PG.ed.w = null; toast('Записано'); await pgReload();
+    });
+    case 'pgwedit': PG.ed.w = { v: el.dataset.v, d: el.dataset.d }; pgRender(); return window.scrollTo(0, 0);
+    case 'pgwdel': return need(async () => { const { error } = await sb.from('weight_log').delete().eq('id', el.dataset.id); if (error) throw error; await pgReload(); });
+    case 'pgmsave': return need(async () => {
+      const row = { day: $('#pg-m-day').value }; let any = false;
+      for (const [k] of PG_M) { const v = pgNum($('#pg-m-' + k).value); if (v != null && (v < 10 || v > 250)) return toast('Мерките са в см (10–250)'); row[k] = v; if (v != null) any = true; }
+      if (!row.day || row.day > today()) return toast('Избери валидна дата'); if (!any) return toast('Въведи поне една мярка');
+      await up('measurements', row, 'client_id,day'); PG.ed.m = null; toast('Записано'); await pgReload();
+    });
+    case 'pgmedit': { const x = D.meas.find(m => String(m.id) === el.dataset.id); PG.ed.m = { ...x }; pgRender(); return window.scrollTo(0, 0); }
+    case 'pgmdel': return need(async () => { const { error } = await sb.from('measurements').delete().eq('id', el.dataset.id); if (error) throw error; await pgReload(); });
+    case 'pgqopen': case 'pgqview': {
+      const n = +el.dataset.n, t = D.tests.find(x => x.test_no === n);
+      if (act === 'pgqview') PG.q = { n, view: true };
+      else PG.q = { n, si: 0, ans: { ...(t?.answers || {}) } };
+      if (act === 'pgqopen') { const i = PG.st.secs.findIndex(s => s.qs.some(y => PG.q.ans[y.id] == null)); PG.q.si = i < 0 ? 0 : i; }
+      return pgRender();
+    }
+    case 'pgqback': PG.q = null; return pgRender();
+    case 'pgqpick': { const q = PG.st.secs.flatMap(s => s.qs).find(y => y.id === el.dataset.q); PG.q.ans[q.id] = q.options[+el.dataset.j].label; return pgRender(); }
+    case 'pgqprev': PG.q.si--; pgRender(); return window.scrollTo(0, 0);
+    case 'pgqnext': return need(async () => { await pgQSave('draft', true); PG.q.si++; pgRender(); window.scrollTo(0, 0); });
+    case 'pgqsave': return need(async () => { await pgQSave('draft'); toast('Запазено — продължи по-късно'); PG.q = null; await pgReload(); });
+    case 'pgqsend': return need(async () => {
+      if (!PG.staff && PG.st.secs.some(s => s.qs.some(y => PG.q.ans[y.id] == null))) return toast('Отговори на всички въпроси');
+      const was = D.tests.find(t => t.test_no === PG.q.n);
+      await pgQSave(was?.status === 'submitted' || !PG.staff || Object.keys(PG.q.ans).length >= PG.st.nq ? 'submitted' : 'draft'); const n = PG.q.n; PG.q = { n, view: true }; toast('Изпратено'); await pgReload();
+    });
+    case 'pgqnote': { const { error } = await sb.from('questionnaire_tests').update({ coach_note: $('#pg-qn').value.trim() || null }).eq('client_id', c).eq('test_no', +el.dataset.n); if (error) throw error; toast('Бележката е запазена'); return pgReload(); }
+    case 'pgcsave': return need(async () => {
+      const wk = $('#pg-cw').value, g = id => pgNum($('#pg-c-' + id).value), sl = id => { const e = $('#pg-c-' + id); return e.dataset.set === '1' ? Number(e.value) : null; };
+      const row = { week_start: wk, sleep_h: g('sleep_h'), workouts: g('workouts'), steps: g('steps'), water_l: g('water_l'), sleep_q: sl('sleep_q'), energy: sl('energy'), stress: sl('stress'), appetite: sl('appetite'), digestion: sl('digestion'), adherence: sl('adherence'), note: $('#pg-c-note').value.trim() || null };
+      if (Object.entries(row).every(([k, v]) => k === 'week_start' || v == null)) return toast('Попълни поне едно поле');
+      await up('weekly_checkins', row, 'client_id,week_start'); PG.ed.cw = null; toast('Чек-инът е записан'); await pgReload();
+    });
+    case 'pgcedit': PG.ed.cw = el.dataset.w; pgRender(); return window.scrollTo(0, 0);
+    case 'pgcdel': return need(async () => { const { error } = await sb.from('weekly_checkins').delete().eq('id', el.dataset.id); if (error) throw error; await pgReload(); });
+    case 'pgcnote': { const { error } = await sb.from('weekly_checkins').update({ coach_note: $('#pg-cn-' + el.dataset.id).value.trim() || null }).eq('id', el.dataset.id); if (error) throw error; toast('Бележката е запазена'); return pgReload(); }
+    case 'pgpdel': return need(async () => { await sb.storage.from('progress-photos').remove([el.dataset.p]); const { error } = await sb.from('progress_photos').delete().eq('id', el.dataset.id); if (error) throw error; await pgReload(); });
+    case 'pgpsave': return need(async () => {
+      const g = id => pgNum($('#pg-p-' + id).value), s = id => $('#pg-p-' + id).value.trim() || null;
+      const oa = {}; PG_OPEN.forEach((_, i) => { const v = $('#pg-o-' + i).value.trim(); if (v) oa['q' + (i + 1)] = v; });
+      await up('progress_profile', { sex: $('#pg-p-sex').value || null, age: g('age'), height_cm: g('height_cm'), start_weight: g('start_weight'), start_date: $('#pg-p-start_date').value || null, goal: $('#pg-p-goal').value || null, target_weight: g('target_weight'), training_exp: s('training_exp'), injuries: s('injuries'), eating_disorders: s('eating_disorders'), open_answers: oa }, 'client_id');
+      toast('Профилът е запазен'); await pgReload();
+    });
+    case 'pgopen': { await openClient(el.dataset.id, 'prog'); const e = $('#pg-staff'); if (e && !e.dataset.on) { e.dataset.on = 1; pgBoot(true, el.dataset.id, 'pg-staff', $('#cl').dataset.uid); } return; }
+    case 'pgssave': {
+      const rows = PG.st.secs.map(x => ({ section: x.key, low_max: +$('#pgs-l-' + x.key).value, high_min: +$('#pgs-h-' + x.key).value }));
+      if (rows.some(r => isNaN(r.low_max) || isNaN(r.high_min) || r.low_max >= r.high_min)) return toast('„НИСЪК до“ трябва да е по-малко от „ВИСОК от“');
+      const { error } = await sb.from('progress_settings').upsert(rows, { onConflict: 'section' }); if (error) throw error; PG.st = null; return toast('Праговете са запазени');
+    }
+    case 'pgdelask': PG.ed.del = true; return pgRender();
+    case 'pgdelcancel': PG.ed.del = false; return pgRender();
+    case 'pgdelmine': return need(async () => {
+      const paths = D.photos.map(x => x.path); if (paths.length) await sb.storage.from('progress-photos').remove(paths);
+      const { error } = await sb.rpc('progress_delete_mine'); if (error) throw error; PG.ed = {}; PG.tab = 'weight'; toast('Данните са изтрити'); await pgReload();
+    });
+  }
+}
+async function pgQSave(status, quiet) {
+  const q = PG.q, c = PG.cid;
+  const row = { client_id: c, test_no: q.n, answers: q.ans, status };
+  if (PG.staff && status === 'draft' && PG.D.tests.find(t => t.test_no === q.n)?.status === 'submitted') row.status = 'submitted';
+  const { error } = await sb.from('questionnaire_tests').upsert(row, { onConflict: 'client_id,test_no' });
+  if (error) throw error;
+  if (!quiet) return;
+  const t = PG.D.tests.find(x => x.test_no === q.n); if (t) { t.answers = { ...q.ans }; } else PG.D.tests.push({ test_no: q.n, answers: { ...q.ans }, status: 'draft' });
+}
+async function pgChange(el) {
+  if (el.dataset.pgch === 'cweek') { PG.ed.cw = el.value; return pgRender(); }
+  if (el.dataset.pgch === 'cmp') { PG.ed.cmp = { a: $('#pg-ca').value, b: $('#pg-cb').value, ang: $('#pg-cang').value }; return pgRender(); }
+  if (el.dataset.pgch === 'photo') {
+    const f = el.files[0]; if (!f) return; if (!PG.staff && pgRo()) return;
+    const s = +el.dataset.s, a = el.dataset.a, path = `${PG.cid}/${s}-${a}.jpg`;
+    try {
+      toast('Качване…'); const blob = await pgResize(f);
+      const { error } = await sb.storage.from('progress-photos').upload(path, blob, { upsert: true, contentType: 'image/jpeg' }); if (error) throw error;
+      const { error: e2 } = await sb.from('progress_photos').upsert({ client_id: PG.cid, stage: s, angle: a, path, taken_on: today() }, { onConflict: 'client_id,stage,angle' }); if (e2) throw e2;
+      delete PG.urls[path]; toast('Снимката е качена'); await pgReload();
+    } catch (e) { fail(e, 'Снимката не се качи'); }
+  }
+}
+document.addEventListener('change', e => { const el = e.target.closest('[data-pgch]'); if (el) pgChange(el); });
+document.addEventListener('input', e => { const el = e.target; if (el.dataset && el.dataset.pgsl) { el.dataset.set = '1'; const o = document.getElementById(el.dataset.pgsl); if (o) o.textContent = el.value; } });
+
+/* ── служебен сайт: списък „Прогрес“ в Обобщение и прагове ── */
+async function pgDashHtml() {
+  await pgStatic().catch(() => { });
+  const { data, error } = await sb.rpc('progress_overview'); if (error || !data) return '';
+  const t = today(), wkNow = pgMon(t), lastDue = ymd(addDays(parse(wkNow), -7));
+  const noW = [], noC = [], tests = [], high = [];
+  data.forEach(r => {
+    if (!r.last_weight || r.last_weight < ymd(addDays(parse(t), -7))) noW.push(r);
+    if (!r.last_checkin || r.last_checkin < lastDue) noC.push(r);
+    const done = r.tests_done || [], next = [1, 2, 3].find(n => !done.includes(n));
+    if (next && r.start_date) { const due = ymd(addDays(parse(r.start_date), [0, 42, 84][next - 1])); if (due <= ymd(addDays(parse(t), 7))) tests.push({ ...r, next, due }); }
+    if ((r.high_sections || []).length) high.push(r);
+  });
+  const L = (rows, f) => rows.length ? rows.slice(0, 40).map(r => `<div class="bk"><div class="nm"><a href="#" data-act="pgopen" data-id="${r.client_id}">${esc(r.name)}</a> <span class="mute">${esc(f(r))}</span></div></div>`).join('') : '<div class="mute">Няма.</div>';
+  const sn = k => (PG.st?.secs.find(s => s.key === k) || {}).title || k;
+  return `<div class="card" style="margin-top:14px"><h3 style="margin-top:0">Прогрес на клиентите <span class="mute">(${data.length} с включен модул)</span></h3>
+    <div class="grid2"><div><h3>Без тегло над 7 дни (${noW.length})</h3>${L(noW, r => r.last_weight ? 'последно ' + fmt(r.last_weight) : 'още няма')}</div>
+    <div><h3>Пропуснат чек-ин (${noC.length})</h3>${L(noC, r => r.last_checkin ? 'последен ' + pgDm(r.last_checkin) : 'още няма')}</div>
+    <div><h3>Предстои тест (${tests.length})</h3>${L(tests, r => `Тест ${r.next} · до ${fmt(r.due)}`)}</div>
+    <div><h3>ВИСОК приоритет (${high.length})</h3>${L(high, r => `Тест ${r.last_test}: ` + r.high_sections.map(sn).join(', '))}</div></div></div>`;
+}
+async function pgSettingsHtml() {
+  PG.st = null; const st = await pgStatic();
+  return `<p class="mute">Прагове за приоритет в въпросника. Точки ≥ „ВИСОК от“ → ВИСОК; над „НИСЪК до“ → СРЕДЕН; иначе НИСЪК. Общите прагове са сума от разделите.</p>
+    <table><tr><th>Раздел</th><th>Макс.</th><th>НИСЪК до</th><th>ВИСОК от</th></tr>${st.secs.map(s => `<tr><td>${esc(s.title)}</td><td>${s.max_points}</td><td><input type="number" id="pgs-l-${s.key}" value="${s.low}" min="0" max="${s.max_points}" style="width:80px"></td><td><input type="number" id="pgs-h-${s.key}" value="${s.high}" min="0" max="${s.max_points}" style="width:80px"></td></tr>`).join('')}</table>
+    <div style="margin-top:12px"><button class="pri" data-act="pgssave">Запази праговете</button></div>`;
+}
+
 /* ═════════════════ събития ═════════════════ */
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
@@ -1591,6 +2100,7 @@ document.addEventListener('click', async e => {
   }
   e.preventDefault();
   try {
+    if (act.startsWith('pg')) { await pgAct(act, el); return; }
     switch (act) {
       case 'close': modal.close(); break;
       case 'login': await doLogin(); break;
@@ -1628,7 +2138,7 @@ document.addEventListener('click', async e => {
       case 'sdel': if (confirm('Да се изтрие ли часът заедно със записванията?')) { const id = sessId(); const { error } = await sb.from('sessions').delete().eq('id', id); if (error) return fail(error, 'Не се изтри'); modal.close(); weekView(); } break;
       case 'bst': await setBookingStatus(el.closest('.bk').dataset.bid, el.dataset.st); break;
       case 'brm': { const bid = el.closest('.bk').dataset.bid; if (!confirm('Да се премахне ли записването?')) break; const bb = (await sb.from('bookings').select('client_id,sessions(date,start_time)').eq('id', bid).single()).data; await removeCharge(bid); await sb.from('bookings').delete().eq('id', bid); if (bb) logEvent('removed', `Премахнат: ${bkLabel(bb.client_id, bb.sessions.date, bb.sessions.start_time)}`); await refreshAfter(sessId()); break; }
-      case 'cltab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=cltab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; break; }
+      case 'cltab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=cltab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; if (el.dataset.t === 'prog' && !$('#pg-staff').dataset.on) { $('#pg-staff').dataset.on = 1; pgBoot(true, $('#cl').dataset.cid, 'pg-staff', $('#cl').dataset.uid); } break; }
       case 'client': S.ctab = 'profile'; modal.show('<div class="mute">Зареждане…</div>', true); await openClient(el.dataset.id); break;
       case 'csave': await saveClient(); break;
       case 'cpadd': await addPackage(); break;
