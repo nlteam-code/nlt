@@ -1127,6 +1127,7 @@ async function openClient(id, tab) {
     <div class="row" style="margin-top:6px"><input type="number" id="chg-amt" placeholder="Сума" style="width:90px" step="0.01"><input id="chg-note" placeholder="Такса – за какво" style="flex:1;min-width:120px"><button data-act="chgadd">+ Такса</button></div>
     </div>` : ''}
   </div>`, true);
+  if (x.user_id) sb.from('client_consents').select('accepted_at,signed_name,version').eq('client_id', x.id).order('accepted_at', { ascending: false }).limit(1).then(r => { const el = $('#cl h2'); if (!el) return; const c0 = r.data && r.data[0]; el.insertAdjacentHTML('afterend', `<div class="mute" style="font-size:12px;margin:-4px 0 8px">${c0 ? `Подписани условия: ${fmt(String(c0.accepted_at).slice(0, 10))} · ${esc(c0.signed_name)}` : 'Още не е подписал условията'}</div>`); });
 }
 const cid = () => $('#cl')?.dataset.cid;
 async function afterClient() { const id = cid(); S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(id, S.ctab); }
@@ -1536,7 +1537,53 @@ async function clientApp() {
   const mine = new Set(C.bookings.map(b => b.session_id));
   const minH = C.cv.bookMinHours ?? 1, limit = new Date(Date.now() + minH * 3600e3);
   C.classes = (cl.data || []).filter(s => new Date(`${s.date}T${hm(s.start_time)}:00`) > limit).filter(s => !me.location || s.location === me.location).map(s => ({ ...s, free: free[s.id]?.free, taken: free[s.id]?.taken, mine: mine.has(s.id) }));
+  if (!S.previewClient) {
+    const g = await sb.from('client_consents').select('id').eq('client_id', me.id).eq('version', CONSENT_V).limit(1);
+    if (!g.error && !(g.data && g.data.length)) return consentGate();
+  }
   renderClient();
+}
+
+/* ── условия и съгласие с подпис (преди влизане в приложението) ── */
+const CONSENT_V = 'v1-2026-11';
+const CONSENT_TEXT = [
+  ['Кой обработва данните', 'NLT Personal Training Club е администратор на твоите лични данни. За въпроси относно тях се обръщаш към клуба.'],
+  ['Какви данни пазим', 'Име, имейл, телефон, записани и проведени посещения, абонаменти и плащания. При масаж пазим и твоите записвания за масаж. В раздел „Прогрес“ можеш по желание да въведеш тегло, обиколки, отговори на въпросник и снимки. Това са данни за здравето и се използват само с отделното съгласие, което даваш в самия раздел.'],
+  ['За какво ги ползваме', 'За управление на посещенията и абонаментите, записване на часове (тренировки и масажи), връзка с теб и проследяване на твоя напредък. Не продаваме данните ти и не ги ползваме за реклама без твое съгласие.'],
+  ['Кой има достъп', 'Треньорите и администраторите на клуба. Ползваме доставчици на услуги за хостинг и записване: Supabase, GitHub Pages и SimplyBook (за масажите).'],
+  ['Твоите права', 'Можеш да поискаш достъп, поправка, изтриване или ограничаване на данните си, както и да оттеглиш съгласие. Имаш право да подадеш жалба до Комисията за защита на личните данни. Данните за „Прогрес“ можеш да изтриеш и сам от приложението.'],
+  ['Правила на клуба', 'Груповите тренировки се отказват според правилата на клуба. Масажите се отказват през приложението най-късно 4 часа преди часа; плащането за масаж е на място.'],
+  ['Здравословно състояние', 'Декларирам, че нямам медицински противопоказания за физическа активност или ще уведомя треньора за такива преди тренировка.']
+];
+function consentGate() {
+  const me = S.me.row;
+  $('#app').innerHTML = `<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span></header><main class="c-main" style="padding-bottom:40px">
+    <h2 class="c-title">Условия и съгласие</h2>
+    <div class="c-note">Преди да влезеш в приложението, прочети условията и се подпиши.</div>
+    <section class="c-card" style="max-height:46vh;overflow:auto">${CONSENT_TEXT.map(([h, t]) => `<div class="c-k" style="margin-top:10px">${esc(h)}</div><div style="font-size:14px;line-height:1.5">${esc(t)}</div>`).join('')}</section>
+    <label style="display:flex;gap:10px;align-items:flex-start;margin:14px 0;font-size:14px"><input type="checkbox" id="cg-ok" style="margin-top:3px;width:20px;height:20px"><span>Прочетох и приемам условията и обработването на личните ми данни, описано по-горе.</span></label>
+    <label class="c-k" for="cg-name">Три имена</label>
+    <input id="cg-name" autocomplete="name" value="${esc(me.name || '')}" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--c-line,#ccc);font-size:16px;margin-bottom:12px">
+    <div class="c-k">Подпис (с пръст или мишка)</div>
+    <canvas id="cg-sig" width="600" height="200" style="width:100%;height:150px;border:1px solid var(--c-line,#ccc);border-radius:12px;background:#fff;touch-action:none"></canvas>
+    <button class="c-btn plain" data-act="cgclear" style="margin:4px 0 10px">Изчисти подписа</button>
+    <button class="c-btn solid wide" data-act="cgsign">Подписвам и продължавам</button>
+    <button class="c-btn plain wide" data-act="logout">Изход</button></main></div>`;
+  const cv = $('#cg-sig'), cx = cv.getContext('2d'); let draw = false; C.sig = false;
+  cx.lineWidth = 3; cx.lineCap = 'round'; cx.strokeStyle = '#111';
+  const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+  cv.onpointerdown = e => { draw = true; cv.setPointerCapture(e.pointerId); const [x, y] = pos(e); cx.beginPath(); cx.moveTo(x, y); e.preventDefault(); };
+  cv.onpointermove = e => { if (!draw) return; const [x, y] = pos(e); cx.lineTo(x, y); cx.stroke(); C.sig = true; e.preventDefault(); };
+  cv.onpointerup = cv.onpointercancel = () => { draw = false; };
+}
+async function consentSign() {
+  const ok = $('#cg-ok').checked, name = $('#cg-name').value.trim();
+  if (!ok) return toast('Отбележи, че приемаш условията.');
+  if (name.length < 5 || !name.includes(' ')) return toast('Въведи име и фамилия.');
+  if (!C.sig) return toast('Моля, подпиши се в полето.');
+  const { error } = await sb.from('client_consents').insert({ client_id: S.me.row.id, version: CONSENT_V, signed_name: name, signature: $('#cg-sig').toDataURL('image/png'), user_agent: navigator.userAgent.slice(0, 200) });
+  if (error && error.code !== '23505') return fail(error, 'Подписът не се записа');
+  clientApp();
 }
 const LOGO_URL = 'https://newleveltraining.bg/wp-content/uploads/nltlogo-new.png';
 const logoHtml = h => `<img class="c-logoimg" src="${LOGO_URL}" alt="NLT Personal Training Club" style="height:${h}px" onerror="this.outerHTML='<span class=&quot;c-logo&quot;>NLT</span>'">`;
@@ -2306,6 +2353,8 @@ document.addEventListener('click', async e => {
       case 'mtoggle': S.massage = !S.massage; weekView(); break;
       case 'mcancel': if (confirm('Да откажа ли масажа?')) massageCancelStaff(el.dataset.id); break;
       case 'mdone': massageDone(el.dataset.id); break;
+      case 'cgsign': consentSign(); break;
+      case 'cgclear': { const cv = $('#cg-sig'); if (cv) { cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); C.sig = false; } break; }
       case 'mbook': mbStart(); break;
       case 'msvc': mbDays(el.dataset.id); break;
       case 'mday': mbSlots(el.dataset.d); break;
