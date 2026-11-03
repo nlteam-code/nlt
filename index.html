@@ -1518,15 +1518,16 @@ function downloadIcs(bid) {
 const C = { pkgs: [], bookings: [], classes: [], policy: {}, cv: {} };
 async function clientApp() {
   const me = S.me.row, t = today(), to = ymd(addDays(new Date(), 28));
+  const wq = sb.from('weight_log').select('day,weight_kg').eq('client_id', me.id).order('day');
   const mq = sb.from('massage_bookings').select('*').eq('client_id', me.id).gte('date', t).order('date').order('start_time');
-  const [pk, bk, cl, set, mm] = await Promise.all([
+  const [pk, bk, cl, set, mm, wl] = await Promise.all([
     sb.from('package_status').select('*').eq('client_id', me.id).order('end_date', { ascending: false }),
     sb.from('bookings').select('id,status,late,session_id,sessions!inner(id,date,start_time,duration_min,kind,title,location,cancelled)').eq('client_id', me.id).gte('sessions.date', t).order('date', { foreignTable: 'sessions' }),
     sb.from('sessions').select('id,date,start_time,title,location,capacity,kind,cancelled').eq('kind', 'group').eq('cancelled', false).gte('date', t).lte('date', to).order('date').order('start_time'),
     sb.from('settings').select('*'),
-    mq
+    mq, wq
   ]);
-  C.massages = (mm && mm.data) || [];
+  C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
   C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {};
   const ids = (cl.data || []).map(s => s.id);
@@ -1590,6 +1591,24 @@ function cSession(b, t) {
       ${grp ? `<button class="c-ic" title="Промяна" aria-label="Промяна" data-act="ccancel" data-bid="${b.id}" data-sid="${b.session_id}">${ic('edit', 20)}</button>` : ''}
     </div></div>`;
 }
+
+function weightCard() {
+  const w = (C.weights || []).filter(x => x.weight_kg != null);
+  if (!w.length) return `<section class="c-card" data-act="cnav" data-t="prog" style="cursor:pointer"><div class="c-k">Прогрес · тегло</div><div>Добави първото си тегло и следи как се променя.</div></section>`;
+  const last = w[w.length - 1], first = w[0], diff = Math.round((last.weight_kg - first.weight_kg) * 10) / 10;
+  const pts = w.slice(-12), mn = Math.min(...pts.map(x => +x.weight_kg)), mx = Math.max(...pts.map(x => +x.weight_kg)), rg = (mx - mn) || 1;
+  const xy = pts.map((x, i) => `${pts.length > 1 ? i / (pts.length - 1) * 100 : 50},${28 - (x.weight_kg - mn) / rg * 24}`).join(' ');
+  const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+  return `<section class="c-card" data-act="cnav" data-t="prog" style="cursor:pointer"><div class="c-k">Прогрес · тегло</div>
+    <div style="display:flex;align-items:center;gap:14px;justify-content:space-between"><div><b style="font-size:26px">${(+last.weight_kg).toFixed(1)} кг</b><div class="c-mute" style="font-size:12px">${fmt(last.day)}${w.length > 1 ? ` · ${sign}${Math.abs(diff).toFixed(1)} кг от началото` : ''}</div></div>
+    ${pts.length > 1 ? `<svg viewBox="0 0 100 32" width="110" height="36" preserveAspectRatio="none" aria-hidden="true"><polyline points="${xy}" fill="none" stroke="var(--c-coral,#eb4c51)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>` : ''}</div></section>`;
+}
+function massageCard(t) {
+  const m = (C.massages || []).filter(x => x.status === 'booked' && x.date >= t)[0];
+  if (!m) return '';
+  return `<section class="c-card" data-act="cnav" data-t="mine" style="cursor:pointer"><div class="c-k">Масаж · Лерин</div>
+    <div style="display:flex;gap:14px;align-items:center"><div class="c-ct" style="font-size:24px;font-weight:700">${hm(m.start_time)}</div><div><div class="c-st">${esc(m.service)}</div><div class="c-ss">${esc(dayWord(m.date, t))} · плащане на място</div></div></div></section>`;
+}
 function clientHome(me, t, act) {
   const nb = C.bookings[0], first = (me.name || '').split(' ')[0];
   const warn = act.filter(p => p.left <= 2 || p.days <= 7);
@@ -1607,9 +1626,11 @@ function clientHome(me, t, act) {
       <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
   ${warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
   ${main ? `<section class="c-card c-sum" data-act="cnav" data-t="pkg">${rings(main, 132)}
-      <div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.left} от ${main.total}</b><span>посещения</span></div></div>
+      <div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.total - main.left} от ${main.total}</b><span>изразходени посещения · остават ${main.left}</span></div></div>
       <div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>`
-    : `<section class="c-card"><div class="c-k">Абонамент</div><div>Нямаш активен абонамент. Свържи се с клуба.</div></section>`}
+    : ''}
+  ${massageCard(t)}
+  ${weightCard()}
   ${C.bookings.length > 1 ? `<h3 class="c-h">Предстоящи</h3><section class="c-card c-list">${C.bookings.slice(1, 4).map(b => cSession(b, t)).join('')}${C.bookings.length > 4 ? `<button class="c-more" data-act="cnav" data-t="mine">Всички (${C.bookings.length})</button>` : ''}</section>` : ''}`;
 }
 function clientBookTab(me, t, act) {
