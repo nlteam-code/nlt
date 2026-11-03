@@ -95,9 +95,11 @@ label.f input,label.f select{color:var(--ink)}
 .chips button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
 .fe{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}.fe .ft{color:var(--mute);width:42px;flex:none}
 .stat2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat2 b{display:block;font-size:18px}.stat2 span{font-size:12px;color:var(--mute)}
-.wait{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;max-height:130px;overflow:auto}
-.wait .wi{padding:3px 9px;border:1px solid var(--line);border-radius:99px;cursor:grab;background:var(--card);font-size:12.5px}
-.wait .wi.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.wkl{display:flex;gap:12px;align-items:flex-start}.wkl>#grid{flex:1;min-width:0}#wbtn{flex:0 0 230px;position:sticky;top:8px}#wbtn:empty{display:none}
+.wcard{padding:10px}.wait{display:flex;flex-direction:column;gap:4px;max-height:calc(100vh - 330px);min-height:120px;overflow:auto}
+.wait .wi{padding:6px 10px;border:1px solid var(--line);border-radius:10px;cursor:grab;background:var(--card);font-size:13px;display:flex;flex-direction:column;line-height:1.25}
+.wait .wi .wm{font-size:11.5px;color:var(--mute)}.wait .wi.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}.wait .wi.on .wm{color:inherit;opacity:.85}
+@media (max-width:820px){.wkl{flex-direction:column}#wbtn{flex:none;width:100%;position:static}.wait{max-height:200px}}
 .irow{padding:7px 0;border-bottom:1px solid var(--line)}.irow .il{display:block;color:var(--mute);font-size:12px;margin-bottom:3px}
 .ev[draggable=true]{cursor:grab}
 svg text{fill:var(--mute);font-size:11px}svg .bar{fill:var(--acc)}svg .gl{stroke:var(--line)}
@@ -723,12 +725,14 @@ function drawKpiClients() {
 /* ── седмичен график ── */
 const H0 = 6, H1 = 21, HH = 48;
 async function weekView() {
+  if (S.waitOpen === undefined) S.waitOpen = true;
+  if (!S.pstat || !S.pstat.length) S.pstat = await loadPstat();
   const a = ymd(S.week), b = ymd(addDays(S.week, 6));
   const main = $('#main');
   main.innerHTML = `<div class="row" style="margin-bottom:10px">
     <button data-act="wk" data-d="-7">←</button><button data-act="wk" data-d="0">Днес</button><button data-act="wk" data-d="7">→</button>
     <b id="wlabel">${fmt(a)} – ${fmt(b)}</b><span class="sp"></span>
-    <span id="wbtn">${waitHtml()}</span><button class="pri" data-act="newsess">+ Нов час</button></div><div id="grid" class="mute">Зареждане…</div>`;
+    <button class="sm" data-act="wtoggle">Клиенти</button><button class="pri" data-act="newsess">+ Нов час</button></div><div class="wkl"><aside id="wbtn">${waitHtml()}</aside><div id="grid" class="mute">Зареждане…</div></div>`;
   const { data, error } = await sb.from('sessions')
     .select('*,bookings(id,status,client_id,use_plan)').eq('location', S.loc).gte('date', a).lte('date', b).order('start_time');
   if (error) return fail(error, 'Графикът не се зареди');
@@ -889,9 +893,11 @@ async function loadPstat() {
   if (error) { fail(error, 'Пакетите не се заредиха (изпълнен ли е 03_popravki.sql?)'); return []; }
   return data;
 }
+const CST = { active: 'Активни', wait: 'Чакащи', pause: 'Пауза', inactive: 'Неактивни' };
+function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 'Inactive') return 'inactive'; return curPkg(c.id) ? 'active' : 'wait'; }
 function curPkg(cid) {
   const t = today();
-  const list = S.pstat.filter(p => p.client_id === cid);
+  const list = (S.pstat || []).filter(p => p.client_id === cid);
   return list.find(p => p.start_date <= t && p.end_date >= t) || null;
 }
 function pkgChip(p) {
@@ -906,24 +912,29 @@ async function clientsView() {
   drawClients();
 }
 function drawClients() {
-  const q = S.q.toLowerCase();
-  const list = S.clients.filter(c => (!q || (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q))
-    && (c.location === S.loc || !c.location || q)).filter(c => {
-      const p = curPkg(c.id);
-      if (S.cfilter === 'nopkg') return !p;
-      if (S.cfilter === 'exp') { if (!p) return false; const left = p.total - p.used, days = (parse(p.end_date) - parse(today())) / 864e5; return left <= 1 || days <= 3; }
-      return true;
-    });
-  $('#main').innerHTML = `<div class="row" style="margin-bottom:10px">
+  const q = S.q.toLowerCase(); S.cst = S.cst || 'all'; S.cloc = S.cloc || 'all';
+  const base = S.clients.filter(c => (!q || (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q)) && (S.cloc === 'all' || c.location === S.cloc));
+  const cnt = k => base.filter(c => cstat(c) === k).length;
+  const list = base.filter(c => {
+    if (S.cst !== 'all' && cstat(c) !== S.cst) return false;
+    if (S.cfilter === 'exp') { const p = curPkg(c.id); if (!p) return false; const left = p.total - p.used, days = (parse(p.end_date) - parse(today())) / 864e5; return left <= 1 || days <= 3; }
+    return true;
+  });
+  const stCls = { active: 'ok', wait: 'warn', pause: '', inactive: '' };
+  $('#main').innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap">
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
-    <select id="cf"><option value="all">Всички</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option><option value="nopkg" ${S.cfilter === 'nopkg' ? 'selected' : ''}>Без пакет</option></select>
+    <select id="cs"><option value="all">Всички (${base.length})</option>${Object.entries(CST).map(([k, l]) => `<option value="${k}" ${S.cst === k ? 'selected' : ''}>${l} (${cnt(k)})</option>`).join('')}</select>
+    <select id="cl"><option value="all">Двата обекта</option>${LOCS.map(l => `<option ${S.cloc === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <select id="cf"><option value="all">Без друг филтър</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option></select>
     <button class="pri" data-act="newclient">+ Нов клиент</button></div>
-    <div class="mute" style="margin-bottom:6px">${list.length} клиента · ${esc(S.loc)}</div>
-    <div class="tw"><table><thead><tr><th>Име</th><th>Телефон</th><th>Пакет</th></tr></thead><tbody>
-    ${list.slice(0, 400).map(c => `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}${c.status !== 'Active' ? ` <span class="chip">${esc(c.status)}</span>` : ''}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td></tr>`).join('')}
+    <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.cst !== 'all' ? ' · ' + CST[S.cst] : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
+    <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Телефон</th><th>Пакет</th></tr></thead><tbody>
+    ${list.slice(0, 400).map(c => { const k = cstat(c); return `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}</td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td></tr>`; }).join('')}
     </tbody></table></div>`;
   const qi = $('#cq'); qi.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; drawClients(); const n = $('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
   $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
+  $('#cs').onchange = e => { S.cst = e.target.value; drawClients(); };
+  $('#cl').onchange = e => { S.cloc = e.target.value; drawClients(); };
 }
 async function openClient(id, tab) {
   const [c, cp, pay, chg, bk, hist, hv, hm2, arq] = await Promise.all([
@@ -964,7 +975,7 @@ async function openClient(id, tab) {
       <label class="f">Имейл<input id="c-email" value="${esc(x.email || '')}"></label>
       <label class="f">Локация<select id="c-loc">${LOCS.map(l => `<option ${l === x.location ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="f">Откъде идва<select id="c-src">${['Уебсайт', 'Препоръка', 'Instagram', 'Facebook', 'Google', 'Друго'].map(v => `<option ${v === (x.source || 'Уебсайт') ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-      <label class="f">Статус<select id="c-st">${['Active', 'Lead', 'Inactive'].map(s => `<option ${s === x.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+      <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент, иначе Чакащ)'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => `<option value="${v}" ${v === (x.status === 'Lead' ? 'Active' : x.status) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     </div>
     <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
     <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button></div>
@@ -1308,13 +1319,21 @@ async function saveCv() {
 
 /* ── чакащи клиенти и влачене ── */
 function waitHtml() {
-  if (!S.waitOpen) return `<button class="sm" data-act="wtoggle">Чакащи (${S.clients.filter(c => c.status === 'Lead').length})</button>`;
-  const q = (S.wq || '').toLowerCase(), all = S.clients.filter(c => c.status === 'Lead');
-  const list = q ? all.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)) : all;
+  if (!S.waitOpen) return '';
+  S.wst = S.wst || 'all';
+  const q = (S.wq || '').toLowerCase();
+  const pool = S.clients.filter(c => { const k = cstat(c); return (k === 'active' || k === 'wait') && (S.wall || c.location === S.loc || !c.location); });
+  const all = pool.filter(c => S.wst === 'all' || cstat(c) === S.wst);
+  const list = (q ? all.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)) : all).sort((a, b) => a.name.localeCompare(b.name, 'bg'));
   const pc = S.waitPick && S.clients.find(c => c.id === S.waitPick);
-  return `<div class="card" style="margin-bottom:10px;width:100%"><div class="row"><b>Чакащи (${all.length})</b><input id="wq" placeholder="Търси…" value="${esc(S.wq || '')}"><span class="sp"></span><button class="sm" data-act="wtoggle">Скрий</button></div>
-    <div class="wait">${list.map(c => `<span class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="true" data-act="wpick" data-id="${c.id}" title="${esc(c.name)}">${esc(c.name.length > 22 ? c.name.split(' ')[0] + ' ' + c.name.split(' ').slice(-1) : c.name)}</span>`).join('') || '<span class="mute">Няма клиенти със статус „Очакване“.</span>'}</div>
-    ${pc ? `<div>Избран: <b>${esc(pc.name)}</b>. Натисни час в графика или го пусни върху графика. <button class="sm" data-act="wclear">Откажи</button></div>` : '<div class="mute">Избери клиент и натисни час (записва се при Аксел), или го завлачи върху графика.</div>'}</div>`;
+  const nA = pool.filter(c => cstat(c) === 'active').length, nW = pool.length - nA;
+  const chip = (k, l) => `<button class="sm ${S.wst === k ? 'pri' : ''}" data-act="wst" data-k="${k}">${l}</button>`;
+  return `<div class="card wcard"><div class="row" style="margin-bottom:6px"><b>Клиенти (${all.length})</b><span class="sp"></span><button class="sm" data-act="wtoggle" title="Скрий">✕</button></div>
+    <input id="wq" placeholder="Търси…" value="${esc(S.wq || '')}" style="width:100%;margin-bottom:6px">
+    <div class="row" style="gap:4px;margin-bottom:6px;flex-wrap:wrap">${chip('all', 'Всички')}${chip('active', 'Активни ' + nA)}${chip('wait', 'Чакащи ' + nW)}</div>
+    <label class="mute" style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:6px"><input type="checkbox" data-act="wall" ${S.wall ? 'checked' : ''}> и от другия обект</label>
+    <div class="wait">${list.map(c => { const p = curPkg(c.id), left = p ? p.total - p.used : 0; return `<div class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="true" data-act="wpick" data-id="${c.id}" title="${esc(c.name)}"><span class="wn">${esc(c.name)}</span><span class="wm">${S.wall ? esc(c.location || '') + ' · ' : ''}${p ? left + ' ост.' : 'без абонамент'}</span></div>`; }).join('') || '<span class="mute">Няма клиенти.</span>'}</div>
+    ${pc ? `<div style="margin-top:6px;font-size:13px">Избран: <b>${esc(pc.name)}</b>. Натисни час или го завлачи върху графика. <button class="sm" data-act="wclear">Откажи</button></div>` : '<div class="mute" style="margin-top:6px;font-size:12px">Избери клиент и натисни час (записва се при Аксел), или го завлачи върху графика.</div>'}</div>`;
 }
 async function quickBook(cid, date, time) {
   const tr = S.staff.find(t => t.active && t.name.startsWith('Аксел'));
@@ -1650,6 +1669,7 @@ document.addEventListener('click', async e => {
       case 'wtoggle': S.waitOpen = !S.waitOpen; $('#wbtn').innerHTML = waitHtml(); break;
       case 'wpick': S.waitPick = S.waitPick === el.dataset.id ? null : el.dataset.id; $('#wbtn').innerHTML = waitHtml(); break;
       case 'wclear': S.waitPick = null; $('#wbtn').innerHTML = waitHtml(); break;
+      case 'wst': S.wst = el.dataset.k; $('#wbtn').innerHTML = waitHtml(); break;
       case 'ics': downloadIcs(el.dataset.id); break;
       case 'cbook': await clientBook(el.dataset.id); break;
       case 'ccancel': clientCancelDialog(el.dataset.bid, el.dataset.sid); break;
@@ -1659,6 +1679,7 @@ document.addEventListener('click', async e => {
   } catch (err) { fail(err, 'Грешка'); }
 });
 document.addEventListener('change', async e => {
+  if (e.target.dataset && e.target.dataset.act === 'wall') { S.wall = e.target.checked; $('#wbtn').innerHTML = waitHtml(); return; }
   if (e.target.id === 'klist-sel') { D.klist = e.target.value; return kpiView(); }
   const el = e.target.closest('[data-act=blate]');
   if (el) { const bid = el.closest('.bk').dataset.bid; await sb.from('bookings').update({ late: el.checked }).eq('id', bid); await refreshAfter(sessId()); }
