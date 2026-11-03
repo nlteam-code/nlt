@@ -592,9 +592,9 @@ async function kpiOwner() {
   const trainers = `<div class="card" style="margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 8px">Треньори <span class="mute" style="font-weight:400">· последни 28 дни</span></h3><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Ср. на час</th><th>Приход</th></tr></thead><tbody>
     ${trn.map(r => `<tr><td><b>${esc(r.name)}</b></td><td>${r.hours}</td><td>${r.visits}</td><td>${r.avg_per_session ?? '–'}</td><td>${eur(r.revenue || 0)}</td></tr>`).join('') || '<tr><td colspan="5" class="mute">Няма данни.</td></tr>'}</tbody></table></div>`;
   // клиенти за действие
-  const lists = { lost: ['Отказали се', lost], risk: ['В риск', risk], nopkg: ['Без абонамент', noPkg] }, cur = lists[D.klist] || lists.lost;
-  const list = `<div class="card" style="margin-bottom:14px;overflow:auto"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Клиенти за действие</h3><span class="sp"></span>${Object.entries(lists).map(([k, [l, a]]) => `<button class="sm ${D.klist === k ? 'pri' : ''}" data-act="klist" data-k="${k}">${l} · ${a.length}</button>`).join('')}</div>
-    <table><thead><tr><th>Клиент</th><th>Обект</th><th>Преди (4 седм.)</th><th>Сега</th><th>Последно</th><th>Абонамент</th></tr></thead><tbody>
+  const lists = { lost: ['Отказали се', lost], back: ['Започнали / върнали се', back.sort((x, y) => y.done_28 - x.done_28)], risk: ['В риск', risk], nopkg: ['Без абонамент', noPkg] }, cur = lists[D.klist] || lists.lost;
+  const list = `<div class="card" style="margin-bottom:14px;overflow:auto"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Клиенти за действие</h3><span class="sp"></span><select id="klist-sel" style="font-weight:600">${Object.entries(lists).map(([k, [l, a]]) => `<option value="${k}" ${D.klist === k ? 'selected' : ''}>${l} · ${a.length}</option>`).join('')}</select></div>
+    <table><thead><tr><th>Клиент</th><th>Обект</th><th>Преди (4 седм.)</th><th>Сега (4 седм.)</th><th>Последно</th><th>Абонамент</th></tr></thead><tbody>
     ${cur[1].slice(0, 40).map(c => `<tr class="click" data-act="client" data-id="${c.client_id}"><td><b>${esc(c.name)}</b></td><td>${esc(c.location || '')}</td><td>${c.done_prev_28}</td><td>${c.done_28}</td><td>${c.last_visit ? fmt(c.last_visit) + ` <span class="mute">· ${c.days_since} дни</span>` : '–'}</td><td>${c.pkg_end ? 'до ' + fmt(c.pkg_end) + ` · ${c.pkg_left} ост.` : '<span class="chip warn">няма</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="mute">Няма клиенти в този списък.</td></tr>'}</tbody></table>
     ${cur[1].length > 40 ? `<div class="mute" style="margin-top:6px">Показани са първите 40 от ${cur[1].length}.</div>` : ''}</div>`;
   const more = `<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:600">Още показатели · най-заети часове, честота, източник</summary>${heatGrid(ht.data || [])}${freqBlock(kc, locs)}${sourcesBlock(sr.data)}</details>`;
@@ -1659,6 +1659,7 @@ document.addEventListener('click', async e => {
   } catch (err) { fail(err, 'Грешка'); }
 });
 document.addEventListener('change', async e => {
+  if (e.target.id === 'klist-sel') { D.klist = e.target.value; return kpiView(); }
   const el = e.target.closest('[data-act=blate]');
   if (el) { const bid = el.closest('.bk').dataset.bid; await sb.from('bookings').update({ late: el.checked }).eq('id', bid); await refreshAfter(sessId()); }
 });
