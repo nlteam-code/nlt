@@ -305,6 +305,11 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .cm .pg-card{padding:18px;box-shadow:var(--c-shadow)}
 .pg-h{margin:0 0 8px;font-size:14px;font-weight:700}
 .pg-mute{color:var(--pg-mute)}.pg-sm{font-size:13px}
+.lockbox{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--c-line,rgba(255,255,255,.12));min-height:320px}
+.lockfake{filter:blur(7px);opacity:.55;padding:20px;display:flex;flex-direction:column;gap:18px;pointer-events:none;user-select:none;color:var(--c-accent,#eb4c51)}
+.lockfake svg{width:100%;height:120px}.lf-row{display:flex;gap:12px}.lf-row i{display:block;height:16px;border-radius:8px;background:currentColor;opacity:.35}
+.lockmsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:20px}
+.lockmsg b{font-size:18px}.lockmsg span{opacity:.75;font-size:14px;max-width:280px}
 .pg-empty{text-align:center;color:var(--pg-mute);padding:26px 12px}
 .pg-note{background:var(--warn-bg,#fff0e6);color:var(--warn,#b4531d);border-radius:10px;padding:8px 12px;font-size:13px}
 .pg-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}.pg-tabs::-webkit-scrollbar{display:none}
@@ -2007,7 +2012,12 @@ function cSession(b, t) {
     </div></div>`;
 }
 
+const PROG_LOCKED = true;
+function progLocked() {
+  return `<h2 class="c-title">Прогрес</h2><div class="lockbox"><div class="lockfake" aria-hidden="true"><div class="lf-row"><i style="width:38%"></i><i style="width:22%"></i></div><svg viewBox="0 0 300 110" preserveAspectRatio="none"><path d="M0 90 C40 80 70 70 110 60 S190 40 230 30 S280 20 300 14" fill="none" stroke="currentColor" stroke-width="4"/></svg><div class="lf-row"><i style="width:60%"></i></div><div class="lf-row"><i style="width:45%"></i><i style="width:30%"></i></div></div><div class="lockmsg"><b>Услугата все още не е активна</b><span>Скоро ще можеш да следиш теглото, измерванията и тестовете си тук.</span></div></div>`;
+}
 function weightCard() {
+  if (PROG_LOCKED) return `<section class="c-card" style="position:relative;overflow:hidden"><div class="c-k">Прогрес</div><div style="filter:blur(6px);opacity:.6;pointer-events:none" aria-hidden="true">72,4 кг · −1,8 кг</div><div class="mute" style="margin-top:6px">Услугата все още не е активна</div></section>`;
   const w = (C.weights || []).filter(x => x.weight_kg != null);
   if (!w.length) return `<section class="c-card" data-act="cnav" data-t="prog" style="cursor:pointer"><div class="c-k">Прогрес · тегло</div><div>Добави първото си тегло и следи как се променя.</div></section>`;
   const last = w[w.length - 1], first = w[0], diff = Math.round((last.weight_kg - first.weight_kg) * 10) / 10;
@@ -2171,12 +2181,11 @@ function clientAsk(sid) {
 function renderClient() {
   closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
-  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? clientRewards() : C.tab === 'prog' ? '<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>' : clientHome(me, t, act);
+  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? clientRewards() : C.tab === 'prog' ? progLocked() : clientHome(me, t, act);
   const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['prog', 'chart', 'Прогрес']];
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
     <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
-  if (C.tab === 'prog') pgBoot(false, me.id, 'pg', me.user_id);
 }
 async function clientBook(sid) {
   closeSheet(); if (S.previewClient) return toast('Само преглед — записването е изключено.');
