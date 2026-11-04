@@ -1263,14 +1263,18 @@ function payHistHtml() {
   const H = D.phist;
   if (!H) return '<div class="mute" style="padding:12px">Зареждане…</div>';
   const rows = H.filter(p => payLoc() === 'all' || (S.clients.find(c => c.id === p.client_id) || {}).location === payLoc());
-  return `<div class="tw" style="max-height:380px;overflow:auto"><table><thead><tr><th>Дата</th><th>Клиент</th><th>Сума</th><th>Начин</th><th>Бележка</th><th></th></tr></thead><tbody>${rows.map(p => `<tr><td>${esc(p.date)}</td><td><b>${esc(cname(p.client_id))}</b></td><td>${eur(p.amount)}</td><td>${esc(p.method || '—')}</td><td class="mute">${esc(p.note || '')}</td><td style="white-space:nowrap"><button class="sm" data-act="hedit" data-id="${p.id}">Коригирай</button> <button class="sm" data-act="hdel" data-id="${p.id}">Изтрий</button></td></tr>`).join('') || '<tr><td colspan="6" class="mute">Няма плащания.</td></tr>'}</tbody></table></div><p class="mute">Последните 300 плащания. Корекциите се отразяват веднага в дължимото.</p>`;
+  const ms = ['all']; for (let i = 0; i < 12; i++) { const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1); ms.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
+  const sum = rows.reduce((a, p) => a + Number(p.amount), 0);
+  return `<div class="row" style="margin-bottom:8px;flex-wrap:wrap"><select id="phm">${ms.map(k => `<option value="${k}" ${k === D.phm ? 'selected' : ''}>${k === 'all' ? 'Всички' : k}</option>`).join('')}</select><b>${rows.length} плащания · ${eur(sum)}</b><span class="sp"></span><button class="sm" data-act="hcsv">Копирай за счетоводителя</button></div><div class="tw" style="max-height:380px;overflow:auto"><table><thead><tr><th>Дата</th><th>Клиент</th><th>Сума</th><th>Начин</th><th>Бележка</th><th></th></tr></thead><tbody>${rows.map(p => `<tr><td>${esc(p.date)}</td><td><b>${esc(cname(p.client_id))}</b></td><td>${eur(p.amount)}</td><td>${esc(p.method || '—')}</td><td class="mute">${esc(p.note || '')}</td><td style="white-space:nowrap"><button class="sm" data-act="hedit" data-id="${p.id}">Коригирай</button> <button class="sm" data-act="hdel" data-id="${p.id}">Изтрий</button></td></tr>`).join('') || '<tr><td colspan="6" class="mute">Няма плащания.</td></tr>'}</tbody></table></div><p class="mute">Корекциите се отразяват веднага в дължимото.</p>`;
 }
 async function refreshBal() {
   const r = await sb.rpc(S.owner ? 'dash_balances' : 'my_debtors'); if (r.error) return;
   D.bal = r.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(x => x.c && (!S.view || (S.view.locations || []).includes(x.c.location)));
 }
 async function loadPayHist() {
-  const { data } = await sb.from('payments').select('*').order('date', { ascending: false }).order('id').limit(300);
+  let q = sb.from('payments').select('*').order('date', { ascending: false }).order('id').limit(2000);
+  if (D.phm && D.phm !== 'all') { const [y, m] = D.phm.split('-').map(Number); q = q.gte('date', ymd(new Date(y, m - 1, 1))).lte('date', ymd(new Date(y, m, 0))); }
+  const { data } = await q;
   D.phist = data || []; if (D.tab === 'hist') redrawPay();
 }
 function payCard() {
@@ -1344,7 +1348,29 @@ async function trainerDash() {
   $('#main').innerHTML = `
     <div class="card" style="margin-bottom:12px">${soon}</div>
     ${actCardHtml(acts)}
+    <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>`;
+  loadCancelCard();
+}
+async function loadCancelCard() {
+  const el = document.getElementById('cancelcard'); if (!el) return;
+  const from = ymd(addDays(new Date(), -28));
+  const { data, error } = await sb.from('bookings').select('status,late,client_id,sessions!inner(date,location)').gte('sessions.date', from).lte('sessions.date', today()).limit(6000);
+  if (error) { el.innerHTML = '<h2>Отказани часове</h2><div class="mute">Не се зареди.</div>'; return; }
+  const dn = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'], loc = {}, wd = [0, 0, 0, 0, 0, 0, 0], who = {};
+  for (const b of data) {
+    const l = b.sessions.location, o = loc[l] = loc[l] || { n: 0, c: 0, late: 0 };
+    o.n++; if (b.status === 'cancelled') { o.c++; if (b.late) o.late++; wd[new Date(b.sessions.date + 'T12:00:00').getDay()]++; who[b.client_id] = (who[b.client_id] || 0) + 1; }
+  }
+  const top = Object.entries(who).sort((a, z) => z[1] - a[1]).slice(0, 5), mx = Math.max(1, ...wd), order = [1, 2, 3, 4, 5, 6, 0];
+  const tot = Object.values(loc).reduce((a, o) => ({ n: a.n + o.n, c: a.c + o.c }), { n: 0, c: 0 });
+  el.innerHTML = `<h2>Отказани часове <span class="mute" style="font-weight:400">· последните 4 седмици, и двата обекта</span></h2>
+    <div class="tw"><table><thead><tr><th>Обект</th><th>Записани</th><th>Отказани</th><th>% отказ</th><th>От тях късни</th></tr></thead><tbody>
+    ${LOCS.filter(l => loc[l]).map(l => `<tr><td><b>${esc(l)}</b></td><td>${loc[l].n}</td><td>${loc[l].c}</td><td>${Math.round(loc[l].c / loc[l].n * 100)}%</td><td>${loc[l].late}</td></tr>`).join('')}
+    <tr><td class="mute">Общо</td><td>${tot.n}</td><td>${tot.c}</td><td>${tot.n ? Math.round(tot.c / tot.n * 100) : 0}%</td><td></td></tr></tbody></table></div>
+    <div style="display:flex;gap:6px;align-items:flex-end;height:90px;margin:14px 0 4px">${order.map(d => `<div style="flex:1;text-align:center"><div style="font-size:12px">${wd[d]}</div><div style="background:var(--accent,#eb4c51);border-radius:4px 4px 0 0;height:${Math.max(3, Math.round(wd[d] / mx * 60))}px"></div><div class="mute" style="font-size:12px">${dn[d]}</div></div>`).join('')}</div>
+    <div class="mute" style="margin:8px 0 4px">Най-често отказват</div>
+    ${top.map(([id, n]) => `<div class="fe"><span>${esc(cname(id))}</span><span class="chip">${n}</span></div>`).join('') || '<div class="mute">Няма отказани часове.</div>'}`;
 }
 function actCardHtml(acts) {
   const FEEDS = { cancel: 'Отказан', change: 'Сменен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит' }, dd = parse(D.day);
@@ -1642,12 +1668,14 @@ async function dashView() {
         <div class="stat2"><div><b>${eur(st.proj)}</b><span>Прогнозен приход</span></div><div><b>${eur(st.done)}</b><span>Реализиран до момента</span></div><div><b>${st.n_done} / ${st.n}</b><span>Проведени / всички посещения</span></div><div><b>${eur(st.n ? st.proj / st.n : 0)}</b><span>Средна цена на посещение</span></div></div>
         <p class="mute">${diff === null ? 'Няма данни за предишния месец.' : `Спрямо ${mLabel(shiftM(D.month, -1))}: ${diff >= 0 ? '+' : ''}${diff}% (${eur(pv.proj)}).`} Цената на пакета ÷ броя посещения в него; еднократните — по тяхната цена. Отказаните не се броят.</p></div>
     </div>
+    <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div class="card" style="margin-bottom:12px"><h2>Финансова графика по месеци</h2>
       <div class="chips">${chip('ctab', 'pay', 'Плащания', D.chart)}${chip('ctab', 'chg', 'Такси', D.chart)}${chip('ctab', 'proj', 'Прогноза по посещения', D.chart)}</div>${svg}</div>
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>`;
+  loadCancelCard();
 }
 
 /* ── Пакети ── */
@@ -2709,7 +2737,8 @@ document.addEventListener('click', async e => {
       case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
       case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); S.owner ? dashView() : trainerDash(); break;
       case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
-      case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; loadPayHist(); } redrawPay(); break;
+      case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; D.phm = D.phm || today().slice(0, 7); loadPayHist(); } redrawPay(); break;
+      case 'hcsv': { const rows = (D.phist || []).filter(p => payLoc() === 'all' || (S.clients.find(c => c.id === p.client_id) || {}).location === payLoc()); const t = ['Дата\tКлиент\tОбект\tСума\tНачин\tБележка'].concat(rows.map(p => [p.date, cname(p.client_id), (S.clients.find(c => c.id === p.client_id) || {}).location || '', String(p.amount).replace('.', ','), p.method || '', p.note || ''].join('\t'))).join('\n'); try { await navigator.clipboard.writeText(t); toast('Копирано, постави в Excel'); } catch (e) { modal.show(`<h2>Копирай ръчно</h2><textarea style="width:100%;height:200px">${esc(t)}</textarea>`); } break; }
       case 'hdel': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p || !confirm(`Изтриване на плащане ${money(p.amount)} от ${p.date} (${cname(p.client_id)})?`)) break; const { error } = await sb.from('payments').delete().eq('id', p.id); if (error) return fail(error, 'Не се изтри'); logEvent('removed', `Изтрито плащане ${money(p.amount)} (${p.date}): ${cname(p.client_id)}`); await refreshBal(); loadPayHist(); break; }
       case 'hedit': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p) break; modal.show(`<div id="he" data-id="${p.id}"><h2>Корекция · ${esc(cname(p.client_id))}</h2><label class="f">Сума<input id="he-a" type="number" step="0.01" value="${p.amount}"></label><label class="f">Начин<select id="he-m"><option ${p.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${p.method === 'Банков път' ? 'selected' : ''}>Банков път</option></select></label><label class="f">Дата<input id="he-d" type="date" value="${p.date}"></label><label class="f">Бележка<input id="he-n" value="${esc(p.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="hsave">Запази корекцията</button></div></div>`); break; }
       case 'hsave': { const id = $('#he').dataset.id, p = (D.phist || []).find(x => x.id === id), a = Math.round(+$('#he-a').value * 100) / 100; if (!(a > 0)) return toast('Въведи сума.'); const { error } = await sb.from('payments').update({ amount: a, method: $('#he-m').value, date: $('#he-d').value, note: $('#he-n').value.trim() || null }).eq('id', id); if (error) return fail(error, 'Не се запази'); modal.close(); logEvent('change', `Коригирано плащане: ${cname(p.client_id)} ${money(p.amount)} → ${money(a)}`); await refreshBal(); loadPayHist(); toast('Коригирано.'); break; }
@@ -2752,6 +2781,7 @@ document.addEventListener('click', async e => {
   } catch (err) { fail(err, 'Грешка'); }
 });
 document.addEventListener('change', async e => {
+  if (e.target.id === 'phm') { D.phm = e.target.value; D.phist = null; redrawPay(); loadPayHist(); return; }
   if (e.target.dataset && e.target.dataset.act === 'wall') { S.wall = e.target.checked; $('#wbtn').innerHTML = waitHtml(); return; }
   if (e.target.id === 'klist-sel') { D.klist = e.target.value; return kpiView(); }
   const el = e.target.closest('[data-act=blate]');
