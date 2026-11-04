@@ -1103,11 +1103,12 @@ function drawClients() {
     return true;
   }).sort((a, b) => ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(a)] - ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
   const stCls = { active: 'ok', wait: 'warn', pause: '', inactive: '' };
+  S.clist = list;
   $('#main').innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap">
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
     <select id="cl"><option value="all">Двата обекта</option>${LOCS.map(l => `<option ${S.cloc === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
     <select id="cf"><option value="all">Без друг филтър</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option><option value="mo" ${S.cfilter === 'mo' ? 'selected' : ''}>Само масажи</option></select>
-    <button class="pri" data-act="newclient">+ Нов клиент</button></div>
+    ${S.owner ? '<button data-act="cemails" title="Имейлите на показания списък, готови за скрито копие (BCC)">Имейли за писмо</button>' : ''}<button class="pri" data-act="newclient">+ Нов клиент</button></div>
     <div class="chips" style="margin-bottom:8px"><button class="${S.csts.length ? '' : 'on'}" data-act="cstat" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${S.csts.includes(k) ? 'on' : ''}" data-act="cstat" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
     <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.csts.length ? ' · ' + S.csts.map(k => CST[k]).join(', ') : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
     <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Телефон</th><th>Пакет</th></tr></thead><tbody>
@@ -2759,6 +2760,13 @@ document.addEventListener('click', async e => {
       case 'perm': { const v = el.checked, { error } = await sb.from('staff').update({ [el.dataset.p]: v }).eq('id', el.dataset.s); if (error) { el.checked = !v; return fail(error, 'Правото не се записа'); } const t = S.staff.find(x => x.id === el.dataset.s); if (t) t[el.dataset.p] = v; toast(v ? 'Правото е дадено' : 'Правото е махнато'); break; }
       case 'pradd': case 'prdel': case 'pmstat': case 'pcsv': payAct(act, el); break;
       case 'rwclaim': { if (S.previewClient) return toast('Само преглед.'); const { error } = await sb.rpc('claim_reward', { p_level: +el.dataset.id }); if (error) return fail(error, 'Не се получи'); toast('Заявено'); clientApp(); break; }
+      case 'cemails': {
+        const L = (S.clist || []).filter(c => !c.massage_only), ok = L.filter(c => c.email && c.email.includes('@')), em = [...new Set(ok.map(c => c.email.trim().toLowerCase()))], no = L.filter(c => !(c.email && c.email.includes('@')));
+        const chunks = []; for (let i = 0; i < em.length; i += 90) chunks.push(em.slice(i, i + 90));
+        D.echunks = chunks.map(c => c.join(', '));
+        modal.show(`<h2>Имейли за писмо</h2><div class="mute" style="margin-bottom:8px">${L.length} клиента в показания списък · ${em.length} различни имейла${no.length ? ` · ${no.length} без имейл` : ''}. Постави всяка група в полето „Скрито копие (BCC)“ в Gmail — по едно писмо на група.</div>${chunks.map((c, i) => `<div style="margin-bottom:10px"><b>Писмо ${i + 1} · ${c.length} имейла</b><textarea readonly rows="3" style="width:100%">${esc(D.echunks[i])}</textarea><button class="sm" data-act="cecopy" data-i="${i}">Копирай</button></div>`).join('')}${no.length ? `<h3>Без имейл — прати линка ръчно</h3><div class="mute">${no.map(c => esc(c.name) + (c.phone ? ' · ' + esc(c.phone) : '')).join('<br>')}</div>` : ''}`);
+        break; }
+      case 'cecopy': { const t = D.echunks[+el.dataset.i]; try { await navigator.clipboard.writeText(t); toast('Копирано'); } catch (e) { toast('Маркирай текста и копирай ръчно'); } break; }
       case 'pgmode': D.pgm = el.dataset.m; pgvRender(); break;
       case 'pgst': D.pgs = el.dataset.k === 'all' ? [] : ((D.pgs || []).includes(el.dataset.k) ? D.pgs.filter(x => x !== el.dataset.k) : [...(D.pgs || []), el.dataset.k]); pgvRender(); break;
       case 'pgloc': D.pgl = el.dataset.l; pgvRender(); break;
