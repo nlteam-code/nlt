@@ -533,9 +533,9 @@ function renderStaff() {
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
     <div class="tabs">
-      ${[['dash', 'Обобщение'], ['kpi', 'KPI'], ['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес'], ['tasks', 'Задачи'], ['rewards', 'Награди'], ['packages', 'Пакети'], ['team', 'Служители']].concat(S.owner ? [['reports', 'Отчети']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
+      ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес'], ['tasks', 'Задачи'], ['rewards', 'Награди'], ['packages', 'Пакети'], ['team', 'Служители']]).concat(S.owner ? [['reports', 'Отчети']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
-    <select id="loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+    <select id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
   <div class="wrap" id="main"></div>`;
@@ -1088,28 +1088,27 @@ async function clientsView() {
   drawClients();
 }
 function drawClients() {
-  const q = S.q.toLowerCase(); S.cst = S.cst || 'all'; if (S.cloc === undefined) S.cloc = S.loc;
+  const q = S.q.toLowerCase(); S.csts = S.csts || []; if (S.cloc === undefined) S.cloc = S.loc;
   const base = S.clients.filter(c => (S.cfilter === 'mo' ? c.massage_only : !c.massage_only) && (!q || (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q)) && (S.cloc === 'all' || c.location === S.cloc));
   const cnt = k => base.filter(c => cstat(c) === k).length;
   const list = base.filter(c => {
-    if (S.cst !== 'all' && cstat(c) !== S.cst) return false;
+    if (S.csts.length && !S.csts.includes(cstat(c))) return false;
     if (S.cfilter === 'exp') { const p = curPkg(c.id); if (!p) return false; const left = p.total - p.used, days = (parse(p.end_date) - parse(today())) / 864e5; return left <= 1 || days <= 3; }
     return true;
-  });
+  }).sort((a, b) => ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(a)] - ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
   const stCls = { active: 'ok', wait: 'warn', pause: '', inactive: '' };
   $('#main').innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap">
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
-    <select id="cs"><option value="all">Всички (${base.length})</option>${Object.entries(CST).map(([k, l]) => `<option value="${k}" ${S.cst === k ? 'selected' : ''}>${l} (${cnt(k)})</option>`).join('')}</select>
     <select id="cl"><option value="all">Двата обекта</option>${LOCS.map(l => `<option ${S.cloc === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
     <select id="cf"><option value="all">Без друг филтър</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option><option value="mo" ${S.cfilter === 'mo' ? 'selected' : ''}>Само масажи</option></select>
     <button class="pri" data-act="newclient">+ Нов клиент</button></div>
-    <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.cst !== 'all' ? ' · ' + CST[S.cst] : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
+    <div class="chips" style="margin-bottom:8px"><button class="${S.csts.length ? '' : 'on'}" data-act="cstat" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${S.csts.includes(k) ? 'on' : ''}" data-act="cstat" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
+    <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.csts.length ? ' · ' + S.csts.map(k => CST[k]).join(', ') : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
     <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Телефон</th><th>Пакет</th></tr></thead><tbody>
     ${list.slice(0, 400).map(c => { const k = cstat(c); return `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}</td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td></tr>`; }).join('')}
     </tbody></table></div>`;
   const qi = $('#cq'); qi.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; drawClients(); const n = $('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
   $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
-  $('#cs').onchange = e => { S.cst = e.target.value; drawClients(); };
   $('#cl').onchange = e => { S.cloc = e.target.value; drawClients(); };
 }
 async function openClient(id, tab) {
@@ -1186,7 +1185,7 @@ async function openClient(id, tab) {
     <div style="max-height:300px;overflow:auto">${ledger.map(l => `<div class="bk"><div class="nm"><b style="color:${l.plus ? 'var(--ok)' : 'var(--bad)'}">${l.plus ? '+' : '−'} ${money(l.a)}</b> · ${fmt(l.d)} · ${l.t}</div><button class="sm danger" data-act="${l.act}" data-id="${l.id}">✕</button></div>`).join('') || '<div class="mute">Няма плащания.</div>'}</div>
     ${archMoney.length ? `<h3>Архив от PT Minder · ${archMoney.length} плащания · ${money(archMoney.reduce((a, p) => a + Number(p.amount || 0), 0))}</h3><div class="mute" style="margin-bottom:6px">Само за справка — не влиза в баланса.</div><div style="max-height:220px;overflow:auto">${archMoney.map(p => `<div class="bk"><div class="nm"><b style="color:var(--ok)">+ ${money(p.amount)}</b> · ${fmt(p.date)} · ${esc(p.category || '')} ${esc(p.method || '')} ${esc(p.note || '')}</div></div>`).join('')}</div>` : ''}
     <div class="row" style="margin-top:8px"><input type="number" id="pay-amt" placeholder="Сума" style="width:90px" step="0.01">
-      <select id="pay-m"><option>В брой</option><option>Карта</option><option>Банков път</option></select><input id="pay-note" placeholder="Бележка" style="flex:1;min-width:120px">
+      <select id="pay-m"><option>В брой</option><option>Банков път</option></select><input id="pay-d" type="date" value="${today()}" title="Дата на плащането"><input id="pay-note" placeholder="Бележка" style="flex:1;min-width:120px">
       <button data-act="payadd">+ Плащане</button></div>
     <div class="row" style="margin-top:6px"><input type="number" id="chg-amt" placeholder="Сума" style="width:90px" step="0.01"><input id="chg-note" placeholder="Такса – за какво" style="flex:1;min-width:120px"><button data-act="chgadd">+ Такса</button></div>
     </div>` : ''}
@@ -1236,7 +1235,7 @@ const eur = n => `€${(Math.round((+n || 0) * 100) / 100).toLocaleString('bg-BG
 const dmm = d => `${d.slice(8)}.${d.slice(5, 7)}`;
 const D = { month: firstOf(today()), tab: 'due', chart: 'pay', day: today(), filter: 'all' };
 
-function logEvent(type, text) { sb.from('activity').insert({ type, text, actor: S.me?.row?.user_id || null }).then(() => {}, () => {}); }
+function logEvent(type, text, loc) { sb.from('activity').insert({ type, text, location: loc || (LOCS.includes(S.loc) ? S.loc : null), actor: S.me?.row?.user_id || null }).then(() => {}, () => {}); }
 const bkLabel = (cid, date, time) => `${cname(cid)} · ${dmm(date)} ${hm(time)}`;
 
 function spark(v) {
@@ -1275,12 +1274,20 @@ function redrawPay() {
   const n = document.getElementById('paytw'); if (n) n.scrollTop = top;
   const k = document.getElementById('kpidue'); if (k) k.innerHTML = dueKpi();
 }
-async function quickPay(btn) {
+function quickPay(btn) {
   const id = btn.dataset.id, a = Math.round(+btn.dataset.amt * 100) / 100;
-  btn.disabled = true; btn.textContent = '…';
-  const { error } = await sb.from('payments').insert({ client_id: id, amount: a, method: 'В брой', note: 'Плащане на дължимо' });
-  if (error) { btn.disabled = false; btn.textContent = 'Платено'; return fail(error, 'Плащането не се записа'); }
-  logEvent('paid', `Плащане ${money(a)}: ${cname(id)}`);
+  modal.show(`<div id="qp" data-id="${id}"><h2>Плащане · ${esc(cname(id))}</h2>
+    <label class="f">Сума<input id="qp-a" type="number" step="0.01" min="0" value="${a}"></label>
+    <label class="f">Начин на плащане<select id="qp-m"><option>В брой</option><option>Банков път</option></select></label>
+    <label class="f">Дата<input id="qp-d" type="date" value="${today()}"></label>
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="qpsave">Запази плащането</button></div></div>`);
+}
+async function quickPaySave() {
+  const id = $('#qp').dataset.id, a = Math.round(+$('#qp-a').value * 100) / 100, m = $('#qp-m').value, d = $('#qp-d').value || today();
+  if (!(a > 0)) return toast('Въведи сума.');
+  const { error } = await sb.from('payments').insert({ client_id: id, amount: a, method: m, date: d, note: 'Плащане на дължимо' });
+  if (error) return fail(error, 'Плащането не се записа');
+  modal.close(); logEvent('paid', `Плащане ${money(a)} (${m}): ${cname(id)}`);
   const r = (D.bal || []).find(x => x.c.id === id); if (r) r.bal = Math.round((r.bal - a) * 100) / 100;
   redrawPay(); toast(`Платено ${money(a)} · ${cname(id)}`);
 }
@@ -1296,13 +1303,26 @@ function exitPreview() { S.previewClient = null; S.me = S.view || S.real; S.owne
 async function trainerDash() {
   loadMain();
   D.tab = 'due'; D.ploc = D.ploc || 'all';
-  const [bal, soon] = await Promise.all([sb.rpc('my_debtors'), nextClients()]);
+  D.day = D.day || today(); D.filter = D.filter || 'all';
+  const dA = new Date(D.day + 'T00:00:00'), dB = new Date(dA.getTime() + 864e5), myLocs = S.me.row.locations || [];
+  const [bal, soon, actq] = await Promise.all([sb.rpc('my_debtors'), nextClients(), sb.from('activity').select('*').gte('at', dA.toISOString()).lt('at', dB.toISOString()).order('at', { ascending: false }).limit(300)]);
+  const acts = (actq.data || []).filter(e => e.type !== 'paid' && e.location && myLocs.includes(e.location));
   if (bal.error) return fail(bal.error, 'Обобщението не се зареди (изпълнен ли е 06_finansi_samo_sobstvenik.sql?)');
   S.pstat = S.pstat || await loadPstat();
   D.bal = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c && (!S.view || (S.view.locations || []).includes(r.c.location)));
   $('#main').innerHTML = `
     <div class="card" style="margin-bottom:12px">${soon}</div>
+    ${actCardHtml(acts)}
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>`;
+}
+function actCardHtml(acts) {
+  const FEEDS = { cancel: 'Отказан', change: 'Сменен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит' }, dd = parse(D.day);
+  const cnt = t => acts.filter(e => e.type === t).length, shown = acts.filter(e => D.filter === 'all' || e.type === D.filter);
+  const chip = (v, l, extra = '') => `<button class="sm ${D.filter === v ? 'on' : ''}" data-act="afilter" data-v="${v}">${l}${extra}</button>`;
+  return `<div class="card" style="margin-bottom:12px"><h2>Дневна активност <span class="mute" style="font-weight:400">· ${esc((S.me.row.locations || []).join(', '))}</span></h2>
+    <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
+    <div class="chips">${chip('all', 'Всички', ` ${acts.length}`)}${chip('cancel', 'Отказани', ` ${cnt('cancel')}`)}${chip('change', 'Сменени', ` ${cnt('change')}`)}${chip('attended', 'Проведени', ` ${cnt('attended')}`)}${chip('new', 'Записани', ` ${cnt('new')}`)}</div>
+    <div style="max-height:340px;overflow:auto">${shown.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден.</div>'}</div></div>`;
 }
 async function nextClients() {
   const nowT = new Date().toTimeString().slice(0, 5);
@@ -1785,7 +1805,7 @@ async function dropOnGrid(e) {
     if (ev.date === body.dataset.date && hm(ev.start_time) === nt) return;
     const { error } = await sb.from('sessions').update({ date: body.dataset.date, start_time: nt }).eq('id', ev.id);
     if (error) return fail(error, 'Не се премести');
-    logEvent('change', `Преместен час: ${dmm(ev.date)} ${hm(ev.start_time)} → ${dmm(body.dataset.date)} ${nt}${ev.title ? ' · ' + ev.title : ''}`);
+    logEvent('change', `Преместен час: ${dmm(ev.date)} ${hm(ev.start_time)} → ${dmm(body.dataset.date)} ${nt}${ev.title ? ' · ' + ev.title : ''}`, ev.location);
     weekView();
   }
 }
@@ -1815,7 +1835,7 @@ async function bookClient(sid, cid2, auto, seriesMode) {
   if (ex) { const r = await sb.from('bookings').update({ status: 'booked', late: false, use_plan, price }).eq('id', ex.id).select('id').single(); if (r.error) { fail(r.error, 'Не се добави'); return false; } bid = r.data.id; }
   else { const r = await sb.from('bookings').insert({ session_id: sid, client_id: cid2, use_plan, price }).select('id').single(); if (r.error) { fail(r.error, 'Не се добави'); return false; } bid = r.data.id; }
   if (!use_plan) await sb.from('charges').insert({ client_id: cid2, amount: price, date: s.date, booking_id: bid, note: `Еднократно посещение ${fmt(s.date)} ${hm(s.start_time)}` });
-  logEvent('new', `Записан: ${bkLabel(cid2, s.date, s.start_time)}${s.title ? ' · ' + s.title : ''}${use_plan ? ' (абонамент)' : ' (еднократно)'}`);
+  logEvent('new', `Записан: ${bkLabel(cid2, s.date, s.start_time)}${s.title ? ' · ' + s.title : ''}${use_plan ? ' (абонамент)' : ' (еднократно)'}`, s.location);
   return true;
 }
 
@@ -2605,6 +2625,8 @@ document.addEventListener('click', async e => {
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
       case 'kper': D.kper = el.dataset.p; kpiView(); break;
       case 'ktr': D.ktr = el.dataset.u; kpiView(); break;
+      case 'cstat': { const k = el.dataset.k; if (k === 'all') S.csts = []; else S.csts = S.csts.includes(k) ? S.csts.filter(x => x !== k) : [...S.csts, k]; drawClients(); break; }
+      case 'qpsave': quickPaySave(); break;
       case 'ptoggle': pgvToggle(el); break;
       case 'tkloc': D.tkl = el.dataset.l; tskRender(); break;
       case 'tkkind': D.tkk = el.dataset.k; tskRender(); break;
@@ -2641,7 +2663,7 @@ document.addEventListener('click', async e => {
       case 'cpadd': await addPackage(); break;
       case 'cpauto': await sb.from('client_packages').update({ auto_renew: el.dataset.on !== '1' }).eq('id', el.dataset.id); await afterClient(); toast(el.dataset.on === '1' ? 'Автоматичното подновяване е спряно' : 'Автоматичното подновяване е включено'); break;
       case 'cpdel': if (confirm('Да се изтрие ли пакетът?')) { await sb.from('client_packages').delete().eq('id', el.dataset.id); await afterClient(); } break;
-      case 'payadd': { const a = +$('#pay-amt').value; if (!a) return toast('Въведи сума.'); await sb.from('payments').insert({ client_id: cid(), amount: a, method: $('#pay-m').value, note: $('#pay-note').value.trim() || null }); logEvent('paid', `Плащане ${money(a)}: ${cname(cid())}`); await afterClient(); break; }
+      case 'payadd': { const a = +$('#pay-amt').value; if (!a) return toast('Въведи сума.'); await sb.from('payments').insert({ client_id: cid(), amount: a, method: $('#pay-m').value, date: $('#pay-d').value || today(), note: $('#pay-note').value.trim() || null }); logEvent('paid', `Плащане ${money(a)} (${$('#pay-m').value}): ${cname(cid())}`); await afterClient(); break; }
       case 'paydel': await sb.from('payments').delete().eq('id', el.dataset.id); await afterClient(); break;
       case 'chgadd': { const a = +$('#chg-amt').value; if (!a) return toast('Въведи сума.'); await sb.from('charges').insert({ client_id: cid(), amount: a, note: $('#chg-note').value.trim() || null }); await afterClient(); break; }
       case 'chdel': await sb.from('charges').delete().eq('id', el.dataset.id); await afterClient(); break;
@@ -2650,8 +2672,8 @@ document.addEventListener('click', async e => {
         const { data, error } = await sb.from('clients').insert({ name, phone: $('#nc-phone').value.trim() || null, email: $('#nc-email').value.trim() || null, location: $('#nc-loc').value }).select().single();
         if (error) return fail(error, 'Не се създаде'); S.clients.push(data); S.clients.sort((a, b) => a.name.localeCompare(b.name, 'bg')); modal.close(); drawClients(); await openClient(data.id); break; }
       case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
-      case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); dashView(); break;
-      case 'afilter': D.filter = el.dataset.v; dashView(); break;
+      case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); S.owner ? dashView() : trainerDash(); break;
+      case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
       case 'ptab': D.tab = el.dataset.v; redrawPay(); break;
       case 'ploc': D.ploc = el.dataset.v; redrawPay(); {const k = document.getElementById('kpidue'); if (k) k.innerHTML = dueKpi();} break;
       case 'ctab': D.chart = el.dataset.v; dashView(); break;
