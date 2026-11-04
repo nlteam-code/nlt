@@ -1931,7 +1931,7 @@ async function clientApp() {
   ]);
   try {
     const [ch, py, dv, hvv] = await Promise.all([sb.from('charges').select('date,amount,note').eq('client_id', me.id), sb.from('payments').select('date,amount,method,note').eq('client_id', me.id), sb.from('bookings').select('sessions!inner(date,kind)').eq('client_id', me.id).eq('status', 'done'), sb.from('hist_visits').select('date,status').eq('client_id', me.id).limit(1000)]);
-    C.chs = ch.data || []; C.pays = py.data || []; C.done = (dv.data || []).filter(x => x.sessions).map(x => ({ date: x.sessions.date, kind: x.sessions.kind }))
+    C.chs = ch.data || []; C.pays = py.data || []; C.done = (dv.data || []).filter(x => x.sessions).map(x => ({ date: x.sessions.date, kind: x.sessions.kind }));
     (hvv.data || []).filter(h => !/cancel|no.?show|late/i.test(h.status || '')).forEach(h => C.done.push({ date: h.date }));
   } catch (e) { C.chs = []; C.pays = []; C.done = []; }
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
