@@ -1155,7 +1155,7 @@ async function openClient(id, tab) {
     <div class="grid2">
       <label class="f">Име<input id="c-name" value="${esc(x.name)}"></label>
       <label class="f">Телефон<input id="c-phone" value="${esc(x.phone || '')}"></label>
-      <label class="f">Имейл<input id="c-email" value="${esc(x.email || '')}"></label>
+      <label class="f">Имейл<input id="c-email" value="${esc(x.email || '')}"><button type="button" class="sm" style="margin-top:4px;align-self:flex-start" data-act="cinvite">Изпрати покана</button></label>
       <label class="f">Локация<select id="c-loc">${LOCS.map(l => `<option ${l === x.location ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="f">Откъде идва<select id="c-src">${['Уебсайт', 'Препоръка', 'Instagram', 'Facebook', 'Google', 'Друго'].map(v => `<option ${v === (x.source || 'Уебсайт') ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент, иначе Чакащ)'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => `<option value="${v}" ${v === (x.status === 'Lead' ? 'Active' : x.status) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -1205,12 +1205,21 @@ async function openClient(id, tab) {
 }
 const cid = () => $('#cl')?.dataset.cid;
 async function afterClient() { const id = cid(); S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(id, S.ctab); }
+async function sendInvite(email, quiet) {
+  email = (email || '').trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) { if (!quiet) toast('Няма валиден имейл.'); return false; }
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) { toast('Поканата не е изпратена: ' + (/rate|seconds/i.test(error.message) ? 'изчакай минута и опитай пак.' : error.message)); return false; }
+  toast('Поканата е изпратена до ' + email); return true;
+}
 async function saveClient() {
   const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, source: $('#c-src') ? $('#c-src').value : undefined, notes: $('#c-notes').value.trim() || null };
   if (!p.name) return toast('Името е задължително.');
   const { error } = await sb.from('clients').update(p).eq('id', cid());
   if (error) return fail(error, 'Не се записа');
-  Object.assign(S.clients.find(c => c.id === cid()), p); toast('Записано'); if (S.tab === 'clients') drawClients();
+  const cc = S.clients.find(c => c.id === cid()), prevEmail = (cc.email || '').trim().toLowerCase();
+  Object.assign(cc, p); toast('Записано'); if (S.tab === 'clients') drawClients();
+  if (p.email && p.email.trim().toLowerCase() !== prevEmail && !cc.user_id) sendInvite(p.email);
 }
 async function addPackage() {
   const p = S.packages.find(x => x.id === $('#np-sel').value), start = $('#np-start').value;
@@ -2789,6 +2798,7 @@ document.addEventListener('click', async e => {
       case 'cltab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=cltab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; if (el.dataset.t === 'prog' && !$('#pg-staff').dataset.on) { $('#pg-staff').dataset.on = 1; pgBoot(true, $('#cl').dataset.cid, 'pg-staff', $('#cl').dataset.uid); } break; }
       case 'client': S.ctab = 'profile'; modal.show('<div class="mute">Зареждане…</div>', true); await openClient(el.dataset.id); break;
       case 'csave': await saveClient(); break;
+      case 'cinvite': { const em = ($('#c-email')?.value || '').trim(); if (!confirm(`Да изпратя имейл с код за вход до ${em}?`)) break; await sendInvite(em); break; }
       case 'cpadd': await addPackage(); break;
       case 'cpauto': await sb.from('client_packages').update({ auto_renew: el.dataset.on !== '1' }).eq('id', el.dataset.id); await afterClient(); toast(el.dataset.on === '1' ? 'Автоматичното подновяване е спряно' : 'Автоматичното подновяване е включено'); break;
       case 'cpdel': if (confirm('Да се изтрие ли пакетът?')) { await sb.from('client_packages').delete().eq('id', el.dataset.id); await afterClient(); } break;
@@ -2799,7 +2809,7 @@ document.addEventListener('click', async e => {
       case 'newclient': newClientDialog(); break;
       case 'ncsave': { const name = $('#nc-name').value.trim(); if (!name) return toast('Въведи име.');
         const { data, error } = await sb.from('clients').insert({ name, phone: $('#nc-phone').value.trim() || null, email: $('#nc-email').value.trim() || null, location: $('#nc-loc').value }).select().single();
-        if (error) return fail(error, 'Не се създаде'); S.clients.push(data); S.clients.sort((a, b) => a.name.localeCompare(b.name, 'bg')); modal.close(); drawClients(); await openClient(data.id); break; }
+        if (error) return fail(error, 'Не се създаде'); S.clients.push(data); S.clients.sort((a, b) => a.name.localeCompare(b.name, 'bg')); modal.close(); drawClients(); await openClient(data.id); if (data.email) sendInvite(data.email); break; }
       case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
       case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); S.owner ? dashView() : trainerDash(); break;
       case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
