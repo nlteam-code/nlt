@@ -1125,7 +1125,7 @@ async function openClient(id, tab) {
     S.owner ? sb.from('charges').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').order('date', { foreignTable: 'sessions' }).limit(30),
     sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).lt('sessions.date', today()).order('date', { foreignTable: 'sessions', ascending: false }).limit(500),
-    sb.from('hist_visits').select('date,time,title,location,status').eq('client_id', id).order('date', { ascending: false }).limit(1000),
+    sb.from('hist_visits').select('id,date,time,title,location,status').eq('client_id', id).order('date', { ascending: false }).limit(1000),
     S.owner ? sb.from('hist_money').select('date,amount,method,category,note').eq('client_id', id).order('date', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
     sb.from('client_packages').select('id,auto_renew,source').eq('client_id', id)
   ]);
@@ -1182,7 +1182,7 @@ async function openClient(id, tab) {
     <h3>Предстоящи</h3>
     ${upcoming.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])}${b.sessions.location !== S.loc ? ' · ' + esc(b.sessions.location) : ''}</div></div>`).join('') || '<div class="mute">Няма.</div>'}
     <h3>История</h3>
-    <div style="max-height:320px;overflow:auto">${arch.map(h => `<div class="bk"><div class="nm">${fmt(h.date)} ${esc(h.t)} · ${esc(h.title || '')} <span class="mute">${esc(h.location || '')}</span> ${h.bad ? '<span class="chip">Отказан</span>' : '<span class="chip" style="color:var(--ok)">Проведен</span>'} <span class="chip">PT Minder</span></div></div>`).join('')}${past.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])} <span class="mute">${esc(b.sessions.location)}${tn(b.sessions.trainer_id) ? ' · ' + esc(tn(b.sessions.trainer_id)) : ''}</span> ${st(b)}${b.use_plan ? '' : ' <span class="chip warn">еднократно</span>'}</div></div>`).join('') || '<div class="mute">Още няма записани посещения.</div>'}</div>
+    <div style="max-height:320px;overflow:auto">${arch.map(h => `<div class="bk"><div class="nm">${fmt(h.date)} ${esc(h.t)} · ${esc(h.title || '')} <span class="mute">${esc(h.location || '')}</span> ${h.bad ? '<span class="chip">Отказан</span>' : '<span class="chip" style="color:var(--ok)">Проведен</span>'} <span class="chip">PT Minder</span></div><button class="sm danger" data-act="vdel" data-k="h" data-id="${h.id}" title="Изтрий посещението">✕</button></div>`).join('')}${past.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])} <span class="mute">${esc(b.sessions.location)}${tn(b.sessions.trainer_id) ? ' · ' + esc(tn(b.sessions.trainer_id)) : ''}</span> ${st(b)}${b.use_plan ? '' : ' <span class="chip warn">еднократно</span>'}</div><button class="sm danger" data-act="vdel" data-k="b" data-id="${b.id}" title="Изтрий посещението">✕</button></div>`).join('') || '<div class="mute">Още няма записани посещения.</div>'}</div>
     </div>
 
     <div class="cpane staffpg" data-p="prog" ${T === 'prog' ? '' : 'hidden'}><div class="pg" id="pg-staff"></div></div>
@@ -2776,6 +2776,15 @@ document.addEventListener('click', async e => {
       case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
       case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; D.phm = D.phm || today().slice(0, 7); loadPayHist(); } redrawPay(); break;
       case 'hcsv': { const rows = (D.phist || []).filter(p => payLoc() === 'all' || (S.clients.find(c => c.id === p.client_id) || {}).location === payLoc()); const t = ['Дата\tКлиент\tОбект\tСума\tНачин\tБележка'].concat(rows.map(p => [p.date, cname(p.client_id), (S.clients.find(c => c.id === p.client_id) || {}).location || '', String(p.amount).replace('.', ','), p.method || '', p.note || ''].join('\t'))).join('\n'); try { await navigator.clipboard.writeText(t); toast('Копирано, постави в Excel'); } catch (e) { modal.show(`<h2>Копирай ръчно</h2><textarea style="width:100%;height:200px">${esc(t)}</textarea>`); } break; }
+      case 'vdel': {
+        const E = D.ecl; if (!E) break; const isH = el.dataset.k === 'h', id = el.dataset.id, row = el.closest('.bk'), label = row ? row.querySelector('.nm').innerText.replace(/\s+/g, ' ').slice(0, 90) : '';
+        if (!confirm(`Изтриване на посещението?\n${label}\n\nТекущият абонамент ще се върне с 1 посещение назад.`)) break;
+        let r;
+        if (isH) r = await sb.from('hist_visits').delete().eq('id', id);
+        else { if (S.owner) await sb.from('charges').delete().eq('booking_id', id); r = await sb.from('bookings').delete().eq('id', id); }
+        if (r.error) return fail(r.error, 'Не се изтри');
+        logEvent('removed', `Изтрито посещение: ${cname(E.id)} · ${label}`);
+        S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(E.id, 'visits'); toast('Изтрито — абонаментът е преизчислен.'); break; }
       case 'tledit': {
         const E = D.ecl, id = el.dataset.id, ty = el.dataset.ty; if (!E) break;
         if (ty === 'pkg') { const p = E.pk.find(x => x.id === id); if (!p) break;
