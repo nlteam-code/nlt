@@ -990,7 +990,18 @@ async function moveSession(dm) {
   await refreshAfter(id);
 }
 async function addClientToSession(cid2) {
-  if (await bookClient(sessId(), cid2, false)) { toast('Добавен'); await refreshAfter(sessId()); }
+  const id0 = sessId();
+  if (!(await bookClient(id0, cid2, false))) return;
+  const { data: s0 } = await sb.from('sessions').select('id,series_id,date,title').eq('id', id0).single();
+  if (s0 && s0.series_id) {
+    const { data: fut } = await sb.from('sessions').select('id').eq('series_id', s0.series_id).gt('date', s0.date).eq('cancelled', false);
+    if ((fut || []).length && confirm(`${cname(cid2)} е записан. Да се запише ли и във всички следващи часове от тази серия (${fut.length})?\n\nOK = всички следващи (всеки същия ден и час)\nОтказ = само този час`)) {
+      let n = 0; for (const f of fut) if (await bookClient(f.id, cid2, true, true)) n++;
+      toast(`Записан в ${n + 1} часа`);
+      return refreshAfter(id0);
+    }
+  }
+  toast('Добавен'); await refreshAfter(id0);
 }
 async function removeCharge(bid) { await sb.rpc('remove_visit_charge', { p_booking: bid }); }
 async function setBookingStatus(bid, st) {
@@ -1510,7 +1521,7 @@ async function dropOnGrid(e) {
 }
 
 /* ── записване на клиент в час (общо) ── */
-async function bookClient(sid, cid2, auto) {
+async function bookClient(sid, cid2, auto, seriesMode) {
   const { data: s } = await sb.from('sessions').select('*,bookings(id,status,client_id)').eq('id', sid).single();
   const ex = s.bookings.find(b => b.client_id === cid2);
   const taken = s.bookings.filter(b => b.status !== 'cancelled').length;
@@ -1518,8 +1529,12 @@ async function bookClient(sid, cid2, auto) {
   if (s.capacity && taken >= s.capacity) { if (auto) { toast('Часът е пълен.'); return false; } if (!confirm(`Часът е пълен (${taken}/${s.capacity}). Да се добави ли все пак?`)) return false; }
   const { data: ps } = await sb.from('package_status').select('*').eq('client_id', cid2).eq('kind', s.kind).lte('start_date', s.date).gte('end_date', s.date);
   const valid = (ps || []).find(p => p.used < p.total);
+  // Записване напред: клиент с активен абонамент от този вид се записва винаги по абонамента (изчерпан/изтичащ пакет не пречи; подновява се автоматично)
+  const { data: anyPk } = await sb.from('package_status').select('id').eq('client_id', cid2).eq('kind', s.kind).gte('end_date', today()).limit(1);
+  const hasPlan = !!valid || !!(anyPk && anyPk.length);
   let use_plan = true, price = null;
-  if (!valid) {
+  if (!hasPlan && seriesMode) return false;
+  if (!hasPlan) {
     if (!auto) {
       const why = (ps || []).length ? 'пакетът му е изчерпан' : 'няма ' + (s.kind === 'solo' ? 'пакет с персонални тренировки' : 'пакет с групови класове') + ' за тази дата';
       if (!confirm(`${cname(cid2)}: ${why}.\n\nOK = добави като еднократно посещение (${money(VISIT_PRICE)}).\nОтказ = не добавяй.`)) return false;
