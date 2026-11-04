@@ -275,6 +275,7 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-chip.ok{color:#2ea064;border-color:rgba(46,160,100,.45)}
 .c-bar{height:8px;border-radius:99px;background:var(--c-ringbg);margin:16px 0 12px;overflow:hidden}
 .c-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--c-orange),var(--c-coral));border-radius:99px}
+.tl{display:flex;flex-direction:column;gap:0;margin:6px 0}.tl-i{display:flex;gap:12px;padding:8px 0;position:relative}.tl-i i{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none}.tl-i:not(:last-child)::before{content:'';position:absolute;left:4px;top:20px;bottom:-6px;width:2px;background:rgba(128,128,128,.25)}.tl-d{font-size:12px;opacity:.65}.tl-s{font-size:13px;opacity:.75}
 .c-pk-f{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}
 .c-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));width:min(calc(100% - 28px),460px);display:flex;padding:6px;border-radius:28px;background:var(--c-nav);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);border:1px solid var(--c-line);box-shadow:0 12px 36px rgba(0,0,0,.22);z-index:10}
 .c-nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font:600 11px Roboto,sans-serif;color:var(--c-mute);padding:9px 2px 8px;border-radius:22px;cursor:pointer;transition:background .2s,color .2s}
@@ -1169,6 +1170,8 @@ async function openClient(id, tab) {
       <button class="sm" data-act="cpauto" data-id="${p.id}" data-on="${arm[p.id] && arm[p.id].auto_renew === false ? 0 : 1}" title="Автоматично подновяване">${arm[p.id] && arm[p.id].auto_renew === false ? '⟳ изкл.' : '⟳ авто'}</button>
       <button class="sm danger" data-act="cpdel" data-id="${p.id}">✕</button></div>`; }).join('') || '<div class="mute">Няма абонаменти.</div>'}
     ${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).length ? `<h3>Платени абонаменти · PT Minder</h3>${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).map(p => `<div class="bk"><div class="nm">${fmt(p.date)} · ${esc(p.category)} · <b>${money(p.amount)}</b></div></div>`).join('')}` : ''}
+    <h3>Хронология</h3>
+    ${subHistory(pk, [...past.filter(b => b.status === 'done').map(b => ({ date: b.sessions.date, kind: b.sessions.kind })), ...arch.filter(h => !h.bad).map(h => ({ date: h.date }))], S.owner ? { pays, chs } : null)}
     <h3>Назначи услуга</h3>
     <div class="row"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
       <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
@@ -1926,6 +1929,10 @@ async function clientApp() {
     sb.from('settings').select('*'),
     mq, wq
   ]);
+  try {
+    const [ch, py, dv] = await Promise.all([sb.from('charges').select('date,amount,note').eq('client_id', me.id), sb.from('payments').select('date,amount,method,note').eq('client_id', me.id), sb.from('bookings').select('sessions!inner(date,kind)').eq('client_id', me.id).eq('status', 'done')]);
+    C.chs = ch.data || []; C.pays = py.data || []; C.done = (dv.data || []).filter(x => x.sessions).map(x => ({ date: x.sessions.date, kind: x.sessions.kind }));
+  } catch (e) { C.chs = []; C.pays = []; C.done = []; }
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
   C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {};
@@ -2181,6 +2188,26 @@ function clientMine(t) {
     : `<div class="c-empty">Нямаш предстоящи тренировки.<br><button class="c-btn solid" style="margin-top:14px" data-act="cnav" data-t="book">Запиши се</button></div>`}
   ${clientMassages()}`;
 }
+/* ── Хронология на абонаментите, плащанията и таксите ── */
+function subHistory(pkgs, visits, money) {
+  const t0 = today(), ev = [], ord = { exp: 0, end: 0, pay: 1, chg: 1, start: 2 };
+  const sorted = (pkgs || []).slice().sort((a, b) => a.start_date.localeCompare(b.start_date));
+  let prevEnd = null;
+  sorted.forEach(p => {
+    const vs = (visits || []).filter(v => v.date >= p.start_date && v.date <= p.end_date && (!v.kind || v.kind === p.kind)).map(v => v.date).sort(), name = p.package_name || 'Абонамент';
+    const gap = prevEnd ? Math.round((parse(p.start_date) - parse(prevEnd)) / 864e5) : null;
+    ev.push({ d: p.start_date, k: 'start', t: `Започна: ${esc(name)}`, s: `${p.total} посещения · до ${fmt(p.end_date)}${money && p.price ? ` · ${eur(p.price)}` : ''}${gap != null ? (gap > 0 ? ` · ${gap} дни след предишния` : ' · веднага след предишния') : ''}` });
+    if (p.used >= p.total) { const d = vs[p.total - 1] || vs[vs.length - 1] || p.end_date; ev.push({ d, k: 'end', t: `Приключи: ${esc(name)}`, s: `последно (${p.total}-о) посещение` }); prevEnd = d; }
+    else if (p.end_date < t0) { ev.push({ d: p.end_date, k: 'exp', t: `Изтече: ${esc(name)}`, s: `използвани ${p.used} от ${p.total}` }); prevEnd = p.end_date; }
+  });
+  if (money) {
+    (money.pays || []).forEach(x => ev.push({ d: x.date, k: 'pay', t: `Плащане +${eur(x.amount)}`, s: [x.method, x.note].filter(Boolean).join(' · ') }));
+    (money.chs || []).forEach(x => ev.push({ d: x.date, k: 'chg', t: `Такса −${eur(x.amount)}`, s: x.note || '' }));
+  }
+  ev.sort((a, b) => b.d.localeCompare(a.d) || ord[b.k] - ord[a.k]);
+  const col = { start: '#4cc38a', end: '#eb4c51', exp: '#9aa0a6', pay: '#4cc38a', chg: '#e9a23b' };
+  return `<div class="tl">${ev.map(e => `<div class="tl-i"><i style="background:${col[e.k]}"></i><div><div class="tl-d">${fmt(e.d)}</div><b>${e.t}</b>${e.s ? `<div class="tl-s">${esc(e.s)}</div>` : ''}</div></div>`).join('') || '<div class="mute">Няма записи.</div>'}</div>`;
+}
 function clientPkg(t, act) {
   const old = C.pkgs.filter(p => p.end_date < t);
   const card = p => { const left = Math.max(0, p.total - p.used), pct = p.total ? Math.min(100, p.used / p.total * 100) : 0, on = p.end_date >= t;
@@ -2191,7 +2218,15 @@ function clientPkg(t, act) {
   return `<h2 class="c-title">Абонамент</h2>
   ${main ? `<section class="c-card c-sum big">${rings(main, 180)}<div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.left} от ${main.total}</b><span>оставащи посещения</span></div></div><div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>` : ''}
   ${act.length ? act.map(card).join('') : '<div class="c-empty">Нямаш активен абонамент.<br>Свържи се с клуба, за да го подновиш.</div>'}
-  ${old.length ? `<h3 class="c-h">Изтекли</h3>${old.slice(0, 5).map(card).join('')}` : ''}`;
+  ${old.length ? `<h3 class="c-h">Изтекли</h3>${old.slice(0, 5).map(card).join('')}` : ''}
+  ${clientHistory()}`;
+}
+function clientHistory() {
+  const fin = C.cv.showFinance !== false, chs = C.chs || [], pays = C.pays || [];
+  const sumPk = (C.pkgs || []).reduce((a, p) => a + Number(p.price || 0), 0), sumCh = chs.reduce((a, x) => a + Number(x.amount), 0), sumPay = pays.reduce((a, x) => a + Number(x.amount), 0), bal = Math.round((sumPk + sumCh - sumPay) * 100) / 100;
+  return `<h3 class="c-h">История</h3><section class="c-card">
+    ${fin ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><div><span class="c-mute">Начислено</span><br><b>${eur(sumPk + sumCh)}</b></div><div><span class="c-mute">Платено</span><br><b>${eur(sumPay)}</b></div><div><span class="c-mute">${bal > 0 ? 'Дължимо' : bal < 0 ? 'В кредит' : 'Баланс'}</span><br><b>${eur(Math.abs(bal))}</b></div></div>` : ''}
+    ${subHistory(C.pkgs, C.done, fin ? { pays, chs } : null)}</section>`;
 }
 function clientProfile() {
   const me = S.me.row;
