@@ -1353,9 +1353,7 @@ async function trainerDash() {
   $('#main').innerHTML = `
     <div class="card" style="margin-bottom:12px">${soon}</div>
     ${actCardHtml(acts)}
-    <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>`;
-  loadCancelCard();
 }
 async function loadCancelCard() {
   const el = document.getElementById('cancelcard'); if (!el) return;
@@ -1383,7 +1381,7 @@ function actCardHtml(acts) {
   const chip = (v, l, extra = '') => `<button class="sm ${D.filter === v ? 'on' : ''}" data-act="afilter" data-v="${v}">${l}${extra}</button>`;
   return `<div class="card" style="margin-bottom:12px"><h2>Дневна активност <span class="mute" style="font-weight:400">· ${esc((S.me.row.locations || []).join(', '))}</span></h2>
     <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
-    <div class="chips">${chip('all', 'Всички', ` ${acts.length}`)}${chip('cancel', 'Отказани', ` ${cnt('cancel')}`)}${chip('change', 'Сменени', ` ${cnt('change')}`)}${chip('attended', 'Проведени', ` ${cnt('attended')}`)}${chip('new', 'Записани', ` ${cnt('new')}`)}</div>
+    <div class="chips">${chip('all', 'Всички', S.owner ? ` ${acts.length}` : '')}${chip('cancel', 'Отказани', S.owner ? ` ${cnt('cancel')}` : '')}${chip('change', 'Сменени', S.owner ? ` ${cnt('change')}` : '')}${chip('attended', 'Проведени', S.owner ? ` ${cnt('attended')}` : '')}${chip('new', 'Записани', S.owner ? ` ${cnt('new')}` : '')}</div>
     <div style="max-height:340px;overflow:auto">${shown.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден.</div>'}</div></div>`;
 }
 async function nextClients() {
@@ -1391,7 +1389,8 @@ async function nextClients() {
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(new Date(), i));
     const { data } = await sb.from('sessions').select('id,date,start_time,duration_min,kind,title,location,cancelled,bookings(client_id,status)').eq('date', d).eq('cancelled', false).order('start_time');
-    const list = (data || []).filter(x => (i > 0 || hm(x.start_time) >= nowT) && x.bookings.some(b => b.status === 'booked'));
+    const mine = S.owner ? null : (S.me.row.locations || []);
+    const list = (data || []).filter(x => (!mine || !mine.length || mine.includes(x.location)) && (i > 0 || hm(x.start_time) >= nowT) && x.bookings.some(b => b.status === 'booked'));
     if (!list.length) continue;
     const t = hm(list[0].start_time), grp = list.filter(x => hm(x.start_time) === t);
     return `<h2>Следващ час · ${i === 0 ? 'днес' : fmtLong(d)} ${t}</h2>` + grp.map(x => `<div style="margin:6px 0"><b>${esc(x.title || KIND[x.kind])}</b> <span class="mute">· ${esc(x.location)}</span><div class="chips">${x.bookings.filter(b => b.status === 'booked').map(b => `<button class="sm" data-act="client" data-id="${b.client_id}">${esc(cname(b.client_id))}</button>`).join('')}</div></div>`).join('');
@@ -1404,11 +1403,12 @@ const PGV = { data: [], done: new Set(), ok: false };
 async function progressView() {
   loadMain();
   await pgStatic().catch(() => { });
+  S.pstat = S.pstat || await loadPstat();
   const [ov, tk] = await Promise.all([sb.rpc('progress_overview'), sb.from('progress_tasks').select('client_id,kind,ref')]);
   if (ov.error) return fail(ov.error, 'Прогресът не се зареди');
   PGV.data = ov.data || []; PGV.ok = !tk.error;
   PGV.done = new Set((tk.data || []).map(x => `${x.client_id}|${x.kind}|${x.ref}`));
-  D.pgl = D.pgl || S.loc || 'all'; D.pgk = D.pgk || 'all';
+  D.pgl = D.pgl || 'all'; D.pgk = D.pgk || 'all';
   pgvRender();
 }
 function pgvTasks() {
@@ -1426,15 +1426,32 @@ function pgvTasks() {
   return out;
 }
 const PGK = [['all', 'Всички'], ['weight', 'Тегло'], ['checkin', 'Чек-ин'], ['test', 'Тестове'], ['high', 'Висок приоритет']];
+function pgvClients() {
+  const main = $('#main'); if (!main) return;
+  const q = (D.pgq || '').toLowerCase(), sts = D.pgs || [], by = Object.fromEntries(PGV.data.map(r => [r.client_id, r]));
+  const base = S.clients.filter(c => !c.massage_only && (D.pgl === 'all' || c.location === D.pgl) && (!q || c.name.toLowerCase().includes(q)));
+  const list = base.filter(c => !sts.length || sts.includes(cstat(c))).sort((a, b) => ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(a)] - ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
+  const stCls = { active: 'ok', wait: 'warn', pause: '', inactive: '' }, todoN = pgvTasks().filter(x => !PGV.done.has(`${x.cid}|${x.k}|${x.ref}`)).length;
+  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="sp"></span>
+    <div class="chips" style="margin:0"><button class="on" data-act="pgmode" data-m="clients">Клиенти</button><button data-act="pgmode" data-m="tasks">Задачи · ${todoN}</button></div></div>
+    <div class="row" style="margin-bottom:10px;flex-wrap:wrap"><input id="pgq" placeholder="Търси клиент…" value="${esc(D.pgq || '')}" style="flex:1;min-width:200px">
+    <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="chips" style="margin-bottom:8px"><button class="${sts.length ? '' : 'on'}" data-act="pgst" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${sts.includes(k) ? 'on' : ''}" data-act="pgst" data-k="${k}">${l} · ${base.filter(c => cstat(c) === k).length}</button>`).join('')}</div>
+    <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Последно тегло</th><th>Чек-ин</th><th>Тестове</th></tr></thead><tbody>
+    ${list.slice(0, 400).map(c => { const r = by[c.id], k = cstat(c); return `<tr class="click" data-act="pgopen" data-id="${c.id}"><td><b>${esc(c.name)}</b></td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${r && r.last_weight ? fmt(r.last_weight) : '<span class="mute">—</span>'}</td><td>${r && r.last_checkin ? fmt(r.last_checkin) : '<span class="mute">—</span>'}</td><td>${r ? (r.tests_done || []).length + '/3' : '<span class="mute">—</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="mute">Няма клиенти.</td></tr>'}
+    </tbody></table></div><div class="mute" style="margin-top:8px">Натисни клиент, за да видиш диаграмите, мерките и отговорите му.</div>`;
+  const qi = $('#pgq'); qi.oninput = e => { D.pgq = e.target.value; const pos = e.target.selectionStart; pgvClients(); const n = $('#pgq'); n.focus(); n.setSelectionRange(pos, pos); };
+}
 function pgvRender() {
   const main = $('#main'); if (!main) return;
+  if (D.pgm !== 'tasks') return pgvClients();
   const all = pgvTasks().filter(x => D.pgl === 'all' || x.loc === D.pgl);
   const key = x => `${x.cid}|${x.k}|${x.ref}`, isDone = x => PGV.done.has(key(x));
   const cnt = k => all.filter(x => !isDone(x) && (k === 'all' || x.k === k)).length;
   const shown = all.filter(x => D.pgk === 'all' || x.k === D.pgk);
   const todo = shown.filter(x => !isDone(x)).sort((a, b) => a.pr - b.pr || a.name.localeCompare(b.name, 'bg')), dn = shown.filter(isDone);
   const row = x => `<div class="bk ptask"><label style="display:flex;align-items:center;gap:10px;flex:1;min-width:240px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px" data-act="ptoggle" data-c="${x.cid}" data-k="${x.k}" data-r="${esc(x.ref)}" ${isDone(x) ? 'checked' : ''}><span><b>${esc(x.name)}</b> <span class="mute">· ${esc(x.loc)}</span><br>${esc(x.what)} <span class="mute">— ${esc(x.sub)}</span></span></label><button class="sm" data-act="pgopen" data-id="${x.cid}">Отвори прогреса</button></div>`;
-  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="mute">${PGV.data.length} клиента с включен модул</span><span class="sp"></span>
+  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="mute">${PGV.data.length} клиента с включен модул</span><span class="sp"></span><div class="chips" style="margin:0"><button data-act="pgmode" data-m="clients">Клиенти</button><button class="on" data-act="pgmode" data-m="tasks">Задачи</button></div><span class="sp"></span>
     <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     ${PGV.ok ? '' : '<div class="card" style="margin-bottom:12px;border-color:var(--bad)">Отмятането още не е включено (липсва таблицата за задачи). Списъкът се вижда, но отметките няма да се запазват.</div>'}
     <div class="chips">${PGK.map(([k, l]) => `<button class="${D.pgk === k ? 'on' : ''}" data-act="pgkind" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
@@ -2742,6 +2759,8 @@ document.addEventListener('click', async e => {
       case 'perm': { const v = el.checked, { error } = await sb.from('staff').update({ [el.dataset.p]: v }).eq('id', el.dataset.s); if (error) { el.checked = !v; return fail(error, 'Правото не се записа'); } const t = S.staff.find(x => x.id === el.dataset.s); if (t) t[el.dataset.p] = v; toast(v ? 'Правото е дадено' : 'Правото е махнато'); break; }
       case 'pradd': case 'prdel': case 'pmstat': case 'pcsv': payAct(act, el); break;
       case 'rwclaim': { if (S.previewClient) return toast('Само преглед.'); const { error } = await sb.rpc('claim_reward', { p_level: +el.dataset.id }); if (error) return fail(error, 'Не се получи'); toast('Заявено'); clientApp(); break; }
+      case 'pgmode': D.pgm = el.dataset.m; pgvRender(); break;
+      case 'pgst': D.pgs = el.dataset.k === 'all' ? [] : ((D.pgs || []).includes(el.dataset.k) ? D.pgs.filter(x => x !== el.dataset.k) : [...(D.pgs || []), el.dataset.k]); pgvRender(); break;
       case 'pgloc': D.pgl = el.dataset.l; pgvRender(); break;
       case 'pgkind': D.pgk = el.dataset.k; pgvRender(); break;
       case 'kheat': D.kheat = el.dataset.l || null; kpiView(); break;
