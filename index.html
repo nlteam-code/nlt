@@ -1592,6 +1592,7 @@ function cStreak() {
   return n;
 }
 function rewardCard() {
+  if (REW_LOCKED) return `<section class="c-card"><div class="c-k">Награди</div><div style="filter:blur(6px);opacity:.6;pointer-events:none" aria-hidden="true"><b style="font-size:26px">12</b> · още 13 до награда</div><div class="mute" style="margin-top:6px">Услугата все още не е активна</div></section>`;
   const R = C.rw; if (!R || !R.levels.length) return '';
   const nx = R.levels.find(l => l.visits > R.visits), prevV = [...R.levels].reverse().find(l => l.visits <= R.visits)?.visits || 0;
   const open = R.levels.filter(l => l.visits <= R.visits && !R.claims.some(c => c.level_id === l.id));
@@ -2040,9 +2041,9 @@ function cSession(b, t) {
     </div></div>`;
 }
 
-const PROG_LOCKED = true;
-function progLocked() {
-  return `<h2 class="c-title">Прогрес</h2><div class="lockbox"><div class="lockfake" aria-hidden="true"><div class="lf-row"><i style="width:38%"></i><i style="width:22%"></i></div><svg viewBox="0 0 300 110" preserveAspectRatio="none"><path d="M0 90 C40 80 70 70 110 60 S190 40 230 30 S280 20 300 14" fill="none" stroke="currentColor" stroke-width="4"/></svg><div class="lf-row"><i style="width:60%"></i></div><div class="lf-row"><i style="width:45%"></i><i style="width:30%"></i></div></div><div class="lockmsg"><b>Услугата все още не е активна</b><span>Скоро ще можеш да следиш теглото, измерванията и тестовете си тук.</span></div></div>`;
+const PROG_LOCKED = true, REW_LOCKED = true;
+function progLocked(title = 'Прогрес', sub = 'Скоро ще можеш да следиш теглото, измерванията и тестовете си тук.') {
+  return `<h2 class="c-title">${title}</h2><div class="lockbox"><div class="lockfake" aria-hidden="true"><div class="lf-row"><i style="width:38%"></i><i style="width:22%"></i></div><svg viewBox="0 0 300 110" preserveAspectRatio="none"><path d="M0 90 C40 80 70 70 110 60 S190 40 230 30 S280 20 300 14" fill="none" stroke="currentColor" stroke-width="4"/></svg><div class="lf-row"><i style="width:60%"></i></div><div class="lf-row"><i style="width:45%"></i><i style="width:30%"></i></div></div><div class="lockmsg"><b>Услугата все още не е активна</b><span>${sub}</span></div></div>`;
 }
 function weightCard() {
   if (PROG_LOCKED) return `<section class="c-card" style="position:relative;overflow:hidden"><div class="c-k">Прогрес</div><div style="filter:blur(6px);opacity:.6;pointer-events:none" aria-hidden="true">72,4 кг · −1,8 кг</div><div class="mute" style="margin-top:6px">Услугата все още не е активна</div></section>`;
@@ -2209,7 +2210,7 @@ function clientAsk(sid) {
 function renderClient() {
   closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
-  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? clientRewards() : C.tab === 'prog' ? progLocked() : clientHome(me, t, act);
+  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? progLocked() : clientHome(me, t, act);
   const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['prog', 'chart', 'Прогрес']];
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
