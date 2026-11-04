@@ -1388,7 +1388,7 @@ async function tasksView() {
     const cc = S.clients.find(x => x.id === c.client_id); if (!cc || cc.status !== 'Active' || cc.massage_only) return;
     const b = { cid: c.client_id, name: c.name, loc: c.location || '', phone: cc.phone || '' };
     if (c.status === 'Active' && c.done_28 > 0 && !c.next_visit && c.pkg_end) out.push({ ...b, k: 'book', ref: wk, pr: 2, what: 'Помоли да запише следващия час', sub: `последно ${c.last_visit ? fmt(c.last_visit) : '–'}, няма записан час` });
-    if (c.status === 'Active' && c.at_risk) out.push({ ...b, k: 'risk', ref: c.last_visit || 'none', pr: 1, what: 'Свържи се, отдавна не е идвал', sub: c.last_visit ? `${c.days_since} дни без посещение` : 'още няма посещение' });
+    if (c.status === 'Active' && c.at_risk && (c.days_since == null || c.days_since <= 60)) out.push({ ...b, k: 'risk', ref: c.last_visit || 'none', pr: 1, what: 'Свържи се, отдавна не е идвал', sub: c.last_visit ? `${c.days_since} дни без посещение` : 'още няма посещение' });
   });
   TSK.rows = out; tskRender();
 }
