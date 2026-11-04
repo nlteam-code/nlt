@@ -1254,14 +1254,40 @@ function payLists() {
 }
 const sumAbs = l => l.reduce((a, r) => a + Math.abs(r.bal), 0);
 function dueKpi() { const { due, cred } = payLists(); return kpiHtml('Дължимо', eur(sumAbs(due)), eur(sumAbs(cred)) + ' преплатено'); }
+function payHistHtml() {
+  const H = D.phist;
+  if (!H) return '<div class="mute" style="padding:12px">Зареждане…</div>';
+  const rows = H.filter(p => payLoc() === 'all' || (S.clients.find(c => c.id === p.client_id) || {}).location === payLoc());
+  return `<div class="tw" style="max-height:380px;overflow:auto"><table><thead><tr><th>Дата</th><th>Клиент</th><th>Сума</th><th>Начин</th><th>Бележка</th><th></th></tr></thead><tbody>${rows.map(p => `<tr><td>${esc(p.date)}</td><td><b>${esc(cname(p.client_id))}</b></td><td>${eur(p.amount)}</td><td>${esc(p.method || '—')}</td><td class="mute">${esc(p.note || '')}</td><td style="white-space:nowrap"><button class="sm" data-act="hedit" data-id="${p.id}">Коригирай</button> <button class="sm" data-act="hdel" data-id="${p.id}">Изтрий</button></td></tr>`).join('') || '<tr><td colspan="6" class="mute">Няма плащания.</td></tr>'}</tbody></table></div><p class="mute">Последните 300 плащания. Корекциите се отразяват веднага в дължимото.</p>`;
+}
+async function refreshBal() {
+  const r = await sb.rpc(S.owner ? 'dash_balances' : 'my_debtors'); if (r.error) return;
+  D.bal = r.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(x => x.c && (!S.view || (S.view.locations || []).includes(x.c.location)));
+}
+async function loadPayHist() {
+  const { data } = await sb.from('payments').select('*').order('date', { ascending: false }).order('id').limit(300);
+  D.phist = data || []; if (D.tab === 'hist') redrawPay();
+}
 function payCard() {
+  if (D.tab === 'hist' && S.owner) return payCardHead() + payHistHtml();
+  return payCardBody();
+}
+function payCardHead() {
+  const { due, cred, even } = payLists();
+  const ch = (act, v, l, cur2, extra = '') => `<button class="sm ${cur2 === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}${extra}</button>`;
+  const locs = [['all', 'Всички обекти'], ...LOCS.map(l => [l, l])];
+  const cnt = l => (D.bal || []).filter(r => r.bal > 0 && (l === 'all' || r.c.location === l || !r.c.location)).length;
+  return `<h2>Плащания</h2><div class="chips" style="margin-bottom:6px">${locs.map(([v, l]) => ch('ploc', v, l, payLoc(), ` <span class="mute">${cnt(v)}</span>`)).join('')}</div>
+    <div class="chips" style="margin-bottom:8px">${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}${ch('ptab', 'hist', 'История', D.tab)}</div>`;
+}
+function payCardBody() {
   const { due, cred, even } = payLists(), list = D.tab === 'due' ? due : D.tab === 'credit' ? cred : even;
   const ch = (act, v, l, cur2, extra = '') => `<button class="sm ${cur2 === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}${extra}</button>`;
   const locs = [['all', 'Всички обекти'], ...LOCS.map(l => [l, l])].filter(([v]) => S.owner || v === 'all' || (S.me.row.locations || []).includes(v));
   const cnt = l => (D.bal || []).filter(r => r.bal > 0 && (l === 'all' || r.c.location === l || !r.c.location)).length;
   return `<h2>Плащания</h2>
     <div class="chips" style="margin-bottom:6px">${locs.map(([v, l]) => ch('ploc', v, l, payLoc(), ` <span class="mute">${cnt(v)}</span>`)).join('')}</div>
-    <div class="chips">${S.owner ? `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}` : `<span class="mute">Трябва да платят · ${due.length}</span>`}</div>
+    <div class="chips">${S.owner ? `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}${ch('ptab', 'hist', 'История', D.tab)}` : `<span class="mute">Трябва да платят · ${due.length}</span>`}</div>
     <div class="tw" id="paytw" style="max-height:340px;overflow:auto"><table><thead><tr><th>Клиент</th><th>${D.tab === 'due' ? 'Дължимо' : D.tab === 'credit' ? 'В кредит' : 'Баланс'}</th><th>Обект</th><th>Пакет</th><th></th></tr></thead><tbody>
     ${list.slice(0, 150).map(r => `<tr data-cid="${r.c.id}"><td><b>${esc(r.c.name)}</b></td><td>${D.tab === 'due' ? `<span class="neg">−${eur(r.bal)}</span>` : D.tab === 'credit' ? `<span class="pos">+${eur(-r.bal)}</span>` : eur(0)}</td><td class="mute">${esc(r.c.location || '—')}</td><td>${pkgChip(curPkg(r.c.id))}</td>
     <td style="white-space:nowrap">${D.tab === 'due' ? `<button class="sm pri" data-act="quickpay" data-id="${r.c.id}" data-amt="${r.bal}">Платено</button> ` : ''}<button class="sm" data-act="client" data-id="${r.c.id}">Отвори</button></td></tr>`).join('') || '<tr><td colspan="5" class="mute">Няма.</td></tr>'}</tbody></table></div>
@@ -2674,7 +2700,10 @@ document.addEventListener('click', async e => {
       case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
       case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); S.owner ? dashView() : trainerDash(); break;
       case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
-      case 'ptab': D.tab = el.dataset.v; redrawPay(); break;
+      case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; loadPayHist(); } redrawPay(); break;
+      case 'hdel': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p || !confirm(`Изтриване на плащане ${money(p.amount)} от ${p.date} (${cname(p.client_id)})?`)) break; const { error } = await sb.from('payments').delete().eq('id', p.id); if (error) return fail(error, 'Не се изтри'); logEvent('removed', `Изтрито плащане ${money(p.amount)} (${p.date}): ${cname(p.client_id)}`); await refreshBal(); loadPayHist(); break; }
+      case 'hedit': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p) break; modal.show(`<div id="he" data-id="${p.id}"><h2>Корекция · ${esc(cname(p.client_id))}</h2><label class="f">Сума<input id="he-a" type="number" step="0.01" value="${p.amount}"></label><label class="f">Начин<select id="he-m"><option ${p.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${p.method === 'Банков път' ? 'selected' : ''}>Банков път</option></select></label><label class="f">Дата<input id="he-d" type="date" value="${p.date}"></label><label class="f">Бележка<input id="he-n" value="${esc(p.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="hsave">Запази корекцията</button></div></div>`); break; }
+      case 'hsave': { const id = $('#he').dataset.id, p = (D.phist || []).find(x => x.id === id), a = Math.round(+$('#he-a').value * 100) / 100; if (!(a > 0)) return toast('Въведи сума.'); const { error } = await sb.from('payments').update({ amount: a, method: $('#he-m').value, date: $('#he-d').value, note: $('#he-n').value.trim() || null }).eq('id', id); if (error) return fail(error, 'Не се запази'); modal.close(); logEvent('change', `Коригирано плащане: ${cname(p.client_id)} ${money(p.amount)} → ${money(a)}`); await refreshBal(); loadPayHist(); toast('Коригирано.'); break; }
       case 'ploc': D.ploc = el.dataset.v; redrawPay(); {const k = document.getElementById('kpidue'); if (k) k.innerHTML = dueKpi();} break;
       case 'ctab': D.chart = el.dataset.v; dashView(); break;
       case 'quickpay': await quickPay(el); break;
