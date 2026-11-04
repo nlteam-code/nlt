@@ -568,7 +568,7 @@ async function kpiTrainer() {
   loadMain();
   D.ktr = D.ktr || 'month';
   const heatLoc = D.kheat || null;
-  const [st, cl, bz, tr, rv, ht, sr] = await Promise.all([sb.rpc('kpi_staff', { p_from: from, p_to: to }), sb.rpc('kpi_clients'), S.owner ? sb.rpc('kpi_business') : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_trend', { p_unit: D.ktr, p_from: '2026-06-01' }) : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_revenue') : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_heat', { p_loc: heatLoc }) : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_sources') : Promise.resolve({ data: null })]);
+  const [st, cl, bz, tr, rv, ht, sr] = await Promise.all([sb.rpc('kpi_staff', { p_from: from, p_to: to }), sb.rpc('kpi_clients'), S.owner ? sb.rpc('kpi_business') : Promise.resolve({ data: null }), (S.owner || S.me.row.perm_visits_loc) ? sb.rpc('kpi_trend', { p_unit: D.ktr, p_from: '2026-06-01' }) : Promise.resolve({ data: null }), (S.owner || S.me.row.perm_revenue) ? sb.rpc('kpi_revenue', { p_loc: null }) : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_heat', { p_loc: heatLoc }) : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_sources') : Promise.resolve({ data: null })]);
   if (st.error || cl.error) return fail(st.error || cl.error, 'KPI не се зареди (изпълнен ли е 09_kpi.sql?)');
   const myId = S.me.row.id;
   D.kc = cl.data || [];
@@ -587,8 +587,8 @@ async function kpiTrainer() {
     ${own ? `<h3>Моите показатели</h3><div class="kpis">
       ${kpi('Часове', own.hours, own.sessions + ' тренировки')}${kpi('Посещения', own.visits, own.avg_per_session ? own.avg_per_session + ' средно на час' : '')}${kpi('Запълненост', own.fill_pct == null ? '–' : own.fill_pct + '%', own.uniq_clients + ' различни клиенти')}
       ${kpi('Отказани', own.cancels, own.late_cancels + ' късни')}${kpi('Неотбелязани', own.unmarked, 'часове без отбелязване')}${kpi('Подновени', own.renewals, 'абонамента на мои клиенти')}</div>` : ''}
-    ${S.owner && tr.data ? trendCard(tr.data) : ''}
-    ${S.owner && rv.data ? revenueCard(rv.data) : ''}
+    ${tr.data && !tr.error ? `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 8px">Посещения по обект</h3>${stackChart(tr.data, ['Боян Петров', 'Лерин'], 'visits', D.ktr)}</div>` : ''}
+    ${rv.data && !rv.error ? `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 8px">Приход</h3>${revenueCard2(rv.data)}</div>` : ''}
     ${S.owner && ht.data ? heatCard(ht.data) : ''}
     ${S.owner ? freqCard(D.kc, sr.data) : ''}
     ${S.owner ? `<div class="card" style="margin-bottom:14px;overflow:auto"><h3 style="margin-top:0">Треньори</h3><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Ср. на час</th><th>Запълненост</th><th>Клиенти</th><th>Отказани</th><th>Неотм.</th><th>Подновени</th><th>Приход</th></tr></thead><tbody>
@@ -1476,15 +1476,7 @@ function reportsRender() {
   const noRate = !PAY.rates.length;
   main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Отчети · Заплати</b><span class="sp"></span>
     <select id="pay-m">${months.map(k => `<option value="${k}" ${k === D.pm ? 'selected' : ''}>${mn(k)}</option>`).join('')}</select></div>
-    <div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 6px">Ставки</h3>
-      ${noRate ? '<div class="mute" style="margin-bottom:8px">Още няма ставки. Добави обща ставка (за всички треньори) и по желание отделна за конкретен треньор. Важи най-специфичната: треньор + вид, после треньор, после обща.</div>' : ''}
-      <div class="scroll"><table><thead><tr><th>За кого</th><th>Часове</th><th>На час</th><th>На посещение</th><th>От дата</th><th></th></tr></thead><tbody>
-      ${PAY.rates.map(r => `<tr><td>${esc(stName(r.staff_id))}</td><td>${kn[r.kind]}</td><td>${eur(r.per_hour)}</td><td>${eur(r.per_visit)}</td><td>${fmt(r.valid_from)}</td><td><button class="sm" data-act="prdel" data-id="${r.id}">Изтрий</button></td></tr>`).join('')}
-      <tr><td><select id="pr-s"><option value="">Всички (обща)</option>${S.staff.filter(x => x.active).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></td>
-      <td><select id="pr-k"><option value="all">групови и индивидуални</option><option value="group">групови</option><option value="solo">индивидуални</option></select></td>
-      <td><input id="pr-h" type="number" step="0.01" min="0" placeholder="€ на час" style="width:100px"></td><td><input id="pr-v" type="number" step="0.01" min="0" placeholder="€ на посещ." style="width:110px"></td>
-      <td><input id="pr-d" type="date" value="${PAY.from}"></td><td><button class="sm pri" data-act="pradd">Добави</button></td></tr></tbody></table></div>
-      <div class="mute" style="margin-top:6px">Часовете са от графика (проведени, не отменени), посещенията са отметнатите „проведени". При нова ставка добави нов ред с нова дата, старите месеци остават със старата.</div></div>
+    <div class="mute" style="margin-bottom:12px">Ставките на час и на посещение се задават в раздел „Служители".</div>
     <div class="card" style="margin-bottom:14px;overflow:auto"><div class="row" style="margin-bottom:8px;flex-wrap:wrap"><h3 style="margin:0">${mn(D.pm)}</h3><span class="pill ${stP[1]}">${stP[0]}</span><span class="mute">${PAY.to >= today() ? 'до днес' : ''}</span></div>
       <table><thead><tr><th>Треньор</th><th>Часове (гр. / инд.)</th><th>Посещения (гр. / инд.)</th><th>За часове</th><th>За посещения</th><th>Бонус / удръжка</th><th>Общо</th></tr></thead><tbody>
       ${rows.map(r => `<tr><td><b>${esc(r.name)}</b></td><td>${n1(r.hours_group)} / ${n1(r.hours_solo)}</td><td>${r.visits_group} / ${r.visits_solo}</td><td>${eur(r.pay_hours)}</td><td>${eur(r.pay_visits)}</td>
@@ -1506,7 +1498,7 @@ async function payAct(a, el) {
     if (!row.per_hour && !row.per_visit) return toast('Въведи сума на час или на посещение.');
     const { error } = await sb.from('pay_rates').insert(row); if (error) return fail(error, 'Не се записа'); return reportsView();
   }
-  if (a === 'prdel') { const { error } = await sb.from('pay_rates').delete().eq('id', el.dataset.id); if (error) return fail(error, 'Не се изтри'); return reportsView(); }
+  if (a === 'prdel') { const { error } = await sb.from('pay_rates').delete().eq('id', el.dataset.id); if (error) return fail(error, 'Не се изтри'); return S.tab === 'team' ? teamView() : reportsView(); }
   if (a === 'pmstat') { const { error } = await sb.from('payroll_months').upsert({ month: PAY.from, status: el.dataset.s, updated_at: new Date().toISOString() }, { onConflict: 'month' }); if (error) return fail(error, 'Не се записа'); PAY.status = el.dataset.s; return reportsRender(); }
   if (a === 'pcsv') {
     const f = v => String(Math.round(v * 100) / 100).replace('.', ',');
@@ -1648,6 +1640,33 @@ async function savePkg() {
 }
 
 /* ── Служители ── */
+const RATE_D0 = today().slice(0, 8) + '01';
+function ratesCardHtml(rates) {
+  const stName = id => id ? (S.staff.find(x => x.id === id) || {}).name || '?' : 'Всички (обща)';
+  const kn = { all: 'групови и индивидуални', group: 'групови', solo: 'индивидуални' };
+  const noRate = !rates.length;
+  return `    <div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 6px">Ставки</h3>
+      ${noRate ? '<div class="mute" style="margin-bottom:8px">Още няма ставки. Добави обща ставка (за всички треньори) и по желание отделна за конкретен треньор. Важи най-специфичната: треньор + вид, после треньор, после обща.</div>' : ''}
+      <div class="scroll"><table><thead><tr><th>За кого</th><th>Часове</th><th>На час</th><th>На посещение</th><th>От дата</th><th></th></tr></thead><tbody>
+      ${rates.map(r => `<tr><td>${esc(stName(r.staff_id))}</td><td>${kn[r.kind]}</td><td>${eur(r.per_hour)}</td><td>${eur(r.per_visit)}</td><td>${fmt(r.valid_from)}</td><td><button class="sm" data-act="prdel" data-id="${r.id}">Изтрий</button></td></tr>`).join('')}
+      <tr><td><select id="pr-s"><option value="">Всички (обща)</option>${S.staff.filter(x => x.active).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></td>
+      <td><select id="pr-k"><option value="all">групови и индивидуални</option><option value="group">групови</option><option value="solo">индивидуални</option></select></td>
+      <td><input id="pr-h" type="number" step="0.01" min="0" placeholder="€ на час" style="width:100px"></td><td><input id="pr-v" type="number" step="0.01" min="0" placeholder="€ на посещ." style="width:110px"></td>
+      <td><input id="pr-d" type="date" value="${RATE_D0}"></td><td><button class="sm pri" data-act="pradd">Добави</button></td></tr></tbody></table></div>
+      <div class="mute" style="margin-top:6px">Часовете са от графика (проведени, не отменени), посещенията са отметнатите „проведени". При нова ставка добави нов ред с нова дата, старите месеци остават със старата.</div></div>`;
+}
+async function teamExtras() {
+  if (!S.owner || S.tab !== 'team') return;
+  const { data: rates, error } = await sb.from('pay_rates').select('*').order('valid_from', { ascending: false });
+  if (error || S.tab !== 'team') return;
+  const P = [['perm_visits_loc', 'Вижда броя посещения по обект'], ['perm_revenue', 'Вижда приходите']];
+  const html = `<h3 style="margin:22px 0 8px">Права</h3><div class="card" style="overflow:auto"><div class="mute" style="margin-bottom:8px">Всеки служител вижда своите часове и клиентите си. Тук добавяш допълнителни права. Администраторите и собственикът винаги виждат всичко останало.</div>
+    <table><thead><tr><th>Служител</th>${P.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>
+    ${S.staff.filter(t => t.active).map(t => `<tr><td><b>${esc(t.name)}</b></td>${P.map(([k]) => `<td><input type="checkbox" style="width:20px;height:20px" data-act="perm" data-s="${t.id}" data-p="${k}" ${t[k] ? 'checked' : ''}></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <h3 style="margin:22px 0 8px">Заплати</h3>${ratesCardHtml(rates || [])}`;
+  const m = $('#main'); m.querySelector('#team-x')?.remove();
+  const w = document.createElement('div'); w.id = 'team-x'; w.innerHTML = html; m.append(w);
+}
 function teamView() {
   const admin = S.me.row.role === 'admin', today2 = today();
   $('#main').innerHTML = `<div class="row" style="margin-bottom:10px"><h2 style="margin:0">Служители</h2><span class="sp"></span>${admin ? '<button class="pri" data-act="trnew">+ Нов служител</button>' : ''}</div>` +
@@ -1655,6 +1674,7 @@ function teamView() {
       <br><span class="mute">${[t.phone, t.email].filter(Boolean).map(esc).join(' · ') || 'без контакти'} · ${t.user_id ? 'има акаунт ✓' : 'още без акаунт'}</span><br>${(t.locations || []).map(l => `<span class="chip">${esc(l)}</span>`).join(' ')}${t.notes ? `<br><span class="mute">${esc(t.notes)}</span>` : ''}</div>
       ${admin ? `<button class="sm" data-act="tredit" data-id="${t.id}">Редактирай</button>` : ''}</div></div>`).join('') +
     (admin ? '<p class="mute">Нов служител получава достъп, когато в Supabase → Authentication → Users → Add user се създаде акаунт със същия имейл.</p>' : '');
+  teamExtras();
 }
 function trainerDialog(id) {
   const t = id === 'new' ? { role: 'trainer', active: true, locations: [...LOCS], position: 'Треньор' } : S.staff.find(x => x.id === id);
@@ -2595,6 +2615,7 @@ document.addEventListener('click', async e => {
       case 'rwsave': { const id = el.dataset.id, row = { visits: +$('#rl-v-' + id).value, title: $('#rl-t-' + id).value.trim(), descr: $('#rl-d-' + id).value.trim() || null, active: $('#rl-a-' + id).checked }; if (!row.visits || !row.title) return toast('Попълни тренировки и награда.'); const { error } = await sb.from('reward_levels').update(row).eq('id', id); if (error) return fail(error, 'Не се записа'); toast('Записано'); rewardsView(); break; }
       case 'rwadd': { const row = { visits: +$('#rl-v-new').value, title: $('#rl-t-new').value.trim(), descr: $('#rl-d-new').value.trim() || null }; if (!row.visits || !row.title) return toast('Попълни тренировки и награда.'); const { error } = await sb.from('reward_levels').insert(row); if (error) return fail(error, 'Не се добави (може вече да има ниво със същия брой)'); rewardsView(); break; }
       case 'rwdel': { const { error } = await sb.from('reward_levels').delete().eq('id', el.dataset.id); if (error) return fail(error, 'Не може да се изтрие (има отпуснати награди). Махни отметката „Активно"'); rewardsView(); break; }
+      case 'perm': { const v = el.checked, { error } = await sb.from('staff').update({ [el.dataset.p]: v }).eq('id', el.dataset.s); if (error) { el.checked = !v; return fail(error, 'Правото не се записа'); } const t = S.staff.find(x => x.id === el.dataset.s); if (t) t[el.dataset.p] = v; toast(v ? 'Правото е дадено' : 'Правото е махнато'); break; }
       case 'pradd': case 'prdel': case 'pmstat': case 'pcsv': payAct(act, el); break;
       case 'rwclaim': { if (S.previewClient) return toast('Само преглед.'); const { error } = await sb.rpc('claim_reward', { p_level: +el.dataset.id }); if (error) return fail(error, 'Не се получи'); toast('Заявено'); clientApp(); break; }
       case 'pgloc': D.pgl = el.dataset.l; pgvRender(); break;
