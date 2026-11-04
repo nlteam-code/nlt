@@ -275,6 +275,19 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-chip.ok{color:#2ea064;border-color:rgba(46,160,100,.45)}
 .c-bar{height:8px;border-radius:99px;background:var(--c-ringbg);margin:16px 0 12px;overflow:hidden}
 .c-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--c-orange),var(--c-coral));border-radius:99px}
+
+.mm{display:flex;flex-direction:column;align-items:center}.mm-l{width:2px;height:22px;background:rgba(128,128,128,.4)}
+.mm-n{border:1.5px solid rgba(128,128,128,.4);border-radius:12px;padding:10px 14px;width:min(100%,420px);box-sizing:border-box;text-align:left}
+.mm-n small{display:flex;justify-content:space-between;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.7;margin-bottom:3px}
+.mm-n b{display:block;font-size:14px}.mm-n p{margin:2px 0 0;font-size:12.5px;opacity:.75}
+.mm-t{border-color:#d4342c;background:rgba(212,52,44,.08)}.mm-m{border-color:#2f6fdd}.mm-w{border-style:dashed;border-color:#b8902a;background:rgba(184,144,42,.12);text-align:center}
+.mm-e{border-radius:99px;width:auto;text-align:center;padding:6px 14px;font-size:13px;opacity:.8}
+.mm-s{display:flex;gap:14px;justify-content:center;width:100%;flex-wrap:wrap}.mm-b{display:flex;flex-direction:column;align-items:center;flex:1 1 220px;max-width:420px}
+.mm-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;width:100%;margin-top:8px}
+.mm-r{border:1.5px solid #1f9d62;border-radius:14px;padding:12px;min-width:0}.mm-r.lk{border-color:rgba(128,128,128,.5);opacity:.6}
+.mm-r h4{margin:0 0 8px;font-size:14px;display:flex;justify-content:space-between;gap:8px}.mm-r h4 span{font-size:11px;font-weight:600;opacity:.7}
+.mm-r div{font-size:13px;padding:5px 0;border-top:1px solid rgba(128,128,128,.2)}.mm-r div:first-of-type{border-top:0}.mm-r div i{font-style:normal;font-weight:600;margin-right:6px}
+.mm-h{font-size:12px;text-transform:uppercase;letter-spacing:.08em;opacity:.65;margin:22px 0 4px;text-align:left;width:100%}
 .tl{display:flex;flex-direction:column;gap:0;margin:6px 0}.tl-i{display:flex;gap:12px;padding:8px 0;position:relative}.tl-i i{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none}.tl-i:not(:last-child)::before{content:'';position:absolute;left:4px;top:20px;bottom:-6px;width:2px;background:rgba(128,128,128,.25)}.tl-d{font-size:12px;opacity:.65}.tl-s{font-size:13px;opacity:.75}
 .c-pk-f{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}
 .c-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));width:min(calc(100% - 28px),460px);display:flex;padding:6px;border-radius:28px;background:var(--c-nav);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);border:1px solid var(--c-line);box-shadow:0 12px 36px rgba(0,0,0,.22);z-index:10}
@@ -1813,7 +1826,7 @@ async function saveTrainer() {
 /* ── Настройки ── */
 function settingsView() {
   const sub = S.sub || 'policy';
-  $('#main').innerHTML = `<div class="chips"><button class="${sub === 'policy' ? 'on' : ''}" data-act="sub" data-v="policy">Известия за клиенти</button><button class="${sub === 'cv' ? 'on' : ''}" data-act="sub" data-v="cv">Клиентска визия</button><button class="${sub === 'pgs' ? 'on' : ''}" data-act="sub" data-v="pgs">Прогрес</button></div><div class="card" style="max-width:760px" id="sbox">${sub === 'policy' ? policyHtml() : sub === 'cv' ? cvHtml() : 'Зареждане…'}</div>`;
+  $('#main').innerHTML = `<div class="chips"><button class="${sub === 'policy' ? 'on' : ''}" data-act="sub" data-v="policy">Известия за клиенти</button><button class="${sub === 'cv' ? 'on' : ''}" data-act="sub" data-v="cv">Клиентска визия</button><button class="${sub === 'pgs' ? 'on' : ''}" data-act="sub" data-v="pgs">Прогрес</button>${S.owner ? `<button class="${sub === 'mail' ? 'on' : ''}" data-act="sub" data-v="mail">Имейл схема</button>` : ''}</div><div class="card" style="max-width:${sub === 'mail' ? 980 : 760}px" id="sbox">${sub === 'policy' ? policyHtml() : sub === 'cv' ? cvHtml() : sub === 'mail' && S.owner ? mailMapHtml() : 'Зареждане…'}</div>`;
   if (sub === 'pgs') pgSettingsHtml().then(h => { const b = $('#sbox'); if (b && S.sub === 'pgs') b.innerHTML = h; }).catch(e => fail(e, 'Настройките на прогреса не се заредиха'));
 }
 function policyHtml() {
@@ -1832,6 +1845,33 @@ function policyHtml() {
     <h3>Клиенти без часове</h3>${row('Известие към персонала', `ако активен клиент няма часове повече от ${num('po-inact', p.inactiveDays, 0)} дни (0 = изключено)`)}
     <div style="margin-top:14px"><button class="pri" data-act="policysave">Запази</button></div>
     <p class="mute">Правилото за отказ и местата се прилагат от записването на клиентите. Изпращането на имейли още не е включено.</p>`;
+}
+function mailMapHtml() {
+  const L = '<div class="mm-l"></div>';
+  const n = (c, t, ti, b, p, st) => `<div class="mm-n ${c}"><small><span>${t}</span><span>${st || ''}</span></small><b>${ti}</b>${p ? `<p>${p}</p>` : ''}</div>`;
+  const rem = (t, st, steps, lk) => `<div class="mm-r ${lk ? 'lk' : ''}"><h4>${t}<span>${st}</span></h4>${steps.map(x => `<div><i>${x[0]}</i>${x[1]}</div>`).join('')}</div>`;
+  return `<p class="mute">Схема на имейлите към клиентите: едно пътешествие и няколко самостоятелни подсещания. Изпращането през gym@newleveltraining.bg още не е включено.</p>
+  <div class="mm">
+    <div class="mm-h">Пътешествие · Нов клиент</div>
+    ${n('mm-t', 'Начало', 'Създаден клиентски профил', '', 'Въведен е имейл на клиента.')}${L}
+    ${n('mm-m', 'Писмо 1 · веднага', 'Добре дошъл в NLT', '', 'Код за вход и бутон към приложението.', '✔ Работи')}${L}
+    ${n('mm-w', 'Изчакване', 'Изчакай 3 дни')}${L}
+    ${n('mm-w', 'Условие', 'Влязъл ли е в приложението?')}
+    <div class="mm-s"><div class="mm-b">${L}<b style="color:#1f9d62">Да</b>${L}${n('mm-e', '', 'Прескочи писмо 2')}</div>
+      <div class="mm-b">${L}<b style="color:#d4342c">Не</b>${L}${n('mm-m', 'Писмо 2 · ден 3', 'Влез в приложението', '', 'Напомняне с кода и стъпки за вход.', 'Предстои')}</div></div>
+    ${L}${n('mm-t', 'Събитие', 'Първа проведена тренировка')}${L}
+    ${n('mm-w', 'Изчакване', 'Изчакай 1 ден')}${L}
+    ${n('mm-m', 'Писмо 3 · ден след тренировката', 'Как мина?', '', 'Благодарност, съвет за възстановяване и бутон „Запиши следващия час“.', 'Предстои')}${L}
+    ${n('mm-e', '', 'Край на пътешествието')}
+    <div class="mm-h">Подсещания · по едно писмо</div>
+    <div class="mm-g">
+      ${rem('Подновяване', 'Предстои', [['▶', 'Остава 1 посещение или 3 дни до края'], ['?', 'Няма ли следващ абонамент?'], ['✉', '„Време е за нов абонамент“']])}
+      ${rem('Изтекъл абонамент', 'Предстои', [['▶', 'Абонаментът е изтекъл'], ['?', 'Няма нов в следващите 2 дни'], ['✉', '„Започни нов абонамент“']])}
+      ${rem('Липсваш ни', 'Предстои', [['▶', '14 дни без посещение (активен клиент)'], ['?', 'Няма записан час напред'], ['✉', '„Липсваш ни“ + бутон „Запиши час“']])}
+      ${rem('Седмичен чек-ин', 'След „Прогрес“', [['▶', 'Всеки понеделник'], ['✉', '„Как мина седмицата?“']], 1)}
+      ${rem('Награда', 'След „Награди“', [['▶', 'Достигнато ниво посещения'], ['✉', '„Поздравления!“']], 1)}
+    </div>
+  </div>`;
 }
 function cvHtml() {
   const c = S.cv;
