@@ -1143,7 +1143,7 @@ async function openClient(id, tab) {
   const nDone = past.filter(b => b.status === 'done').length + arch.filter(h => !h.bad).length, nCan = past.filter(b => b.status === 'cancelled').length, nLate = past.filter(b => b.late).length;
   const pstate = p => p.end_date < t0 || p.used >= p.total ? '<span class="chip">Изтекъл</span>' : p.start_date > t0 ? '<span class="chip warn">Предстоящ</span>' : '<span class="chip" style="color:var(--ok)">Активен</span>';
   const ledger = [...pays.map(p => ({ d: p.date, plus: true, a: p.amount, t: `${esc(p.method || '')} ${esc(p.note || '')}`, id: p.id, act: 'paydel' })), ...chs.map(p => ({ d: p.date, plus: false, a: p.amount, t: esc(p.note || 'Такса'), id: p.id, act: 'chdel' }))].sort((a, b) => String(b.d).localeCompare(String(a.d)));
-  const T = tab || 'profile';
+  D.ecl = { id: x.id, pk, pays, chs }; const T = tab || 'profile';
   const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес']].concat(S.owner ? [['pays', 'Плащания']] : []);
   modal.show(`<div id="cl" data-cid="${x.id}" data-uid="${x.user_id || ''}">
     <h2>${esc(x.name)}</h2>
@@ -1171,7 +1171,7 @@ async function openClient(id, tab) {
       <button class="sm danger" data-act="cpdel" data-id="${p.id}">✕</button></div>`; }).join('') || '<div class="mute">Няма абонаменти.</div>'}
     ${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).length ? `<h3>Платени абонаменти · PT Minder</h3>${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).map(p => `<div class="bk"><div class="nm">${fmt(p.date)} · ${esc(p.category)} · <b>${money(p.amount)}</b></div></div>`).join('')}` : ''}
     <h3>Хронология</h3>
-    ${subHistory(pk, [...past.filter(b => b.status === 'done').map(b => ({ date: b.sessions.date, kind: b.sessions.kind })), ...arch.filter(h => !h.bad).map(h => ({ date: h.date }))], S.owner ? { pays, chs } : null)}
+    ${subHistory(pk, [...past.filter(b => b.status === 'done').map(b => ({ date: b.sessions.date, kind: b.sessions.kind })), ...arch.filter(h => !h.bad).map(h => ({ date: h.date }))], S.owner ? { pays, chs } : null, true)}
     <h3>Назначи услуга</h3>
     <div class="row"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
       <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
@@ -2190,24 +2190,24 @@ function clientMine(t) {
   ${clientMassages()}`;
 }
 /* ── Хронология на абонаментите, плащанията и таксите ── */
-function subHistory(pkgs, visits, money) {
+function subHistory(pkgs, visits, money, edit) {
   const t0 = today(), ev = [], ord = { exp: 0, end: 0, pay: 1, chg: 1, start: 2 };
   const sorted = (pkgs || []).slice().sort((a, b) => a.start_date.localeCompare(b.start_date));
   let prevEnd = null;
   sorted.forEach(p => {
     const vs = (visits || []).filter(v => v.date >= p.start_date && v.date <= p.end_date && (!v.kind || v.kind === p.kind)).map(v => v.date).sort(), name = p.package_name || 'Абонамент';
     const gap = prevEnd ? Math.round((parse(p.start_date) - parse(prevEnd)) / 864e5) : null;
-    ev.push({ d: p.start_date, k: 'start', t: `Започна: ${esc(name)}`, s: `${p.total} посещения · до ${fmt(p.end_date)}${money && p.price ? ` · ${eur(p.price)}` : ''}${gap != null ? (gap > 0 ? ` · ${gap} дни след предишния` : ' · веднага след предишния') : ''}` });
-    if (p.used >= p.total) { const d = vs[p.total - 1] || vs[vs.length - 1] || p.end_date; ev.push({ d, k: 'end', t: `Приключи: ${esc(name)}`, s: `последно (${p.total}-о) посещение` }); prevEnd = d; }
-    else if (p.end_date < t0) { ev.push({ d: p.end_date, k: 'exp', t: `Изтече: ${esc(name)}`, s: `използвани ${p.used} от ${p.total}` }); prevEnd = p.end_date; }
+    ev.push({ id: p.id, ty: 'pkg', d: p.start_date, k: 'start', t: `Започна: ${esc(name)}`, s: `${p.total} посещения · до ${fmt(p.end_date)}${money && p.price ? ` · ${eur(p.price)}` : ''}${gap != null ? (gap > 0 ? ` · ${gap} дни след предишния` : ' · веднага след предишния') : ''}` });
+    if (p.used >= p.total) { const d = vs[p.total - 1] || vs[vs.length - 1] || p.end_date; ev.push({ id: p.id, ty: 'pkg', d, k: 'end', t: `Приключи: ${esc(name)}`, s: `последно (${p.total}-о) посещение` }); prevEnd = d; }
+    else if (p.end_date < t0) { ev.push({ id: p.id, ty: 'pkg', d: p.end_date, k: 'exp', t: `Изтече: ${esc(name)}`, s: `използвани ${p.used} от ${p.total}` }); prevEnd = p.end_date; }
   });
   if (money) {
-    (money.pays || []).forEach(x => ev.push({ d: x.date, k: 'pay', t: `Плащане +${eur(x.amount)}`, s: [x.method, x.note].filter(Boolean).join(' · ') }));
-    (money.chs || []).forEach(x => ev.push({ d: x.date, k: 'chg', t: `Такса −${eur(x.amount)}`, s: x.note || '' }));
+    (money.pays || []).forEach(x => ev.push({ id: x.id, ty: 'pay', d: x.date, k: 'pay', t: `Плащане +${eur(x.amount)}`, s: [x.method, x.note].filter(Boolean).join(' · ') }));
+    (money.chs || []).forEach(x => ev.push({ id: x.id, ty: 'chg', d: x.date, k: 'chg', t: `Такса −${eur(x.amount)}`, s: x.note || '' }));
   }
   ev.sort((a, b) => b.d.localeCompare(a.d) || ord[b.k] - ord[a.k]);
   const col = { start: '#4cc38a', end: '#eb4c51', exp: '#9aa0a6', pay: '#4cc38a', chg: '#e9a23b' };
-  return `<div class="tl">${ev.map(e => `<div class="tl-i"><i style="background:${col[e.k]}"></i><div><div class="tl-d">${fmt(e.d)}</div><b>${e.t}</b>${e.s ? `<div class="tl-s">${esc(e.s)}</div>` : ''}</div></div>`).join('') || '<div class="mute">Няма записи.</div>'}</div>`;
+  return `<div class="tl">${ev.map(e => `<div class="tl-i"><i style="background:${col[e.k]}"></i><div><div class="tl-d">${fmt(e.d)}</div><b>${e.t}</b>${e.s ? `<div class="tl-s">${esc(e.s)}</div>` : ''}</div>${edit && e.id ? `<button class="sm" style="margin-left:auto;align-self:center" data-act="tledit" data-ty="${e.ty}" data-id="${e.id}">Редактирай</button>` : ''}</div>`).join('') || '<div class="mute">Няма записи.</div>'}</div>`;
 }
 function clientPkg(t, act) {
   const old = C.pkgs.filter(p => p.end_date < t);
@@ -2776,6 +2776,20 @@ document.addEventListener('click', async e => {
       case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
       case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; D.phm = D.phm || today().slice(0, 7); loadPayHist(); } redrawPay(); break;
       case 'hcsv': { const rows = (D.phist || []).filter(p => payLoc() === 'all' || (S.clients.find(c => c.id === p.client_id) || {}).location === payLoc()); const t = ['Дата\tКлиент\tОбект\tСума\tНачин\tБележка'].concat(rows.map(p => [p.date, cname(p.client_id), (S.clients.find(c => c.id === p.client_id) || {}).location || '', String(p.amount).replace('.', ','), p.method || '', p.note || ''].join('\t'))).join('\n'); try { await navigator.clipboard.writeText(t); toast('Копирано, постави в Excel'); } catch (e) { modal.show(`<h2>Копирай ръчно</h2><textarea style="width:100%;height:200px">${esc(t)}</textarea>`); } break; }
+      case 'tledit': {
+        const E = D.ecl, id = el.dataset.id, ty = el.dataset.ty; if (!E) break;
+        if (ty === 'pkg') { const p = E.pk.find(x => x.id === id); if (!p) break;
+          modal.show(`<div id="te" data-ty="pkg" data-id="${id}"><h2>Редакция на абонамент</h2><div class="mute" style="margin-bottom:8px">${esc(p.package_name || 'Абонамент')}</div><label class="f">Начало<input id="te-s" type="date" value="${p.start_date}"></label><label class="f">Край<input id="te-e" type="date" value="${p.end_date}"></label><label class="f">Брой посещения<input id="te-t" type="number" min="1" value="${p.total}"></label>${S.owner ? `<label class="f">Цена<input id="te-p" type="number" step="0.01" value="${p.price ?? ''}"></label>` : ''}<div class="row" style="margin-top:12px"><button class="pri" data-act="tlsave">Запази</button></div></div>`); }
+        else if (S.owner) { const x = (ty === 'pay' ? E.pays : E.chs).find(r => r.id === id); if (!x) break;
+          modal.show(`<div id="te" data-ty="${ty}" data-id="${id}"><h2>${ty === 'pay' ? 'Редакция на плащане' : 'Редакция на такса'}</h2><label class="f">Сума<input id="te-a" type="number" step="0.01" value="${x.amount}"></label>${ty === 'pay' ? `<label class="f">Начин<select id="te-m"><option ${x.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${x.method === 'Банков път' ? 'selected' : ''}>Банков път</option>${x.method && !['В брой', 'Банков път'].includes(x.method) ? `<option selected>${esc(x.method)}</option>` : ''}</select></label>` : ''}<label class="f">Дата<input id="te-d" type="date" value="${x.date}"></label><label class="f">Бележка<input id="te-n" value="${esc(x.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="tlsave">Запази</button></div></div>`); }
+        break; }
+      case 'tlsave': {
+        const E = D.ecl, box = $('#te'), ty = box.dataset.ty, id = box.dataset.id; let r;
+        if (ty === 'pkg') { const row = { start_date: $('#te-s').value, end_date: $('#te-e').value, total: +$('#te-t').value }; if (!row.start_date || !row.end_date || row.end_date < row.start_date || !(row.total > 0)) return toast('Провери датите и броя посещения.'); if (S.owner && $('#te-p')) row.price = $('#te-p').value === '' ? null : +$('#te-p').value; r = await sb.from('client_packages').update(row).eq('id', id); }
+        else { const a = Math.round(+$('#te-a').value * 100) / 100; if (!(a > 0)) return toast('Въведи сума.'); const row = { amount: a, date: $('#te-d').value, note: $('#te-n').value.trim() || null }; if (ty === 'pay') row.method = $('#te-m').value; r = await sb.from(ty === 'pay' ? 'payments' : 'charges').update(row).eq('id', id); }
+        if (r.error) return fail(r.error, 'Не се запази');
+        modal.close(); logEvent('change', `Коригиран ${ty === 'pkg' ? 'абонамент' : ty === 'pay' ? 'плащане' : 'такса'}: ${cname(E.id)}`);
+        S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(E.id, 'pkgs'); toast('Запазено.'); break; }
       case 'hdel': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p || !confirm(`Изтриване на плащане ${money(p.amount)} от ${p.date} (${cname(p.client_id)})?`)) break; const { error } = await sb.from('payments').delete().eq('id', p.id); if (error) return fail(error, 'Не се изтри'); logEvent('removed', `Изтрито плащане ${money(p.amount)} (${p.date}): ${cname(p.client_id)}`); await refreshBal(); loadPayHist(); break; }
       case 'hedit': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p) break; modal.show(`<div id="he" data-id="${p.id}"><h2>Корекция · ${esc(cname(p.client_id))}</h2><label class="f">Сума<input id="he-a" type="number" step="0.01" value="${p.amount}"></label><label class="f">Начин<select id="he-m"><option ${p.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${p.method === 'Банков път' ? 'selected' : ''}>Банков път</option></select></label><label class="f">Дата<input id="he-d" type="date" value="${p.date}"></label><label class="f">Бележка<input id="he-n" value="${esc(p.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="hsave">Запази корекцията</button></div></div>`); break; }
       case 'hsave': { const id = $('#he').dataset.id, p = (D.phist || []).find(x => x.id === id), a = Math.round(+$('#he-a').value * 100) / 100; if (!(a > 0)) return toast('Въведи сума.'); const { error } = await sb.from('payments').update({ amount: a, method: $('#he-m').value, date: $('#he-d').value, note: $('#he-n').value.trim() || null }).eq('id', id); if (error) return fail(error, 'Не се запази'); modal.close(); logEvent('change', `Коригирано плащане: ${cname(p.client_id)} ${money(p.amount)} → ${money(a)}`); await refreshBal(); loadPayHist(); toast('Коригирано.'); break; }
