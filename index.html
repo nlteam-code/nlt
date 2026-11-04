@@ -532,12 +532,12 @@ function renderStaff() {
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
     <div class="tabs">
-      ${[['dash', 'Обобщение'], ['kpi', 'KPI'], ['week', 'График'], ['clients', 'Клиенти'], ['packages', 'Пакети'], ['team', 'Служители']].concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
+      ${[['dash', 'Обобщение'], ['kpi', 'KPI'], ['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес'], ['packages', 'Пакети'], ['team', 'Служители']].concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <select id="loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
-  <div class="wrap" id="main"></div><div class="wrap" id="pgdash" style="padding-top:0"></div>`;
+  <div class="wrap" id="main"></div>`;
   const as = $('#asel'); if (as) as.onchange = e => {
     if (e.target.value === '__client') { e.target.value = S.view?.id || ''; return pickClientPreview(); }
     const t = S.staff.find(x => x.id === e.target.value);
@@ -547,9 +547,10 @@ function renderStaff() {
   $('#loc').onchange = e => { S.loc = e.target.value; S.cloc = S.loc; store.set('nlt-loc', S.loc); D.ploc = null; renderTab(); };
   renderTab();
 }
+function loadMain() { const m = $('#main'); if (!m) return; if (m.dataset.ld === '1' || !m.firstElementChild) { m.innerHTML = '<div class="mute">Зареждане…</div>'; m.dataset.ld = ''; } }
 function renderTab() {
-  const pd = $('#pgdash'); if (pd) { pd.innerHTML = ''; if (S.tab === 'dash') pgDashHtml().then(h => { if (S.tab === 'dash' && $('#pgdash')) $('#pgdash').innerHTML = h; }).catch(() => { }); }
-  ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
+  const m = $('#main'); if (m && m.dataset.rt !== S.tab) { m.dataset.rt = S.tab; m.dataset.ld = '1'; }
+  ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, progress: progressView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
 }
 
 
@@ -563,7 +564,7 @@ function kpiRange() {
 const pbar = v => `<div class="bar2" style="min-width:70px"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></div>`;
 async function kpiTrainer() {
   const [from, to, label] = kpiRange();
-  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  loadMain();
   D.ktr = D.ktr || 'month';
   const heatLoc = D.kheat || null;
   const [st, cl, bz, tr, rv, ht, sr] = await Promise.all([sb.rpc('kpi_staff', { p_from: from, p_to: to }), sb.rpc('kpi_clients'), S.owner ? sb.rpc('kpi_business') : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_trend', { p_unit: D.ktr, p_from: '2026-06-01' }) : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_revenue') : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_heat', { p_loc: heatLoc }) : Promise.resolve({ data: null }), S.owner ? sb.rpc('kpi_sources') : Promise.resolve({ data: null })]);
@@ -602,7 +603,7 @@ async function kpiTrainer() {
 /* ── KPI на масажното студио (само Лерин). Пари — само за собственика ── */
 async function massageKpi() {
   const main = $('#main'); if (!main) return;
-  const [mb, ms] = await Promise.all([sb.from('massage_bookings').select('client_id,guest_email,guest_name,date,service,status,cancelled_by').limit(5000), S.owner ? sb.from('massage_services').select('name,price') : Promise.resolve({ data: [] })]);
+  const [mb, ms] = await Promise.all([sb.from('massage_bookings').select('client_id,guest_email,guest_name,date,start_time,service,status,cancelled_by').limit(5000), S.owner ? sb.from('massage_services').select('name,price') : Promise.resolve({ data: [] })]);
   if (mb.error) return;
   const t = today(), d28 = ymd(addDays(parse(t), -28)), d56 = ymd(addDays(parse(t), -56)), d90 = ymd(addDays(parse(t), -90)), d7 = ymd(addDays(parse(t), 7));
   const price = Object.fromEntries((ms.data || []).map(x => [x.name, Number(x.price || 0)]));
@@ -618,18 +619,28 @@ async function massageKpi() {
   const cancelPct = (d28n.length + c28.length) ? Math.round(c28.length / (d28n.length + c28.length) * 100) : 0;
   const upc = all.filter(x => x.status === 'booked' && x.date >= t && x.date < d7).length;
   const delta = (a, b) => b ? `${a >= b ? '+' : '−'}${Math.abs(Math.round((a - b) / b * 100))}% срещу предишните 28 дни` : '&nbsp;';
-  const svc = {}; d28n.forEach(x => { svc[x.service] = (svc[x.service] || 0) + 1; });
-  const svcRows = Object.entries(svc).sort((a, b) => b[1] - a[1]).map(([n, c]) => `<tr><td>${esc(n)}</td><td>${c}</td></tr>`).join('');
+  const nm = x => (x.client_id && (S.clients.find(c => c.id === x.client_id) || {}).name) || x.guest_name || x.guest_email || 'Гост';
+  const dow = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'], d30 = ymd(addDays(parse(t), 30));
+  const up = all.filter(x => x.status === 'booked' && x.date >= t && x.date <= d30).sort((a, b) => (a.date + (a.start_time || '')).localeCompare(b.date + (b.start_time || '')));
+  const upRows = up.slice(0, 25).map(x => `<tr><td>${dow[parse(x.date).getDay()]} ${fmt(x.date)}</td><td>${(x.start_time || '').slice(0, 5)}</td><td>${esc(nm(x))}</td><td class="mute">${esc(x.service || '')}</td></tr>`).join('');
+  const hrs = {}; done.filter(x => x.date >= d90 && x.start_time).forEach(x => { const h = dow[parse(x.date).getDay()] + ' ' + x.start_time.slice(0, 2) + ':00'; hrs[h] = (hrs[h] || 0) + 1; });
+  const topH = Object.entries(hrs).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([h, c]) => `${h} (${c})`).join(' · ') || '–';
+  const gaps = []; const byC = {}; done.forEach(x => { (byC[key(x)] = byC[key(x)] || []).push(x.date); });
+  Object.values(byC).forEach(a => { a.sort(); for (let i = 1; i < a.length; i++) gaps.push((parse(a[i]) - parse(a[i - 1])) / 864e5); });
+  const avgGap = gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null;
   const weeks = [...Array(12)].map((_, i) => { const a = ymd(addDays(monday(parse(t)), -7 * (11 - i))), b = ymd(addDays(parse(a), 7)); return { a, n: done.filter(x => inR(x, a, b)).length }; });
   const mx = Math.max(1, ...weeks.map(w => w.n));
   const rev28 = d28n.reduce((a, x) => a + (price[x.service] || 0), 0), revPrev = dPrev.reduce((a, x) => a + (price[x.service] || 0), 0);
   const k = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
-  main.insertAdjacentHTML('beforeend', `<h3 style="margin-top:22px">Масажно студио · Лерин · последни 28 дни</h3>
-    <div class="kpis">${k('Масажи', d28n.length, delta(d28n.length, dPrev.length))}${k('Клиенти', active.size, neu + ' нови')}${k('Повтарящи се', repeat + '%', 'с 2+ масажа за 90 дни')}
-    ${k('Отказани', cancelPct + '%', c28.length + ' часа · ' + cc28 + ' от приложението')}${k('Следващи 7 дни', upc, 'записани масажа')}${S.owner ? k('Приход (по ценоразпис)', eur(rev28), delta(rev28, revPrev)) : ''}</div>
-    <div class="row" style="align-items:flex-start;gap:16px;flex-wrap:wrap">
-      <div class="card" style="flex:1;min-width:260px"><b>Масажи по седмици</b><div style="display:flex;align-items:flex-end;gap:5px;height:90px;margin-top:10px">${weeks.map(w => `<div title="${fmt(w.a)}: ${w.n}" style="flex:1;text-align:center;font-size:10px"><div style="height:${Math.round(w.n / mx * 64) + 2}px;background:var(--acc);border-radius:4px 4px 0 0"></div>${w.n}</div>`).join('')}</div></div>
-      <div class="card" style="flex:1;min-width:260px"><b>Услуги</b><table><tbody>${svcRows || '<tr><td class="mute">Няма данни</td></tr>'}</tbody></table></div></div>`);
+  const h0 = main.firstElementChild, html = `<h3 style="margin-top:6px">Масажно студио · Лерин</h3>
+    <div class="kpis">${k('Масажи · 28 дни', d28n.length, delta(d28n.length, dPrev.length))}${k('Клиенти', active.size, neu + ' нови')}${k('Повтарящи се', repeat + '%', 'с 2+ масажа за 90 дни')}
+    ${k('Отказани', cancelPct + '%', c28.length + ' часа · ' + cc28 + ' от приложението')}${k('Предстоящи 7 дни', upc, 'записани масажа')}${k('Средно между масажи', avgGap == null ? '–' : avgGap + ' дни', 'на един клиент')}${S.owner ? k('Приход (по ценоразпис)', eur(rev28), delta(rev28, revPrev)) : ''}</div>
+    <div class="row" style="align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+      <div class="card" style="flex:1.4;min-width:280px;max-height:340px;overflow:auto"><b>Бъдещи посещения · следващите 30 дни (${up.length})</b><table><tbody>${upRows || '<tr><td class="mute">Няма записани масажи.</td></tr>'}</tbody></table>${up.length > 25 ? `<div class="mute">Показани са първите 25.</div>` : ''}</div>
+      <div class="card" style="flex:1;min-width:260px"><b>Масажи по седмици</b><div style="display:flex;align-items:flex-end;gap:5px;height:90px;margin-top:10px">${weeks.map(w => `<div title="${fmt(w.a)}: ${w.n}" style="flex:1;text-align:center;font-size:10px"><div style="height:${Math.round(w.n / mx * 64) + 2}px;background:var(--acc);border-radius:4px 4px 0 0"></div>${w.n}</div>`).join('')}</div><div class="mute" style="margin-top:8px">Най-търсени часове (90 дни): ${topH}</div></div></div>`;
+  main.querySelector('#msg-kpi')?.remove();
+  const wrap = document.createElement('div'); wrap.id = 'msg-kpi'; wrap.innerHTML = html;
+  if (h0 && h0.classList.contains('row')) h0.after(wrap); else main.prepend(wrap);
 }
 /* ── KPI за собственика: по обект, накратко, къде се пропукваме ── */
 const KLOCS = [['all', 'Двата обекта'], ['Боян Петров', 'Боян Петров'], ['Лерин', 'Лерин']];
@@ -639,7 +650,7 @@ async function kpiView() { await (S.owner ? kpiOwner() : kpiTrainer()); if (S.ta
 async function kpiOwner() {
   D.kloc = D.kloc || 'all'; D.kchart = D.kchart || 'visits'; D.ktr = D.ktr || 'month'; D.klist = D.klist || 'lost';
   const L = D.kloc, loc = L === 'all' ? null : L, locs = L === 'all' ? ['Боян Петров', 'Лерин'] : [L];
-  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  loadMain();
   const [from, to] = [ymd(addDays(new Date(), -27)), ymd(new Date())];
   const [trW, trM, cl, st, rv, ht, sr] = await Promise.all([sb.rpc('kpi_trend', { p_unit: 'week', p_from: '2026-06-01' }), sb.rpc('kpi_trend', { p_unit: 'month', p_from: '2026-06-01' }), sb.rpc('kpi_clients'),
     sb.rpc('kpi_staff', { p_from: from, p_to: to }), sb.rpc('kpi_revenue', { p_loc: loc }), sb.rpc('kpi_heat', { p_loc: loc }), sb.rpc('kpi_sources')]);
@@ -697,8 +708,12 @@ async function kpiOwner() {
   // треньори
   const sidLoc = id => (S.staff.find(x => x.id === id) || {}).locations || [];
   const trn = (st.data || []).filter(r => !loc || sidLoc(r.staff_id).includes(loc)).filter(r => r.sessions > 0 || r.hours > 0);
-  const trainers = `<div class="card" style="margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 8px">Треньори <span class="mute" style="font-weight:400">· последни 28 дни</span></h3><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Ср. на час</th><th>Приход</th></tr></thead><tbody>
-    ${trn.map(r => `<tr><td><b>${esc(r.name)}</b></td><td>${r.hours}</td><td>${r.visits}</td><td>${r.avg_per_session ?? '–'}</td><td>${eur(r.revenue || 0)}</td></tr>`).join('') || '<tr><td colspan="5" class="mute">Няма данни.</td></tr>'}</tbody></table></div>`;
+  const w28 = ymd(addDays(new Date(), -27));
+  const { data: ssn } = await sb.from('sessions').select('trainer_id,date,duration_min').gte('date', w28).lte('date', ymd(new Date())).eq('cancelled', false).limit(5000);
+  const dayset = {}; (ssn || []).forEach(x => { (dayset[x.trainer_id] = dayset[x.trainer_id] || new Set()).add(x.date); });
+  const f1 = n => (Math.round(n * 10) / 10).toString().replace('.', ',');
+  const trainers = `<div class="card" style="margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 8px">Треньори <span class="mute" style="font-weight:400">· последните 4 седмици, средно на работен ден</span></h3><table><thead><tr><th>Треньор</th><th>Работни дни</th><th>Часа на ден</th><th>Посещения на ден</th><th>Общо часове</th><th>Общо посещения</th></tr></thead><tbody>
+    ${trn.map(r => { const dd = (dayset[r.staff_id] || new Set()).size || 0; return `<tr><td><b>${esc(r.name)}</b></td><td>${dd}</td><td>${dd ? f1(r.hours / dd) : '–'}</td><td>${dd ? f1(r.visits / dd) : '–'}</td><td>${r.hours}</td><td>${r.visits}</td></tr>`; }).join('') || '<tr><td colspan="6" class="mute">Няма данни.</td></tr>'}</tbody></table></div>`;
   // клиенти за действие
   const lists = { lost: ['Отказали се', lost], back: ['Започнали / върнали се', back.sort((x, y) => y.done_28 - x.done_28)], risk: ['В риск', risk], nopkg: ['Без абонамент', noPkg] }, cur = lists[D.klist] || lists.lost;
   const list = `<div class="card" style="margin-bottom:14px;overflow:auto"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Клиенти за действие</h3><span class="sp"></span><select id="klist-sel" style="font-weight:600">${Object.entries(lists).map(([k, [l, a]]) => `<option value="${k}" ${D.klist === k ? 'selected' : ''}>${l} · ${a.length}</option>`).join('')}</select></div>
@@ -711,20 +726,24 @@ async function kpiOwner() {
     ${brief}${top}${crack}${charts}${list}${trainers}${more}`;
 }
 function stackChart(rows, locs, key, unit) {
-  const wk = unit === 'week', per = [...new Set(rows.map(r => r.period))].sort(), W = 720, H = 220, pl = 36, pb = 26, pt = 10, cw = (W - pl) / per.length, bw = Math.max(6, Math.min(34, cw - 6));
+  const wk = unit === 'week', per = [...new Set(rows.map(r => r.period))].sort(), W = 720, H = 240, pl = 36, pb = 26, pt = 22, cw = (W - pl) / per.length, n = locs.length, bw = Math.max(5, Math.min(22, (cw - 8) / n));
   const val = (p, l) => (rows.find(r => r.period === p && r.location === l) || {})[key] || 0;
-  const tot = p => locs.reduce((s, l) => s + val(p, l), 0), mxr = Math.max(...per.map(tot), 1), mx = Math.max(4, Math.ceil(mxr / 4) * 4);
+  const mxr = Math.max(...per.flatMap(p => locs.map(l => val(p, l))), 1), mx = Math.max(4, Math.ceil(mxr / 4) * 4);
   const lab = p => { const d = parse(p); return wk ? `${d.getDate()}.${d.getMonth() + 1}` : ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'][d.getMonth()]; };
-  const bars = per.map((p, i) => { let y0 = H - pb; const x = pl + i * cw + (cw - bw) / 2, last = i === per.length - 1;
-    return locs.map(l => { const v = val(p, l); if (!v) return ''; const h = v / mx * (H - pb - pt), y = y0 - h; y0 = y - 2; return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" fill="${TRC[l]}" opacity="${last ? .55 : 1}"><title>${l}: ${v}${last ? ' (до днес)' : ''}</title></rect>`; }).join(''); }).join('');
-  const prv = per[per.length - 2], cur = per[per.length - 1];
+  const last = per.length - 1, ci = last - 1; // последният период е непълен -> растеж между двата преди него
+  const bars = per.map((p, i) => { const x0 = pl + i * cw + (cw - bw * n - 2 * (n - 1)) / 2, lastP = i === last;
+    return locs.map((l, j) => { const v = val(p, l), h = v / mx * (H - pb - pt), y = H - pb - h, x = x0 + j * (bw + 2); const pv = i > 0 && i < last ? val(per[i - 1], l) : null;
+      const g = pv ? Math.round((v - pv) / pv * 100) : null;
+      const gl = g == null || !v || cw < 26 ? '' : `<text x="${x + bw / 2}" y="${y - 4}" text-anchor="middle" font-size="${cw < 40 ? 8 : 10}" font-weight="600" fill="${g >= 0 ? 'var(--ok)' : 'var(--bad)'}">${g > 0 ? '+' : g < 0 ? '−' : ''}${Math.abs(g)}%</text>`;
+      return v ? `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" fill="${TRC[l]}" opacity="${lastP ? .5 : 1}"><title>${l}: ${v}${lastP ? ' (до днес)' : ''}${g != null ? ` · ${g > 0 ? '+' : ''}${g}% срещу предишния` : ''}</title></rect>${gl}` : ''; }).join(''); }).join('');
   const ticks = [0, .5, 1].map(f => Math.round(mx * f));
   const what = key === 'hours' ? 'проведени часа' : 'посещения';
-  return `<div class="row" style="gap:14px;margin-bottom:4px">${locs.map(l => `<span class="mute"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]};margin-right:5px"></i>${l}</span>`).join('')}<span class="mute">${what} · последният период е непълен</span></div>
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:250px" role="img" aria-label="Тенденция">
+  const sum = locs.map(l => { const a = val(per[ci], l), b = val(per[ci - 1], l), g = b ? Math.round((a - b) / b * 100) : 0; return `<span style="margin-right:14px"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]};margin-right:5px"></i>${l}: <b style="color:var(--ink)">${a}</b> <b style="color:var(--${g >= 0 ? 'ok' : 'bad'})">${g > 0 ? '+' : g < 0 ? '−' : ''}${Math.abs(g)}%</b></span>`; }).join('');
+  return `<div class="row" style="gap:14px;margin-bottom:4px">${locs.map(l => `<span class="mute"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]};margin-right:5px"></i>${l}</span>`).join('')}<span class="mute">${what} · % = ръст срещу предишния период · бледият стълб е непълен</span></div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:270px" role="img" aria-label="Тенденция">
     ${ticks.map(t => { const y = H - pb - t / mx * (H - pb - pt); return `<line x1="${pl}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--mute)">${t}</text>`; }).join('')}
     ${bars}${per.map((p, i) => per.length > 14 && i % 2 ? '' : `<text x="${pl + i * cw + cw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--mute)">${lab(p)}</text>`).join('')}</svg>
-    <div class="mute">${wk ? 'Тази седмица' : 'Този месец'}: <b style="color:var(--ink)">${tot(cur)}</b> до днес · ${wk ? 'миналата' : 'миналия'}: <b style="color:var(--ink)">${tot(prv)}</b></div>`;
+    <div class="mute">Последният пълен ${wk ? 'седмичен' : 'месечен'} период (${lab(per[ci])}) срещу предишния: ${sum}</div>`;
 }
 function revenueCard2(rows) {
   if (!rows.length) return '';
@@ -1063,7 +1082,7 @@ function pkgChip(p) {
   return `<span class="chip ${cls}">${left}/${p.total} ${p.kind === 'solo' ? 'перс.' : 'груп.'} · до ${parse(p.end_date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'numeric' })}</span>`;
 }
 async function clientsView() {
-  $('#main').innerHTML = `<div class="mute">Зареждане…</div>`;
+  loadMain();
   S.pstat = await loadPstat();
   drawClients();
 }
@@ -1274,7 +1293,7 @@ function pickClientPreview() {
 function exitPreview() { S.previewClient = null; S.me = S.view || S.real; S.owner = S.realOwner && !S.view; document.body.classList.remove('cm'); renderStaff(); }
 /* ── Обобщение за треньор: кой дължи + кой идва скоро (без приходи и отчети) ── */
 async function trainerDash() {
-  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  loadMain();
   D.tab = 'due'; D.ploc = D.ploc || 'all';
   const [bal, soon] = await Promise.all([sb.rpc('my_debtors'), nextClients()]);
   if (bal.error) return fail(bal.error, 'Обобщението не се зареди (изпълнен ли е 06_finansi_samo_sobstvenik.sql?)');
@@ -1296,9 +1315,59 @@ async function nextClients() {
   }
   return '<h2>Следващ час</h2><div class="mute">Няма предстоящи записвания.</div>';
 }
+
+/* ── Страница „Прогрес“: задачи за треньора, които се отмятат ── */
+const PGV = { data: [], done: new Set(), ok: false };
+async function progressView() {
+  loadMain();
+  await pgStatic().catch(() => { });
+  const [ov, tk] = await Promise.all([sb.rpc('progress_overview'), sb.from('progress_tasks').select('client_id,kind,ref')]);
+  if (ov.error) return fail(ov.error, 'Прогресът не се зареди');
+  PGV.data = ov.data || []; PGV.ok = !tk.error;
+  PGV.done = new Set((tk.data || []).map(x => `${x.client_id}|${x.kind}|${x.ref}`));
+  D.pgl = D.pgl || S.loc || 'all'; D.pgk = D.pgk || 'all';
+  pgvRender();
+}
+function pgvTasks() {
+  const t = today(), wkNow = pgMon(t), lastDue = ymd(addDays(parse(wkNow), -7)), out = [];
+  const sn = k => (PG.st?.secs.find(x => x.key === k) || {}).title || k;
+  PGV.data.forEach(r => {
+    const c = S.clients.find(x => x.id === r.client_id); if (!c || c.status === 'Inactive') return;
+    const base = { cid: r.client_id, name: r.name || c.name, loc: c.location || '' };
+    if (!r.last_weight || r.last_weight < ymd(addDays(parse(t), -7))) out.push({ ...base, k: 'weight', ref: wkNow, what: 'Напомни да се претегли', sub: r.last_weight ? 'последно тегло ' + fmt(r.last_weight) : 'още няма записано тегло', pr: 2 });
+    if (!r.last_checkin || r.last_checkin < lastDue) out.push({ ...base, k: 'checkin', ref: lastDue, what: 'Свържи се за седмичния чек-ин', sub: r.last_checkin ? 'последен ' + pgDm(r.last_checkin) : 'още няма чек-ин', pr: 2 });
+    const done = r.tests_done || [], next = [1, 2, 3].find(n => !done.includes(n));
+    if (next && r.start_date) { const due = ymd(addDays(parse(r.start_date), [0, 42, 84][next - 1])); if (due <= ymd(addDays(parse(t), 7))) out.push({ ...base, k: 'test', ref: 't' + next, what: `Направи тест ${next}`, sub: (due < t ? 'просрочен · бил е до ' : 'до ') + fmt(due), pr: due < t ? 0 : 1 }); }
+    if ((r.high_sections || []).length) out.push({ ...base, k: 'high', ref: 'h' + (r.last_test || 0), what: 'Прегледай плана — висок приоритет', sub: r.high_sections.map(sn).join(', '), pr: 1 });
+  });
+  return out;
+}
+const PGK = [['all', 'Всички'], ['weight', 'Тегло'], ['checkin', 'Чек-ин'], ['test', 'Тестове'], ['high', 'Висок приоритет']];
+function pgvRender() {
+  const main = $('#main'); if (!main) return;
+  const all = pgvTasks().filter(x => D.pgl === 'all' || x.loc === D.pgl);
+  const key = x => `${x.cid}|${x.k}|${x.ref}`, isDone = x => PGV.done.has(key(x));
+  const cnt = k => all.filter(x => !isDone(x) && (k === 'all' || x.k === k)).length;
+  const shown = all.filter(x => D.pgk === 'all' || x.k === D.pgk);
+  const todo = shown.filter(x => !isDone(x)).sort((a, b) => a.pr - b.pr || a.name.localeCompare(b.name, 'bg')), dn = shown.filter(isDone);
+  const row = x => `<div class="bk ptask"><label style="display:flex;align-items:center;gap:10px;flex:1;min-width:240px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px" data-act="ptoggle" data-c="${x.cid}" data-k="${x.k}" data-r="${esc(x.ref)}" ${isDone(x) ? 'checked' : ''}><span><b>${esc(x.name)}</b> <span class="mute">· ${esc(x.loc)}</span><br>${esc(x.what)} <span class="mute">— ${esc(x.sub)}</span></span></label><button class="sm" data-act="pgopen" data-id="${x.cid}">Отвори прогреса</button></div>`;
+  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="mute">${PGV.data.length} клиента с включен модул</span><span class="sp"></span>
+    <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+    ${PGV.ok ? '' : '<div class="card" style="margin-bottom:12px;border-color:var(--bad)">Отмятането още не е включено (липсва таблицата за задачи). Списъкът се вижда, но отметките няма да се запазват.</div>'}
+    <div class="chips">${PGK.map(([k, l]) => `<button class="${D.pgk === k ? 'on' : ''}" data-act="pgkind" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
+    <div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 6px">За вършене · ${todo.length}</h3>${todo.map(row).join('') || '<div class="mute">Всичко е свършено. 🎉</div>'}</div>
+    ${dn.length ? `<details class="card"><summary style="cursor:pointer;font-weight:600">Свършени · ${dn.length}</summary>${dn.map(row).join('')}</details>` : ''}
+    <div class="mute" style="margin-top:10px">Задачите се обновяват сами: ново тегло или чек-ин от клиента ги затваря, а всяка седмица се появяват нови. Отметката „свършено“ важи за текущия период.</div>`;
+}
+async function pgvToggle(el) {
+  const row = { client_id: el.dataset.c, kind: el.dataset.k, ref: el.dataset.r }, k = `${row.client_id}|${row.kind}|${row.ref}`;
+  if (el.checked) { PGV.done.add(k); const { error } = await sb.from('progress_tasks').upsert({ ...row, done_by: S.me.row.id }, { onConflict: 'client_id,kind,ref' }); if (error) { PGV.done.delete(k); fail(error, 'Не се отметна'); } }
+  else { PGV.done.delete(k); const { error } = await sb.from('progress_tasks').delete().match(row); if (error) { PGV.done.add(k); fail(error, 'Не се върна'); } }
+  pgvRender();
+}
 /* ── Обобщение ── */
 async function dashView() {
-  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  loadMain();
   const cur = firstOf(today()), from = shiftM(cur, -10), to = shiftM(cur, 2);
   const dayA = new Date(D.day + 'T00:00:00'), dayB = new Date(dayA.getTime() + 864e5);
   const [m, bal, tr, act] = await Promise.all([
@@ -1360,7 +1429,7 @@ async function dashView() {
 /* ── Пакети ── */
 const UNITS = { weeks: 'седмици', months: 'месеца' };
 async function packagesView() {
-  $('#main').innerHTML = '<div class="mute">Зареждане…</div>';
+  loadMain();
   S.pstat = await loadPstat(); drawPackages();
 }
 function drawPackages() {
@@ -2286,26 +2355,6 @@ document.addEventListener('change', e => { const el = e.target.closest('[data-pg
 document.addEventListener('input', e => { const el = e.target; if (el.dataset && el.dataset.pgsl) { el.dataset.set = '1'; const o = document.getElementById(el.dataset.pgsl); if (o) o.textContent = el.value; } });
 
 /* ── служебен сайт: списък „Прогрес“ в Обобщение и прагове ── */
-async function pgDashHtml() {
-  await pgStatic().catch(() => { });
-  const { data, error } = await sb.rpc('progress_overview'); if (error || !data) return '';
-  const t = today(), wkNow = pgMon(t), lastDue = ymd(addDays(parse(wkNow), -7));
-  const noW = [], noC = [], tests = [], high = [];
-  data.forEach(r => {
-    if (!r.last_weight || r.last_weight < ymd(addDays(parse(t), -7))) noW.push(r);
-    if (!r.last_checkin || r.last_checkin < lastDue) noC.push(r);
-    const done = r.tests_done || [], next = [1, 2, 3].find(n => !done.includes(n));
-    if (next && r.start_date) { const due = ymd(addDays(parse(r.start_date), [0, 42, 84][next - 1])); if (due <= ymd(addDays(parse(t), 7))) tests.push({ ...r, next, due }); }
-    if ((r.high_sections || []).length) high.push(r);
-  });
-  const L = (rows, f) => rows.length ? rows.slice(0, 40).map(r => `<div class="bk"><div class="nm"><a href="#" data-act="pgopen" data-id="${r.client_id}">${esc(r.name)}</a> <span class="mute">${esc(f(r))}</span></div></div>`).join('') : '<div class="mute">Няма.</div>';
-  const sn = k => (PG.st?.secs.find(s => s.key === k) || {}).title || k;
-  return `<div class="card" style="margin-top:14px"><h3 style="margin-top:0">Прогрес на клиентите <span class="mute">(${data.length} с включен модул)</span></h3>
-    <div class="grid2"><div><h3>Без тегло над 7 дни (${noW.length})</h3>${L(noW, r => r.last_weight ? 'последно ' + fmt(r.last_weight) : 'още няма')}</div>
-    <div><h3>Пропуснат чек-ин (${noC.length})</h3>${L(noC, r => r.last_checkin ? 'последен ' + pgDm(r.last_checkin) : 'още няма')}</div>
-    <div><h3>Предстои тест (${tests.length})</h3>${L(tests, r => `Тест ${r.next} · до ${fmt(r.due)}`)}</div>
-    <div><h3>ВИСОК приоритет (${high.length})</h3>${L(high, r => `Тест ${r.last_test}: ` + r.high_sections.map(sn).join(', '))}</div></div></div>`;
-}
 async function pgSettingsHtml() {
   PG.st = null; const st = await pgStatic();
   return `<p class="mute">Прагове за приоритет в въпросника. Точки ≥ „ВИСОК от“ → ВИСОК; над „НИСЪК до“ → СРЕДЕН; иначе НИСЪК. Общите прагове са сума от разделите.</p>
@@ -2350,6 +2399,9 @@ document.addEventListener('click', async e => {
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
       case 'kper': D.kper = el.dataset.p; kpiView(); break;
       case 'ktr': D.ktr = el.dataset.u; kpiView(); break;
+      case 'ptoggle': pgvToggle(el); break;
+      case 'pgloc': D.pgl = el.dataset.l; pgvRender(); break;
+      case 'pgkind': D.pgk = el.dataset.k; pgvRender(); break;
       case 'kheat': D.kheat = el.dataset.l || null; kpiView(); break;
       case 'kloc': D.kloc = el.dataset.l; kpiView(); break;
       case 'kchart': D.kchart = el.dataset.k; kpiView(); break;
