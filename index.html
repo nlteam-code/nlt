@@ -407,6 +407,12 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .pg-up{font-size:13px;font-weight:700;color:var(--pg-acc);cursor:pointer;padding:6px 10px}
 .pg-cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 @media(max-width:380px){.pg-wf{grid-template-columns:1fr 1fr}.pg-wf .pg-btn{grid-column:1/3}}
+/* дата във формат ДД/ММ/ГГГГ върху стандартното поле */
+.dwrap{position:relative;display:inline-block;min-width:0}
+.dwrap>input[type=date]{width:100%;color:transparent}
+.dwrap>input[type=date]::-webkit-datetime-edit{opacity:0}
+.dwrap>.dtxt{position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:inherit;font:inherit;white-space:nowrap}
+.dwrap>.dtxt.ph{opacity:.5}
 </style>
 </head>
 <body>
@@ -436,7 +442,8 @@ const monday = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.ge
 const hm = t => String(t || '').slice(0, 5);
 const mins = t => { const [h, m] = hm(t).split(':').map(Number); return h * 60 + m; };
 const fromMins = n => `${pad(Math.floor(n / 60))}:${pad(n % 60)}`;
-const fmt = s => s ? parse(s).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const dmy = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+const fmt = s => s ? dmy(parse(String(s).slice(0, 10))) : '';
 const fmtLong = s => parse(s).toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' });
 const money = n => `${Number(n || 0).toFixed(2).replace(/\.00$/, '')} €`;
 const today = () => ymd(new Date());
@@ -1123,7 +1130,7 @@ function pkgChip(p) {
   if (!p) return '<span class="chip">без пакет</span>';
   const left = p.total - p.used, days = Math.round((parse(p.end_date) - parse(today())) / 864e5);
   const cls = left <= 0 ? 'bad' : (left <= 1 || days <= 3) ? 'warn' : 'ok';
-  return `<span class="chip ${cls}">${left}/${p.total} ${p.kind === 'solo' ? 'перс.' : 'груп.'} · до ${parse(p.end_date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'numeric' })}</span>`;
+  return `<span class="chip ${cls}">${left}/${p.total} ${p.kind === 'solo' ? 'перс.' : 'груп.'} · до ${fmt(p.end_date)}</span>`;
 }
 async function clientsView() {
   loadMain();
@@ -3006,6 +3013,29 @@ document.addEventListener('input', e => { if (e.target.id === 'wq') { S.wq = e.t
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.open()) modal.close(); });
 
 if (location.hash.includes('type=recovery')) loginView('', 'recovery'); else boot();
+
+// ДД/ММ/ГГГГ за всички полета за дата (стойността остава ГГГГ-ММ-ДД)
+(function () {
+  const txt = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+  const upd = i => { const t = i.parentNode && i.parentNode.querySelector(':scope>.dtxt'); if (!t) return; const s = txt(i.value); if (t.textContent !== (s || 'дд/мм/гггг')) t.textContent = s || 'дд/мм/гггг'; t.classList.toggle('ph', !s); };
+  const wrap = i => {
+    if (i.dataset.dw) return; i.dataset.dw = 1;
+    const cs = getComputedStyle(i), col = cs.color, w = document.createElement('span'); w.className = 'dwrap';
+    if (cs.display === 'block' || cs.width === (i.parentNode && getComputedStyle(i.parentNode).width)) w.style.display = 'block';
+    if (cs.flexGrow && cs.flexGrow !== '0') w.style.flex = cs.flex;
+    if (i.style.width) { w.style.width = i.style.width; }
+    w.style.margin = cs.margin; i.style.margin = '0';
+    i.parentNode.insertBefore(w, i); w.appendChild(i);
+    const t = document.createElement('span'); t.className = 'dtxt'; t.style.color = col; w.appendChild(t);
+    ['input', 'change', 'blur'].forEach(e => i.addEventListener(e, () => upd(i)));
+    i.addEventListener('click', () => { try { i.showPicker && i.showPicker(); } catch (e) { } });
+    upd(i);
+  };
+  const scan = () => document.querySelectorAll('input[type=date]').forEach(i => { if (!i.dataset.dw) wrap(i); else upd(i); });
+  new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
+  setInterval(() => document.querySelectorAll('input[type=date][data-dw]').forEach(upd), 400);
+  document.addEventListener('DOMContentLoaded', scan); scan();
+})();
 </script>
 </body>
 </html>
