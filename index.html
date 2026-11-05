@@ -197,6 +197,23 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-hello span{color:var(--c-mute);font-size:15px;font-weight:500}
 .c-hello b{font:800 32px Montserrat,sans-serif;letter-spacing:-.02em;margin-top:2px}
 .c-title{font:800 28px Montserrat,sans-serif;letter-spacing:-.02em;margin:4px 0 0}
+.ev .tick{float:right;margin-left:4px;width:15px;height:15px;border-radius:50%;background:#2fb36d;color:#fff;font:700 10px/15px Roboto,sans-serif;text-align:center}
+.c-seg{position:relative;display:flex;padding:3px;border-radius:14px;background:var(--c-ringbg)}
+.c-seg button{position:relative;z-index:1;flex:1;border:0;background:none;padding:9px 6px;font:600 14px Roboto,sans-serif;color:var(--c-mute);cursor:pointer;transition:color .25s}
+.c-seg button.on{color:var(--c-ink)}
+.c-seg i{position:absolute;top:3px;left:3px;width:calc(50% - 3px);height:calc(100% - 6px);border-radius:11px;background:var(--c-card);box-shadow:0 1px 3px rgba(20,28,40,.12),0 3px 10px rgba(20,28,40,.08);transition:transform .32s cubic-bezier(.3,.9,.3,1)}
+.c-plans{display:grid;gap:12px}
+.c-plan{position:relative;border-radius:28px;padding:20px 20px 18px;color:#fff;overflow:hidden;background:radial-gradient(90% 80% at 100% 0%,rgba(235,76,81,.22) 0%,rgba(235,76,81,0) 60%),linear-gradient(160deg,#343d4d 0%,#262d38 55%,#1b2028 100%);box-shadow:0 12px 30px rgba(38,45,56,.28)}
+.c-plan.hot{background:radial-gradient(120% 90% at 100% 0%,rgba(235,76,81,.75) 0%,rgba(235,76,81,0) 62%),radial-gradient(90% 70% at 0% 100%,rgba(244,132,96,.25) 0%,rgba(244,132,96,0) 60%),linear-gradient(160deg,#343d4d 0%,#262d38 55%,#1b2028 100%);box-shadow:0 0 0 1.5px rgba(235,76,81,.85),0 18px 40px rgba(235,76,81,.28)}
+.c-plan-n{font:800 22px Montserrat,sans-serif;letter-spacing:-.02em}
+.c-plan-k{font-size:14px;color:rgba(255,255,255,.66);margin-top:2px}
+.c-price{display:flex;align-items:baseline;gap:6px;margin-top:16px}
+.c-price b{font:800 44px Montserrat,sans-serif;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
+.c-price span{font-size:14px;color:rgba(255,255,255,.66)}
+.c-badge{position:absolute;top:16px;right:16px;font:700 11px Roboto,sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:#fff;background:linear-gradient(135deg,var(--c-coral),#f0645f);box-shadow:0 4px 12px rgba(235,76,81,.4)}
+.c-plan.c-single{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.c-plan.c-single .c-price{margin-top:0}
+.c-plan.c-single .c-price b{font-size:36px;color:var(--c-coral)}
 .c-h{font:700 12px Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--c-mute);margin:6px 0 -6px}
 .c-mute{color:var(--c-mute)}
 .c-hero{position:relative;overflow:hidden;color:#fff;border-radius:32px;padding:24px 22px 20px;background:radial-gradient(120% 90% at 100% 0%,rgba(235,76,81,.62) 0%,rgba(235,76,81,0) 58%),radial-gradient(90% 70% at 0% 100%,rgba(244,132,96,.22) 0%,rgba(244,132,96,0) 60%),linear-gradient(160deg,#343d4d 0%,#262d38 55%,#1b2028 100%);box-shadow:0 18px 40px rgba(38,45,56,.35)}
@@ -292,6 +309,7 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-pk-f{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}
 .c-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));width:min(calc(100% - 28px),460px);display:flex;padding:6px;border-radius:28px;background:var(--c-nav);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);border:1px solid var(--c-line);box-shadow:0 12px 36px rgba(0,0,0,.22);z-index:10}
 .c-nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font:600 11px Roboto,sans-serif;color:var(--c-mute);padding:9px 2px 8px;border-radius:22px;cursor:pointer;transition:background .2s,color .2s}
+.c-nav button span{white-space:nowrap;font-size:10.5px;letter-spacing:-.01em}
 .c-nav button.on{color:var(--c-coral);background:rgba(235,76,81,.12)}
 .c-sheet-ov{position:fixed;inset:0;background:rgba(8,11,16,.5);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:30;display:flex;align-items:flex-end;justify-content:center;animation:c-fade .2s}
 @keyframes c-fade{from{opacity:0}}
@@ -541,6 +559,8 @@ async function staffApp() {
   ]);
   if (c.error || p.error || s.error) return fail(c.error || p.error || s.error, 'Грешка при зареждане');
   S.clients = c.data; S.packages = p.data; S.staff = s.data;
+  try { await sb.rpc('charge_started'); } catch (e) { }
+  if (!window.__chargeT) window.__chargeT = setInterval(async () => { try { const r = await sb.rpc('charge_started'); if (!$('#grid')) return; if (!r.error && r.data > 0 && S.tab === 'week' && !document.querySelector('.modal.on, dialog[open]')) weekView(); else drawGrid(); } catch (e) { } }, 60000);
   try { const rr = await sb.rpc('auto_renew_sync'); if (!rr.error && rr.data > 0) S.pstat = null; } catch (e) { }
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
@@ -552,7 +572,7 @@ function renderStaff() {
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
     <div class="tabs">
-      ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес'], ['tasks', 'Задачи'], ['rewards', 'Награди'], ['packages', 'Пакети'], ['team', 'Служители']]).concat(S.owner ? [['reports', 'Отчети']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
+      ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Задачи'], ['rewards', 'Награди']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['reports', 'Отчети']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <select id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
@@ -959,10 +979,11 @@ function drawGrid() {
       const names = act.map(b => cname(b.client_id).split(' ')[0] + ' ' + (cname(b.client_id).split(' ')[1] || '')[0] + '.').join(', ');
       const full = e.kind === 'group' && e.capacity && act.length >= e.capacity;
       const top = (s - h0 * 60) / 60 * HH, hgt = Math.max(((e.duration_min || 60) / 60) * HH - 2, 18);
+      const charged = !e.cancelled && act.length && new Date(`${e.date}T${hm(e.start_time)}:00`) <= new Date();
       const label = e.kind === 'solo' ? (act.length ? esc(act.map(b => cname(b.client_id)).join(', ')) : '<span class="n">свободен</span>') : `${esc(e.title || 'Групов час')}`;
       return `<div class="ev ${e.kind === 'solo' ? 'solo' : ''} ${e.cancelled ? 'cx' : ''} ${full ? 'full' : ''}" draggable="true" data-act="sess" data-id="${e.id}"
         style="top:${top}px;height:${hgt}px;left:calc(${col / n * 100}% + 1px);width:calc(${100 / n}% - 3px)" title="${esc(names)}">
-        <b>${hm(e.start_time)}</b> ${label}${e.kind === 'group' ? ` <span class="n">${act.length}${e.capacity ? '/' + e.capacity : ''}</span>` : ''}</div>`;
+        ${charged ? '<span class="tick" title="Проведена и таксувана">✓</span>' : ''}<b>${hm(e.start_time)}</b> ${label}${e.kind === 'group' ? ` <span class="n">${act.length}${e.capacity ? '/' + e.capacity : ''}</span>` : ''}</div>`;
     }).join('');
     return `<div class="day"><div class="dh ${ds === today() ? 'today' : ''}">${d.toLocaleDateString('bg-BG', { weekday: 'short', day: 'numeric', month: 'numeric' })}</div>
       <div class="body" data-act="slot" data-date="${ds}" data-h0="${h0}" style="height:${total}px">${lines}${html}</div></div>`;
@@ -2068,6 +2089,7 @@ const LOGO_URL = 'https://newleveltraining.bg/wp-content/uploads/nltlogo-new.png
 const logoHtml = h => `<img class="c-logoimg" src="${LOGO_URL}" alt="NLT Personal Training Club" style="height:${h}px" onerror="this.outerHTML='<span class=&quot;c-logo&quot;>NLT</span>'">`;
 const ICO = {
   home: '<path d="M3.5 11 12 3.8 20.5 11"/><path d="M5.5 9.6V20h13V9.6"/><path d="M10 20v-5.5h4V20"/>',
+  tag: '<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.3 6.3a1.4 1.4 0 0 1-2 0z"/><circle cx="8" cy="8" r="1.6"/>',
   plus: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
   cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M8 3v4M16 3v4M3.5 10.5h17"/>',
   calplus: '<rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M8 3v4M16 3v4M3.5 10.5h17M12 13.5v4.5M9.75 15.75h4.5"/>',
@@ -2312,11 +2334,27 @@ function clientAsk(sid) {
     <button class="c-btn solid wide" data-act="cbook" data-id="${sid}">Запиши ме</button>
     <button class="c-btn plain wide" data-act="csheetx">Отказ</button>`);
 }
+const SVC = {
+  single: [['Еднократно посещение', 'в група', 33], ['Еднократно посещение', '1:1 коучинг', 37]],
+  plans: [['Стартиращ', 8, 245, 275, ''], ['Ентусиаст', 12, 320, 360, 'Най-избиран'], ['Трансформация', 16, 415, 440, '']]
+};
+function clientServices() {
+  const g = (C.svcMode || 'group') === 'group';
+  return `<h2 class="c-title">Услуги</h2>
+  <div class="c-seg" role="tablist"><button class="${g ? 'on' : ''}" data-act="csvc" data-m="group">В група</button><button class="${g ? '' : 'on'}" data-act="csvc" data-m="solo">1:1 коучинг</button><i style="transform:translateX(${g ? 0 : 100}%)"></i></div>
+  <h3 class="c-h">Месечни абонаменти</h3>
+  <div class="c-plans">${SVC.plans.map(([n, k, pg, ps, badge]) => `<section class="c-plan ${badge ? 'hot' : ''}">${badge ? `<span class="c-badge">${badge}</span>` : ''}
+    <div class="c-plan-n">${n}</div><div class="c-plan-k">${k} тренировки месечно</div>
+    <div class="c-price"><b>${g ? pg : ps}</b><span>€ / месец</span></div></section>`).join('')}</div>
+  <h3 class="c-h">Еднократно посещение</h3>
+  ${(([n, s, pr]) => `<section class="c-plan c-single"><div><div class="c-plan-n">${n}</div><div class="c-plan-k">${s}</div></div><div class="c-price"><b>${pr}</b><span>€</span></div></section>`)(SVC.single[g ? 0 : 1])}
+  <div class="c-note" style="text-align:center">За абонамент или въпроси — питай треньора си в залата.</div>`;
+}
 function renderClient() {
   closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
-  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? progLocked() : clientHome(me, t, act);
-  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['prog', 'chart', 'Прогрес']];
+  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? progLocked() : C.tab === 'svc' ? clientServices() : clientHome(me, t, act);
+  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['svc', 'tag', 'Услуги'], ['prog', 'chart', 'Прогрес']];
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
     <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
@@ -2782,6 +2820,7 @@ document.addEventListener('click', async e => {
       case 'skippw': boot(); break;
       case 'othermail': S.otpEmail = ''; loginView('', 'code'); break;
       case 'cnav': C.tab = el.dataset.t; renderClient(); window.scrollTo(0, 0); break;
+      case 'csvc': C.svcMode = el.dataset.m; renderClient(); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
       case 'cask': clientAsk(el.dataset.id); break;
       case 'csheetx': closeSheet(); break;
