@@ -51,7 +51,7 @@ h3{margin:16px 0 6px;font-size:14px}
 .hl.half{border-top-style:dotted;opacity:.6}
 .ev{position:absolute;border-radius:7px;padding:2px 5px;font-size:11.5px;line-height:1.25;overflow:hidden;cursor:pointer;background:var(--grp);border:1px solid var(--grp-b);border-left-width:4px}
 .ev.solo{background:var(--solo);border-color:var(--solo-b)}
-.ev.cx{opacity:.45;text-decoration:line-through}
+.ev.evcx{opacity:.45;text-decoration:line-through}
 .ev b{font-weight:700}
 .ev .n{color:var(--mute)}
 .ev.full .n{color:var(--bad);font-weight:600}
@@ -992,7 +992,7 @@ function drawGrid() {
       const top = (s - h0 * 60) / 60 * HH, hgt = Math.max(((e.duration_min || 60) / 60) * HH - 2, 18);
       const charged = !e.cancelled && act.length && new Date(`${e.date}T${hm(e.start_time)}:00`) <= new Date();
       const label = e.kind === 'solo' ? (act.length ? esc(act.map(b => cname(b.client_id)).join(', ')) : '<span class="n">свободен</span>') : `${esc(e.title || 'Групов час')}`;
-      return `<div class="ev ${e.kind === 'solo' ? 'solo' : ''} ${e.cancelled ? 'cx' : ''} ${full ? 'full' : ''}" draggable="true" data-act="sess" data-id="${e.id}"
+      return `<div class="ev ${e.kind === 'solo' ? 'solo' : ''} ${e.cancelled ? 'evcx' : ''} ${full ? 'full' : ''}" draggable="true" data-act="sess" data-id="${e.id}"
         style="top:${top}px;height:${hgt}px;left:calc(${col / n * 100}% + 1px);width:calc(${100 / n}% - 3px)" title="${esc(names)}">
         ${charged ? '<span class="tick" title="Проведена и таксувана">✓</span>' : ''}<b>${hm(e.start_time)}</b> ${label}${e.kind === 'group' ? ` <span class="n">${act.length}${e.capacity ? '/' + e.capacity : ''}</span>` : ''}</div>`;
     }).join('');
