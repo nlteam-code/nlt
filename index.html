@@ -254,6 +254,7 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-warn i{width:8px;height:8px;border-radius:50%;background:var(--c-coral);margin-top:6px;flex:none}
 .c-warn span{color:var(--c-mute)}
 .c-list{padding:4px 18px}
+.c-vrow{display:flex;gap:14px;align-items:center;padding:11px 0;border-bottom:1px solid var(--c-line)}.c-vrow:last-child{border-bottom:0}.c-vrow>b{flex:none;width:92px;font-variant-numeric:tabular-nums}
 .c-sess{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--c-line)}
 .c-sess:last-of-type{border-bottom:0}
 .c-when{width:60px;flex:none}
@@ -2030,10 +2031,15 @@ async function clientApp() {
     mq, wq
   ]);
   try {
-    const [ch, py, dv, hvv] = await Promise.all([sb.from('charges').select('date,amount,note').eq('client_id', me.id), sb.from('payments').select('date,amount,method,note').eq('client_id', me.id), sb.from('bookings').select('sessions!inner(date,kind)').eq('client_id', me.id).eq('status', 'done'), sb.from('hist_visits').select('date,status').eq('client_id', me.id).limit(1000)]);
+    const [ch, py, dv, hvv] = await Promise.all([sb.from('charges').select('date,amount,note').eq('client_id', me.id), sb.from('payments').select('date,amount,method,note').eq('client_id', me.id), sb.from('bookings').select('sessions!inner(date,kind)').eq('client_id', me.id).eq('status', 'done'), sb.from('hist_visits').select('date,status,title').eq('client_id', me.id).limit(1000)]);
     C.chs = ch.data || []; C.pays = py.data || []; C.done = (dv.data || []).filter(x => x.sessions).map(x => ({ date: x.sessions.date, kind: x.sessions.kind }));
     (hvv.data || []).filter(h => !/cancel|no.?show|late/i.test(h.status || '')).forEach(h => C.done.push({ date: h.date }));
-  } catch (e) { C.chs = []; C.pays = []; C.done = []; }
+    const c3 = since3m();
+    const rv = await sb.from('bookings').select('status,late,sessions!inner(date,start_time,title,location,kind)').eq('client_id', me.id).gte('sessions.date', c3).lte('sessions.date', t);
+    C.recent = (rv.data || []).filter(b => b.sessions && (b.status === 'done' || (b.status === 'cancelled' && b.late))).map(b => ({ date: b.sessions.date, time: hm(b.sessions.start_time), title: b.sessions.title || (b.sessions.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'), loc: b.sessions.location || '', late: b.status === 'cancelled' }))
+      .concat((hvv.data || []).filter(h => h.date >= c3 && h.date <= t && !/cancel|no.?show/i.test(h.status || '')).map(h => ({ date: h.date, time: '', title: h.title || 'Тренировка', loc: '', late: /late/i.test(h.status || '') })))
+      .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  } catch (e) { C.chs = []; C.pays = []; C.done = []; C.recent = []; }
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
   C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {};
@@ -2311,7 +2317,7 @@ function subHistory(pkgs, visits, money, edit) {
   return `<div class="tl">${ev.map(e => `<div class="tl-i"><i style="background:${col[e.k]}"></i><div><div class="tl-d">${fmt(e.d)}</div><b>${e.t}</b>${e.s ? `<div class="tl-s">${esc(e.s)}</div>` : ''}</div>${edit && e.id ? `<button class="sm" style="margin-left:auto;align-self:center" data-act="tledit" data-ty="${e.ty}" data-id="${e.id}">Редактирай</button>` : ''}</div>`).join('') || '<div class="mute">Няма записи.</div>'}</div>`;
 }
 function clientPkg(t, act) {
-  const old = C.pkgs.filter(p => p.end_date < t);
+  const old = C.pkgs.filter(p => p.end_date < t && p.end_date >= since3m());
   const card = p => { const left = Math.max(0, p.total - p.used), pct = p.total ? Math.min(100, p.used / p.total * 100) : 0, on = p.end_date >= t;
     return `<section class="c-card c-pk"><div class="c-pk-h"><b>${esc(p.package_name || 'Абонамент')}</b><span class="c-chip ${on ? 'ok' : ''}">${on ? 'активен' : 'изтекъл'}</span></div>
     <div class="c-bar"><i style="width:${pct}%"></i></div>
@@ -2323,12 +2329,15 @@ function clientPkg(t, act) {
   ${old.length ? `<h3 class="c-h">Изтекли</h3>${old.slice(0, 5).map(card).join('')}` : ''}
   ${clientHistory()}`;
 }
+function since3m() { const d = new Date(); d.setMonth(d.getMonth() - 3); return ymd(d); }
 function clientHistory() {
-  const fin = C.cv.showFinance !== false, chs = C.chs || [], pays = C.pays || [];
+  const fin = C.cv.showFinance !== false, chs = C.chs || [], pays = C.pays || [], c3 = since3m();
   const sumPk = (C.pkgs || []).reduce((a, p) => a + Number(p.price || 0), 0), sumCh = chs.reduce((a, x) => a + Number(x.amount), 0), sumPay = pays.reduce((a, x) => a + Number(x.amount), 0), bal = Math.round((sumPk + sumCh - sumPay) * 100) / 100;
-  return `<h3 class="c-h">История</h3><section class="c-card">
-    ${fin ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><div><span class="c-mute">Начислено</span><br><b>${eur(sumPk + sumCh)}</b></div><div><span class="c-mute">Платено</span><br><b>${eur(sumPay)}</b></div><div><span class="c-mute">${bal > 0 ? 'Дължимо' : bal < 0 ? 'В кредит' : 'Баланс'}</span><br><b>${eur(Math.abs(bal))}</b></div></div>` : ''}
-    ${subHistory(C.pkgs, C.done, fin ? { pays, chs } : null)}</section>`;
+  const pays3 = pays.filter(x => x.date >= c3), chs3 = chs.filter(x => x.date >= c3), pk3 = (C.pkgs || []).filter(p => p.end_date >= c3), rec = C.recent || [];
+  const visits = `<h3 class="c-h">Посещения · последните 3 месеца</h3><section class="c-card c-list">${rec.length ? rec.map(v => `<div class="c-vrow"><b>${fmt(v.date)}</b><div><div class="c-st">${esc(v.title)}</div><div class="c-ss">${[v.time, v.loc, v.late ? 'късен отказ' : ''].filter(Boolean).map(esc).join(' · ')}</div></div></div>`).join('') : '<div class="c-mute" style="padding:12px 0">Няма посещения през последните 3 месеца.</div>'}</section>`;
+  return `${visits}<h3 class="c-h">${fin ? 'Плащания и абонаменти' : 'Абонаменти'} · последните 3 месеца</h3><section class="c-card">
+    ${fin ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><div><span class="c-mute">Платено за 3 месеца</span><br><b>${eur(pays3.reduce((a, x) => a + Number(x.amount), 0))}</b></div><div><span class="c-mute">${bal > 0 ? 'Дължимо' : bal < 0 ? 'В кредит' : 'Баланс'}</span><br><b>${eur(Math.abs(bal))}</b></div></div>` : ''}
+    ${subHistory(pk3, C.done, fin ? { pays: pays3, chs: chs3 } : null)}</section>`;
 }
 function clientProfile() {
   const me = S.me.row;
