@@ -1205,7 +1205,7 @@ async function openClient(id, tab) {
       <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент, иначе Чакащ)'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => `<option value="${v}" ${v === (x.status === 'Lead' ? 'Active' : x.status) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     </div>
     <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
-    <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button></div>
+    <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button>${S.owner ? '<button class="sm" style="margin-left:auto;color:var(--bad);border-color:var(--bad)" data-act="cdel">Изтрий клиента</button>' : ''}</div>
     ${S.owner ? `<div class="mute" style="margin-top:10px">Баланс: <b style="color:${bal > 0 ? 'var(--bad)' : 'var(--ok)'}">${bal > 0 ? 'Дължимо ' + money(bal) : bal < 0 ? 'Аванс ' + money(-bal) : 'Изравнено'}</b></div>` : ''}
     </div>
 
@@ -2887,6 +2887,11 @@ document.addEventListener('click', async e => {
       case 'cltab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=cltab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; if (el.dataset.t === 'prog' && !$('#pg-staff').dataset.on) { $('#pg-staff').dataset.on = 1; pgBoot(true, $('#cl').dataset.cid, 'pg-staff', $('#cl').dataset.uid); } break; }
       case 'client': S.ctab = 'profile'; modal.show('<div class="mute">Зареждане…</div>', true); await openClient(el.dataset.id); break;
       case 'csave': await saveClient(); break;
+      case 'cdel': { const id = cid(), nm = cname(id); if (!S.owner || !id) break;
+        if (!confirm(`Да изтрия ли окончателно ${nm}?\n\nИзтриват се и всичките му записвания, абонаменти, такси и профилът за вход. Това не може да се върне.\n\nАко само е спрял да идва, по-добре сложи статус „Неактивен“.`)) break;
+        const { error } = await sb.rpc('delete_client', { p_id: id });
+        if (error) { if (/плащания/.test(error.message || '')) return toast(error.message); return fail(error, 'Не се изтри'); }
+        S.clients = S.clients.filter(c => c.id !== id); modal.close(); toast(`${nm} е изтрит`); if (S.tab === 'clients') drawClients(); break; }
       case 'cinvite': { const em = ($('#c-email')?.value || '').trim(); if (!confirm(`Да изпратя имейл с код за вход до ${em}?`)) break; await sendInvite(em); break; }
       case 'cpadd': await addPackage(); break;
       case 'cpauto': await sb.from('client_packages').update({ auto_renew: el.dataset.on !== '1' }).eq('id', el.dataset.id); await afterClient(); toast(el.dataset.on === '1' ? 'Автоматичното подновяване е спряно' : 'Автоматичното подновяване е включено'); break;
