@@ -569,6 +569,7 @@ async function staffApp() {
 function renderStaff() {
   document.body.classList.remove('cm');
   const admin = S.me.row.role === 'admin';
+  { const okLocs = LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)); if (okLocs.length && !okLocs.includes(S.loc)) { S.loc = okLocs[0]; S.cloc = S.loc; } }
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
     <div class="tabs">
