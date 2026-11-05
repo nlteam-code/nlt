@@ -1,13 +1,15 @@
 <!doctype html>
 <html lang="bg">
 <head>
+<meta name="color-scheme" content="dark"><meta name="theme-color" content="#11151b">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,600;0,700;0,800;0,900;1,900&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <title>NLT Personal Training Club</title>
 <style>
+:root{color-scheme:dark}
 :root{--bg:#f2f3f7;--card:#fff;--ink:#1d2430;--mute:#6a7482;--line:#e8ebf0;--acc:#eb4c51;--acc-ink:#fff;--navy:#262d38;--org:#f48460;--grp:rgba(38,45,56,.07);--grp-b:#262d38;--solo:rgba(235,76,81,.11);--solo-b:#eb4c51;--warn:#b4531d;--warn-bg:#fff0e6;--bad:#d1363c;--ok:#0f8a5f;--shadow:0 1px 2px rgba(20,28,40,.05),0 12px 32px rgba(20,28,40,.10);--sh:0 1px 2px rgba(20,28,40,.04),0 8px 24px rgba(20,28,40,.06)}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#11151b;--card:#1a1f27;--ink:#f3f5f8;--mute:#97a1af;--line:rgba(255,255,255,.09);--acc:#f0575c;--acc-ink:#fff;--grp:rgba(255,255,255,.08);--grp-b:#9aa6b8;--solo:rgba(240,87,92,.18);--solo-b:#f0575c;--warn:#ffb27d;--warn-bg:#3a2417;--bad:#ff7b81;--ok:#58d39b;--shadow:0 12px 36px rgba(0,0,0,.5);--sh:0 8px 24px rgba(0,0,0,.35)}}
+@media all{:root:not([data-theme=light]){--bg:#11151b;--card:#1a1f27;--ink:#f3f5f8;--mute:#97a1af;--line:rgba(255,255,255,.09);--acc:#f0575c;--acc-ink:#fff;--grp:rgba(255,255,255,.08);--grp-b:#9aa6b8;--solo:rgba(240,87,92,.18);--solo-b:#f0575c;--warn:#ffb27d;--warn-bg:#3a2417;--bad:#ff7b81;--ok:#58d39b;--shadow:0 12px 36px rgba(0,0,0,.5);--sh:0 8px 24px rgba(0,0,0,.35)}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -130,7 +132,7 @@ button.pri{background:linear-gradient(135deg,var(--acc),var(--org));border:0;col
 button.pri:hover{color:#fff;filter:brightness(1.06)}
 button.sm{border-radius:99px;padding:4px 11px;font-weight:500}
 .chips button.on,.seg button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .chips button.on,:root:not([data-theme=light]) .seg button.on{background:#fff;color:#11151b;border-color:#fff}}
+@media all{:root:not([data-theme=light]) .chips button.on,:root:not([data-theme=light]) .seg button.on{background:#fff;color:#11151b;border-color:#fff}}
 .chip{border:0;background:var(--bg);color:var(--mute);font-weight:500;padding:2px 10px}
 .chip.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
 .chip.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
@@ -171,7 +173,7 @@ svg .bcol{transition:opacity .15s}
 .chartw:hover .bcol{opacity:.45}.chartw .bcol:hover{opacity:1}
 /* ───── клиентски екран · NLT бранд ───── */
 :root{--c-bg:#f2f3f7;--c-card:#fff;--c-ink:#1d2430;--c-mute:#6a7482;--c-line:#e4e7ed;--c-navy:#262d38;--c-coral:#eb4c51;--c-orange:#f48460;--c-ringbg:rgba(38,45,56,.09);--c-nav:rgba(255,255,255,.82);--c-shadow:0 1px 2px rgba(20,28,40,.05),0 8px 24px rgba(20,28,40,.06)}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--c-bg:#11151b;--c-card:#1a1f27;--c-ink:#f3f5f8;--c-mute:#97a1af;--c-line:rgba(255,255,255,.09);--c-ringbg:rgba(255,255,255,.1);--c-nav:rgba(26,31,39,.78);--c-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px rgba(0,0,0,.35)}}
+@media all{:root:not([data-theme=light]){--c-bg:#11151b;--c-card:#1a1f27;--c-ink:#f3f5f8;--c-mute:#97a1af;--c-line:rgba(255,255,255,.09);--c-ringbg:rgba(255,255,255,.1);--c-nav:rgba(26,31,39,.78);--c-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px rgba(0,0,0,.35)}}
 :root[data-theme=dark]{--c-bg:#11151b;--c-card:#1a1f27;--c-ink:#f3f5f8;--c-mute:#97a1af;--c-line:rgba(255,255,255,.09);--c-ringbg:rgba(255,255,255,.1);--c-nav:rgba(26,31,39,.78);--c-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px rgba(0,0,0,.35)}
 body.cm{background:var(--c-bg);--bg:var(--c-bg);--card:var(--c-card);--ink:var(--c-ink);--mute:var(--c-mute);--line:var(--c-line);--acc:var(--c-coral);--acc-ink:#fff;font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 body.cm .md{border-radius:26px}
@@ -185,7 +187,7 @@ body.cm .login button.pri{min-height:50px;font-size:16px;border-radius:16px}
 .c-logo{font-family:Montserrat,sans-serif;font-weight:900;font-style:italic;letter-spacing:.04em;font-size:22px}
 .login .c-logoimg{margin:0 auto 6px;max-width:220px}
 body.cm:not(.x) .c-logoimg{filter:none}
-@media (prefers-color-scheme:light){:root:not([data-theme=dark]) .c-top .c-logoimg,:root:not([data-theme=dark]) .login .c-logoimg{background:var(--c-navy);padding:6px 12px;border-radius:12px}}
+@media not all{:root:not([data-theme=dark]) .c-top .c-logoimg,:root:not([data-theme=dark]) .login .c-logoimg{background:var(--c-navy);padding:6px 12px;border-radius:12px}}
 :root[data-theme=light] .c-top .c-logoimg,:root[data-theme=light] .login .c-logoimg{background:var(--c-navy);padding:6px 12px;border-radius:12px}
 .cx{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
 .c-top{display:flex;align-items:center;gap:10px;padding:max(14px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-left,0px)) 10px;position:sticky;top:0;z-index:5;background:linear-gradient(var(--c-bg) 70%,transparent)}
