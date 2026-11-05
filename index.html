@@ -1140,7 +1140,7 @@ function drawClients() {
   S.clist = list;
   $('#main').innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap">
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
-    <select id="cl"><option value="all">Двата обекта</option>${LOCS.map(l => `<option ${S.cloc === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <select id="cl-loc"><option value="all">Двата обекта</option>${LOCS.map(l => `<option ${S.cloc === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
     <select id="cf"><option value="all">Без друг филтър</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option><option value="mo" ${S.cfilter === 'mo' ? 'selected' : ''}>Само масажи</option></select>
     ${S.owner ? '<button data-act="cemails" title="Имейлите на показания списък, готови за скрито копие (BCC)">Имейли за писмо</button>' : ''}<button class="pri" data-act="newclient">+ Нов клиент</button></div>
     <div class="chips" style="margin-bottom:8px"><button class="${S.csts.length ? '' : 'on'}" data-act="cstat" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${S.csts.includes(k) ? 'on' : ''}" data-act="cstat" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
@@ -1150,7 +1150,7 @@ function drawClients() {
     </tbody></table></div>`;
   const qi = $('#cq'); qi.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; drawClients(); const n = $('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
   $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
-  $('#cl').onchange = e => { S.cloc = e.target.value; drawClients(); };
+  $('#cl-loc').onchange = e => { S.cloc = e.target.value; drawClients(); };
 }
 async function openClient(id, tab) {
   const [c, cp, pay, chg, bk, hist, hv, hm2, arq] = await Promise.all([
