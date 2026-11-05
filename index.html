@@ -554,7 +554,7 @@ sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') loginView('', 
 /* ═════════════════ ПЕРСОНАЛ ═════════════════ */
 async function staffApp() {
   const [c, p, s, q] = await Promise.all([
-    sb.from('clients').select('id,name,phone,email,status,location,notes').order('name').range(0, 4999),
+    sb.from('clients').select('id,name,phone,email,status,location,notes,user_id').order('name').range(0, 4999),
     sb.from('packages').select('*').order('sort_order'),
     sb.from('staff').select('*').order('name'),
     sb.from('settings').select('*')
@@ -1148,8 +1148,8 @@ function drawClients() {
     ${S.owner ? '<button data-act="cemails" title="Имейлите на показания списък, готови за скрито копие (BCC)">Имейли за писмо</button>' : ''}<button class="pri" data-act="newclient">+ Нов клиент</button></div>
     <div class="chips" style="margin-bottom:8px"><button class="${S.csts.length ? '' : 'on'}" data-act="cstat" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${S.csts.includes(k) ? 'on' : ''}" data-act="cstat" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
     <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.csts.length ? ' · ' + S.csts.map(k => CST[k]).join(', ') : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
-    <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Телефон</th><th>Пакет</th></tr></thead><tbody>
-    ${list.slice(0, 400).map(c => { const k = cstat(c); return `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}</td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td></tr>`; }).join('')}
+    <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Телефон</th><th>Пакет</th><th title="Активирал профила си в приложението">Профил</th></tr></thead><tbody>
+    ${list.slice(0, 400).map(c => { const k = cstat(c); return `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}</td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td><td>${c.user_id ? '<span class="chip ok" title="Активирал профила си">✓</span>' : ''}</td></tr>`; }).join('')}
     </tbody></table></div>`;
   const qi = $('#cq'); qi.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; drawClients(); const n = $('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
   $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
