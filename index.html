@@ -414,6 +414,29 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .dwrap>input[type=date]::-webkit-datetime-edit{opacity:0}
 .dwrap>.dtxt{position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:inherit;font:inherit;white-space:nowrap}
 .dwrap>.dtxt.ph{opacity:.5}
+.fin-wrap{overflow:auto;padding:0!important}
+table.fin{font-size:12.5px;min-width:1100px}
+table.fin th,table.fin td{padding:6px 8px;white-space:nowrap}
+table.fin .fxn{text-align:right;font-variant-numeric:tabular-nums}
+table.fin .fxl{position:sticky;left:0;background:var(--card);z-index:1;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+table.fin .fxt{font-weight:700;border-left:1px solid var(--line)}
+table.fin tr.fxh td{font-weight:700;background:rgba(255,255,255,.03);padding-top:12px}
+table.fin tr.fxh td.fxl{background:var(--card)}
+table.fin tr.fxs td{font-weight:700;border-top:1px solid var(--line)}
+table.fin tr.fxp td{font-size:13.5px}
+table.fin tr.fxmut td{color:var(--mute)}
+table.fin td.fxauto{color:var(--mute);font-style:italic}
+table.fin td.fxe{cursor:pointer}
+table.fin td.fxe:hover{background:rgba(235,76,81,.10)}
+table.fin td.fxln{cursor:pointer}
+table.fin td.fxln:hover{color:var(--acc)}
+.fin-in{width:78px;padding:2px 4px;font-size:12.5px;text-align:right}
+.fxhint{font-size:11px;font-weight:400;margin-left:4px}
+.fxadd{margin-left:6px;padding:0 6px!important;line-height:16px}
+.fin-cards .fin-k{min-width:150px;padding:12px 16px!important}
+.fin-cards .fin-k b{font-size:20px;display:block;margin-top:2px}
+.fin-cards b.bad{color:var(--bad)}
+.fin-cards b.ok{color:#3fb37f}
 </style>
 </head>
 <body>
@@ -583,7 +606,7 @@ function renderStaff() {
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
     <div class="tabs">
-      ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Задачи'], ['rewards', 'Награди']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['reports', 'Отчети']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
+      ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Задачи'], ['rewards', 'Награди']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['reports', 'Отчети'], ['fin', 'Финанси']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <select id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="mypw" title="Смени своята парола">Парола</button><button class="sm" data-act="logout">Изход</button></div>
@@ -593,7 +616,7 @@ function renderStaff() {
     if (e.target.value === '__client') { e.target.value = S.view?.id || ''; return pickClientPreview(); }
     const t = S.staff.find(x => x.id === e.target.value);
     S.view = t || null; S.me = t ? { role: 'staff', row: t } : S.real; S.owner = S.realOwner && !t;
-    if (t && S.tab === 'settings') S.tab = 'week'; D.ploc = null; renderStaff();
+    if (t && ['settings', 'fin', 'reports', 'tasks', 'rewards', 'team'].includes(S.tab)) S.tab = 'week'; D.ploc = null; renderStaff();
   };
   $('#loc').onchange = e => { S.loc = e.target.value; S.cloc = S.loc; store.set('nlt-loc', S.loc); D.ploc = null; renderTab(); };
   renderTab();
@@ -601,9 +624,223 @@ function renderStaff() {
 function loadMain() { const m = $('#main'); if (!m) return; if (m.dataset.ld === '1' || !m.firstElementChild) { m.innerHTML = '<div class="mute">Зареждане…</div>'; m.dataset.ld = ''; } }
 function renderTab() {
   const m = $('#main'); if (m && m.dataset.rt !== S.tab) { m.dataset.rt = S.tab; m.dataset.ld = '1'; }
-  ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, progress: progressView, tasks: tasksView, rewards: rewardsView, reports: reportsView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
+  ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, progress: progressView, tasks: tasksView, rewards: rewardsView, reports: reportsView, fin: finView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
 }
 
+
+/* ── Финанси: таблицата по обекти (само собственикът) ── */
+const FIN = { sheet: 'Общо', y: new Date().getFullYear(), lines: [], vals: {}, act: null, edit: null };
+const FIN_SHEETS = ['Общо', 'Боян Петров', 'Лерин', 'Масажно', 'Общи'];
+const FIN_SHEET_LBL = { 'Общо': 'Общо', 'Боян Петров': 'Боян Петров', 'Лерин': 'Лерин 53', 'Масажно': 'Масажно студио', 'Общи': 'Общи разходи' };
+const FIN_CATS = ['Сметки', 'Заплати', 'Осигуровки', 'Услуги', 'Консумативи', 'Маркетинг', 'Оборудване', 'Интериор и ремонт', 'Бар', 'Обучение', 'Други', 'Данъци и такси'];
+const FIN_MON = ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'];
+const FIN_MAS_SHARE = 0.4; // заплата масажист: 40% от остатъка
+const fnum = v => v == null || v === '' || isNaN(v) ? '' : (Math.round(v) || 0).toLocaleString('bg-BG');
+const fsum = a => a.reduce((s, v) => s + (+v || 0), 0);
+const fhas = a => a.some(v => v != null && v !== '');
+async function finView() {
+  if (!S.owner) return;
+  loadMain();
+  const [ln, vl, ac] = await Promise.all([
+    sb.from('fin_lines').select('*').order('sort').order('id'),
+    sb.from('fin_values').select('line_id,m,amount').eq('y', FIN.y).range(0, 9999),
+    sb.rpc('fin_actuals', { p_year: FIN.y })]);
+  const er = ln.error || vl.error || ac.error; if (er) return fail(er, 'Финансите не се заредиха');
+  FIN.lines = ln.data || []; FIN.vals = {};
+  (vl.data || []).forEach(v => { (FIN.vals[v.line_id] = FIN.vals[v.line_id] || {})[v.m] = +v.amount; });
+  FIN.act = ac.data || { pay: [], vis: [], mas: [] };
+  finRender();
+}
+function finRow(id) { const o = FIN.vals[id] || {}; return Array.from({ length: 12 }, (_, i) => o[i + 1] ?? null); }
+function finActual(kind, loc) {
+  const a = Array(12).fill(null), src = kind === 'pay' ? FIN.act.pay : kind === 'vis' ? FIN.act.vis : FIN.act.mas;
+  (src || []).forEach(r => { if (kind === 'mas' || r.loc === loc) a[r.m - 1] = (a[r.m - 1] || 0) + +(r.s ?? r.n); });
+  return a;
+}
+/* Изчислява всичко за един лист: приход, разходи по категории, печалба */
+function finCalc(sheet) {
+  const L = FIN.lines.filter(l => l.sheet === sheet);
+  const byKind = k => L.find(l => l.kind === k);
+  const cats = FIN_CATS.map(c => { const ls = L.filter(l => l.kind === 'exp' && l.cat === c); const rows = ls.map(l => ({ l, v: finRow(l.id) })); return { c, rows, tot: Array.from({ length: 12 }, (_, i) => rows.some(r => r.v[i] != null) ? fsum(rows.map(r => r.v[i])) : null) }; });
+  const exp = Array.from({ length: 12 }, (_, i) => cats.some(c => c.tot[i] != null) ? fsum(cats.map(c => c.tot[i])) : null);
+  const out = { sheet, L, cats, exp };
+  if (sheet === 'Боян Петров' || sheet === 'Лерин') {
+    const vl = byKind('visits'), pl = byKind('price');
+    const vs = vl ? finRow(vl.id) : Array(12).fill(null), pr = pl ? finRow(pl.id) : Array(12).fill(null);
+    const va = finActual('vis', sheet), pay = finActual('pay', sheet);
+    out.vl = vl; out.pl = pl; out.vsheet = vs; out.vapp = va; out.price = pr; out.pay = pay;
+    out.visits = vs.map((v, i) => (FIN.y * 12 + i >= 2026 * 12 + 10 && va[i] != null) ? va[i] : (v != null ? v : va[i]));
+    out.est = out.visits.map((v, i) => v != null && pr[i] != null ? v * pr[i] : null);
+    out.rev = pay.map((p, i) => p != null && p !== 0 ? p : out.est[i]);
+    out.revSrc = pay.map(p => p != null && p !== 0 ? 'pay' : 'est');
+  } else if (sheet === 'Масажно') {
+    const vl = byKind('visits'), il = byKind('income');
+    const vs = vl ? finRow(vl.id) : Array(12).fill(null), ma = finActual('mas');
+    out.vl = vl; out.il = il; out.visits = vs.map((v, i) => v != null ? v : ma[i]); out.vapp = ma; out.vsheet = vs;
+    out.rev = il ? finRow(il.id) : Array(12).fill(null);
+    out.rest = out.rev.map((r, i) => r != null || out.exp[i] != null ? (r || 0) - (out.exp[i] || 0) : null);
+    out.sal = out.rest.map(v => v == null ? null : Math.max(0, v) * FIN_MAS_SHARE);
+    out.expAll = out.exp.map((e, i) => e != null || out.sal[i] != null ? (e || 0) + (out.sal[i] || 0) : null);
+  } else { out.rev = Array(12).fill(null); }
+  const ex = out.expAll || out.exp;
+  out.profit = out.rev.map((r, i) => r != null || ex[i] != null ? (r || 0) - (ex[i] || 0) : null);
+  return out;
+}
+function finTotals() {
+  const C = Object.fromEntries(['Боян Петров', 'Лерин', 'Масажно', 'Общи'].map(s => [s, finCalc(s)]));
+  const add = (...arrs) => Array.from({ length: 12 }, (_, i) => arrs.some(a => a[i] != null) ? fsum(arrs.map(a => a[i])) : null);
+  const rev = add(C['Боян Петров'].rev, C['Лерин'].rev, C['Масажно'].rev);
+  const exp = add(C['Боян Петров'].exp, C['Лерин'].exp, C['Масажно'].expAll, C['Общи'].exp);
+  return { C, rev, exp, profit: rev.map((r, i) => r != null || exp[i] != null ? (r || 0) - (exp[i] || 0) : null) };
+}
+function finChart(rev, exp, profit) {
+  const W = 760, H = 210, P = 28, bw = (W - P * 2) / 12;
+  const mx = Math.max(1, ...rev.map(v => +v || 0), ...exp.map(v => +v || 0));
+  const mn = Math.min(0, ...profit.map(v => +v || 0));
+  const span = mx - mn, yv = v => P / 2 + (H - P * 1.5) * (1 - ((v || 0) - mn) / span), y0 = yv(0);
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;display:block">`;
+  s += `<line x1="${P}" x2="${W - P}" y1="${y0}" y2="${y0}" stroke="var(--line)"/>`;
+  for (let i = 0; i < 12; i++) {
+    const x = P + i * bw, w = bw / 2 - 3;
+    if (rev[i] != null) s += `<rect x="${x + 3}" y="${yv(rev[i])}" width="${w}" height="${Math.max(0, y0 - yv(rev[i]))}" rx="2" fill="#3fb37f"><title>${FIN_MON[i]} приход ${fnum(rev[i])} €</title></rect>`;
+    if (exp[i] != null) s += `<rect x="${x + 3 + w + 2}" y="${yv(exp[i])}" width="${w}" height="${Math.max(0, y0 - yv(exp[i]))}" rx="2" fill="#eb4c51"><title>${FIN_MON[i]} разходи ${fnum(exp[i])} €</title></rect>`;
+    s += `<text x="${x + bw / 2}" y="${H - 4}" text-anchor="middle" font-size="10" fill="var(--mute)">${FIN_MON[i]}</text>`;
+  }
+  const pts = profit.map((v, i) => v == null ? null : `${P + i * bw + bw / 2},${yv(v)}`).filter(Boolean);
+  if (pts.length > 1) s += `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--ink,#fff)" stroke-width="2"/>`;
+  profit.forEach((v, i) => { if (v != null) s += `<circle cx="${P + i * bw + bw / 2}" cy="${yv(v)}" r="3" fill="${v < 0 ? '#eb4c51' : 'var(--ink,#fff)'}"><title>${FIN_MON[i]} печалба ${fnum(v)} €</title></circle>`; });
+  return s + `</svg><div class="mute" style="font-size:12px;margin-top:4px"><span style="color:#3fb37f">■</span> приход &nbsp; <span style="color:#eb4c51">■</span> разходи &nbsp; ● печалба</div>`;
+}
+const fcells = (a, cls = '') => a.map(v => `<td class="fxn ${cls}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt ${cls}">${fhas(a) ? fnum(fsum(a)) : ''}</td>`;
+const fedit = (l, a, extra = '') => a.map((v, i) => `<td class="fxn fxe ${extra}" data-act="fincell" data-l="${l.id}" data-m="${i + 1}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt">${fhas(a) ? fnum(fsum(a)) : ''}</td>`;
+function finRender() {
+  const main = $('#main'); if (!main) return;
+  const hdr = `<tr><th class="fxl">Перо</th>${FIN_MON.map(m => `<th class="fxn">${m}</th>`).join('')}<th class="fxn">Общо</th></tr>`;
+  const yrs = []; for (let y = 2024; y <= 2036; y++) yrs.push(y);
+  let body = '', chart = '', cards = '';
+  const sumCard = (lbl, a, cls = '') => `<div class="card fin-k"><div class="mute">${lbl}</div><b class="${cls}">${fhas(a) ? fnum(fsum(a)) + ' €' : '—'}</b></div>`;
+  if (FIN.sheet === 'Общо') {
+    const T = finTotals(), C = T.C;
+    cards = sumCard('Приход', T.rev) + sumCard('Разходи', T.exp) + sumCard('Печалба', T.profit, fsum(T.profit) < 0 ? 'bad' : 'ok');
+    chart = finChart(T.rev, T.exp, T.profit);
+    body = `<tr class="fxh"><td class="fxl" colspan="14">Приход</td></tr>
+      <tr><td class="fxl">Боян Петров</td>${fcells(C['Боян Петров'].rev)}</tr><tr><td class="fxl">Лерин 53</td>${fcells(C['Лерин'].rev)}</tr><tr><td class="fxl">Масажно студио</td>${fcells(C['Масажно'].rev)}</tr>
+      <tr class="fxs"><td class="fxl">Приход — общо</td>${fcells(T.rev)}</tr>
+      <tr class="fxh"><td class="fxl" colspan="14">Разходи</td></tr>
+      <tr><td class="fxl">Боян Петров</td>${fcells(C['Боян Петров'].exp)}</tr><tr><td class="fxl">Лерин 53</td>${fcells(C['Лерин'].exp)}</tr><tr><td class="fxl">Масажно студио (с масажиста)</td>${fcells(C['Масажно'].expAll)}</tr><tr><td class="fxl">Общи разходи</td>${fcells(C['Общи'].exp)}</tr>
+      <tr class="fxs"><td class="fxl">Разходи — общо</td>${fcells(T.exp)}</tr>
+      <tr class="fxh"><td class="fxl" colspan="14">Печалба</td></tr>
+      <tr><td class="fxl">Боян Петров</td>${fcells(C['Боян Петров'].profit)}</tr><tr><td class="fxl">Лерин 53</td>${fcells(C['Лерин'].profit)}</tr><tr><td class="fxl">Масажно студио</td>${fcells(C['Масажно'].profit)}</tr><tr><td class="fxl">Общи разходи</td>${fcells(C['Общи'].profit)}</tr>
+      <tr class="fxs fxp"><td class="fxl">Печалба — общо</td>${fcells(T.profit)}</tr>`;
+  } else {
+    const c = finCalc(FIN.sheet), ex = c.expAll || c.exp;
+    if (FIN.sheet !== 'Общи') { cards = sumCard('Приход', c.rev) + sumCard('Разходи', ex) + sumCard('Печалба', c.profit, fsum(c.profit) < 0 ? 'bad' : 'ok'); chart = finChart(c.rev, ex, c.profit); }
+    else { cards = sumCard('Разходи', c.exp); }
+    if (FIN.sheet === 'Боян Петров' || FIN.sheet === 'Лерин') {
+      body += `<tr class="fxh"><td class="fxl" colspan="14">Приход</td></tr>`;
+      body += `<tr><td class="fxl">Посещения <span class="mute fxhint">сиво = от приложението</span></td>${c.vl ? c.visits.map((v, i) => `<td class="fxn fxe ${c.vsheet[i] !== v ? 'fxauto' : ''}" data-act="fincell" data-l="${c.vl.id}" data-m="${i + 1}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt">${fnum(fsum(c.visits))}</td>` : fcells(c.visits)}</tr>`;
+      body += `<tr><td class="fxl">Средна цена на посещение</td>${c.pl ? fedit(c.pl, c.price).replace(/<td class="fxn fxt">[^<]*<\/td>$/, '<td class="fxn fxt"></td>') : fcells(c.price)}</tr>`;
+      body += `<tr class="fxmut"><td class="fxl">Оценка: посещения × цена</td>${fcells(c.est)}</tr>`;
+      body += `<tr><td class="fxl">Реални плащания (приложение)</td>${fcells(c.pay)}</tr>`;
+      body += `<tr class="fxs"><td class="fxl">Приход <span class="mute fxhint">плащания, иначе оценка</span></td>${c.rev.map((v, i) => `<td class="fxn ${c.revSrc[i] === 'est' && v != null ? 'fxauto' : ''}">${fnum(v)}</td>`).join('')}<td class="fxn fxt">${fhas(c.rev) ? fnum(fsum(c.rev)) : ''}</td></tr>`;
+    }
+    if (FIN.sheet === 'Масажно') {
+      body += `<tr class="fxh"><td class="fxl" colspan="14">Приход</td></tr>`;
+      body += `<tr><td class="fxl">Посещения <span class="mute fxhint">сиво = от приложението</span></td>${c.vl ? c.visits.map((v, i) => `<td class="fxn fxe ${c.vsheet[i] !== v ? 'fxauto' : ''}" data-act="fincell" data-l="${c.vl.id}" data-m="${i + 1}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt">${fnum(fsum(c.visits))}</td>` : fcells(c.visits)}</tr>`;
+      body += `<tr class="fxs"><td class="fxl">Приход</td>${c.il ? fedit(c.il, c.rev) : fcells(c.rev)}</tr>`;
+    }
+    c.cats.forEach(k => {
+      if (!k.rows.length && FIN.sheet === 'Масажно') return;
+      body += `<tr class="fxh"><td class="fxl">${esc(k.c)} <button class="sm fxadd" data-act="finadd" data-c="${esc(k.c)}" title="Добави перо">+</button></td>${k.tot.map(v => `<td class="fxn">${fnum(v)}</td>`).join('')}<td class="fxn fxt">${fhas(k.tot) ? fnum(fsum(k.tot)) : ''}</td></tr>`;
+      k.rows.forEach(r => { body += `<tr><td class="fxl fxln" data-act="finline" data-l="${r.l.id}" title="Преименувай или изтрий">${esc(r.l.name)}</td>${fedit(r.l, r.v)}</tr>`; });
+    });
+    if (FIN.sheet === 'Масажно') {
+      body += `<tr><td class="fxl">Остатък</td>${fcells(c.rest)}</tr>`;
+      body += `<tr><td class="fxl">Заплата масажист (${Math.round(FIN_MAS_SHARE * 100)}% от остатъка)</td>${fcells(c.sal)}</tr>`;
+    }
+    body += `<tr class="fxs"><td class="fxl">Общо разходи</td>${fcells(ex)}</tr>`;
+    if (FIN.sheet !== 'Общи') body += `<tr class="fxs fxp"><td class="fxl">Печалба</td>${fcells(c.profit)}</tr>`;
+  }
+  main.innerHTML = `<div class="row" style="margin-bottom:12px"><b style="font-size:18px">Финанси</b><span class="mute">вижда само собственикът · суми в евро</span><span class="sp"></span>
+      <select id="fin-y">${yrs.map(y => `<option ${y === FIN.y ? 'selected' : ''}>${y}</option>`).join('')}</select>
+      <button class="sm" data-act="finxls">Свали в Excel</button></div>
+    <div class="row" style="margin-bottom:12px">${FIN_SHEETS.map(s => `<button class="tab ${FIN.sheet === s ? 'on' : ''}" data-act="finsheet" data-s="${esc(s)}">${esc(FIN_SHEET_LBL[s])}</button>`).join('')}</div>
+    <div class="row fin-cards" style="margin-bottom:12px">${cards}</div>
+    ${chart ? `<div class="card" style="margin-bottom:12px">${chart}</div>` : ''}
+    <div class="card fin-wrap"><table class="fin"><thead>${hdr}</thead><tbody>${body}</tbody></table></div>
+    <div class="mute" style="margin-top:8px;font-size:12px">Цъкни върху число, за да го промениш (Enter запазва, празно изтрива). Сивите числа идват автоматично от приложението. Цъкни върху име на перо, за да го преименуваш или изтриеш.</div>`;
+  $('#fin-y').onchange = e => { FIN.y = +e.target.value; finView(); };
+}
+function finCellEdit(td) {
+  if (td.querySelector('input')) return;
+  const lid = +td.dataset.l, m = +td.dataset.m, cur = (FIN.vals[lid] || {})[m];
+  td.innerHTML = `<input type="text" inputmode="decimal" class="fin-in" value="${cur ?? ''}">`;
+  const inp = td.querySelector('input'); inp.focus(); inp.select();
+  let done = false;
+  const save = async () => {
+    if (done) return; done = true;
+    const raw = inp.value.trim().replace(/\s/g, '').replace(',', '.');
+    if (raw === String(cur ?? '')) return finRender();
+    if (raw === '') {
+      const { error } = await sb.from('fin_values').delete().match({ line_id: lid, y: FIN.y, m });
+      if (error) { fail(error, 'Не се изтри'); return finRender(); }
+      if (FIN.vals[lid]) delete FIN.vals[lid][m];
+    } else {
+      let n = Number(raw);
+      if (/^[\d.+\-*/() ]+$/.test(raw) && isNaN(n)) { try { n = Function(`"use strict";return (${raw})`)(); } catch (e) { n = NaN; } }
+      if (!isFinite(n)) { toast('Невалидно число'); return finRender(); }
+      n = Math.round(n * 10000) / 10000;
+      const { error } = await sb.from('fin_values').upsert({ line_id: lid, y: FIN.y, m, amount: n, updated_at: new Date().toISOString() }, { onConflict: 'line_id,y,m' });
+      if (error) { fail(error, 'Не се записа'); return finRender(); }
+      (FIN.vals[lid] = FIN.vals[lid] || {})[m] = n;
+    }
+    finRender();
+  };
+  inp.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); save(); } if (ev.key === 'Escape') { done = true; finRender(); } if (ev.key === 'Tab') { ev.preventDefault(); const nx = td.nextElementSibling; save().then(() => { const t = document.querySelector(`[data-act=fincell][data-l="${lid}"][data-m="${m + 1}"]`); if (t && nx) finCellEdit(t); }); } };
+  inp.onblur = save;
+}
+async function finXls() {
+  const X = await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs');
+  const wb = X.utils.book_new(), save = FIN.sheet;
+  for (const s of FIN_SHEETS) {
+    FIN.sheet = s; finRender();
+    const t = document.querySelector('table.fin'); t.querySelectorAll('.fxhint, .fxadd').forEach(n => n.remove());
+    X.utils.book_append_sheet(wb, X.utils.table_to_sheet(t, { raw: false }), FIN_SHEET_LBL[s].slice(0, 31));
+  }
+  FIN.sheet = save; finRender();
+  X.writeFile(wb, `NLT финанси ${FIN.y}.xlsx`);
+}
+async function finAct(act, el) {
+  if (act === 'finsheet') { FIN.sheet = el.dataset.s; return finRender(); }
+  if (act === 'fincell') return finCellEdit(el);
+  if (act === 'finxls') { try { await finXls(); } catch (e) { fail(e, 'Не се изтегли'); } return; }
+  if (act === 'finadd') {
+    modal.show(`<h2>Ново перо · ${esc(el.dataset.c)}</h2><input id="fin-nm" placeholder="Име на перото (напр. Наем склад)" style="width:100%"><div class="row" style="margin-top:12px"><button class="pri" data-act="finaddok" data-c="${esc(el.dataset.c)}">Добави</button><button data-act="close">Отказ</button></div>`);
+    setTimeout(() => $('#fin-nm')?.focus(), 50); return;
+  }
+  if (act === 'finaddok') {
+    const nm = ($('#fin-nm')?.value || '').trim(); if (!nm) return toast('Напиши име');
+    const sort = Math.max(0, ...FIN.lines.map(l => l.sort)) + 1;
+    const { data, error } = await sb.from('fin_lines').insert({ sheet: FIN.sheet, cat: el.dataset.c, name: nm, kind: 'exp', sort }).select().single();
+    if (error) return fail(error, 'Не се добави'); FIN.lines.push(data); modal.close(); return finRender();
+  }
+  if (act === 'finline') {
+    const l = FIN.lines.find(x => x.id === +el.dataset.l); if (!l) return;
+    const n = Object.keys(FIN.vals[l.id] || {}).length;
+    modal.show(`<h2>Перо · ${esc(l.cat)}</h2><input id="fin-nm" value="${esc(l.name)}" style="width:100%"><div class="row" style="margin-top:12px"><button class="pri" data-act="finren" data-l="${l.id}">Запази</button><button data-act="close">Отказ</button><span class="sp"></span><button class="danger" data-act="findel" data-l="${l.id}">Изтрий перото</button></div><div class="mute" style="margin-top:8px;font-size:12px">Изтриването маха перото за всички години${n ? ` (в ${FIN.y} има ${n} попълнени месеца)` : ''}.</div>`);
+    return;
+  }
+  if (act === 'finren') {
+    const nm = ($('#fin-nm')?.value || '').trim(); if (!nm) return toast('Напиши име');
+    const { error } = await sb.from('fin_lines').update({ name: nm }).eq('id', +el.dataset.l); if (error) return fail(error, 'Не се записа');
+    FIN.lines.find(x => x.id === +el.dataset.l).name = nm; modal.close(); return finRender();
+  }
+  if (act === 'findel') {
+    if (!confirm('Да изтрия ли перото с всичките му суми за всички години?')) return;
+    const { error } = await sb.from('fin_lines').delete().eq('id', +el.dataset.l); if (error) return fail(error, 'Не се изтри');
+    FIN.lines = FIN.lines.filter(x => x.id !== +el.dataset.l); delete FIN.vals[+el.dataset.l]; modal.close(); return finRender();
+  }
+}
 
 /* ── KPI: клиенти, треньори, бизнес (треньорите — без пари) ── */
 function kpiRange() {
@@ -2854,6 +3091,7 @@ document.addEventListener('click', async e => {
   e.preventDefault();
   try {
     if (act.startsWith('pg')) { await pgAct(act, el); return; }
+    if (act.startsWith('fin')) { await finAct(act, el); return; }
     switch (act) {
       case 'close': modal.close(); break;
       case 'login': await doLogin(); break;
