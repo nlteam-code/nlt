@@ -1421,13 +1421,18 @@ function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 
 function curPkg(cid) {
   const t = today();
   const list = (S.pstat || []).filter(p => p.client_id === cid);
-  return list.find(p => p.start_date <= t && p.end_date >= t) || null;
+  const cur = list.find(p => p.start_date <= t && p.end_date >= t);
+  if (cur) return cur;
+  /* като в PT Minder: последният пакет остава активен, докато има оставащи посещения, дори след крайната дата (до 60 дни след нея) */
+  const last = list.filter(p => p.start_date <= t).sort((a, b) => a.start_date < b.start_date ? 1 : -1)[0];
+  const lim = new Date(parse(t).getTime() - 60 * 864e5).toISOString().slice(0, 10);
+  return last && last.used < last.total && last.end_date >= lim ? last : null;
 }
 function pkgChip(p) {
   if (!p) return '<span class="chip">без пакет</span>';
   const left = p.total - p.used, days = Math.round((parse(p.end_date) - parse(today())) / 864e5);
   const cls = left <= 0 ? 'bad' : (left <= 1 || days <= 3) ? 'warn' : 'ok';
-  return `<span class="chip ${cls}">${left}/${p.total} ${p.kind === 'solo' ? 'перс.' : 'груп.'} · до ${fmt(p.end_date)}</span>`;
+  return `<span class="chip ${cls}">${left}/${p.total} ${p.kind === 'solo' ? 'перс.' : 'груп.'} · ${p.end_date < today() ? 'до изчерпване' : 'до ' + fmt(p.end_date)}</span>`;
 }
 async function clientsView() {
   loadMain();
