@@ -426,11 +426,13 @@ table.fin tr.fxs td{font-weight:700;border-top:1px solid var(--line)}
 table.fin tr.fxp td{font-size:13.5px}
 table.fin tr.fxmut td{color:var(--mute)}
 table.fin td.fxauto{color:var(--mute);font-style:italic}
-table.fin td.fxe{cursor:pointer}
-table.fin td.fxe:hover{background:rgba(235,76,81,.10)}
+table.fin td.fxc{padding:0!important}
+table.fin .fin-in{width:100%;min-width:64px;box-sizing:border-box;background:transparent;border:1px solid transparent;border-radius:0;color:inherit;font:inherit;text-align:right;padding:6px 8px;outline:none;font-variant-numeric:tabular-nums}
+table.fin .fin-in:hover{background:rgba(255,255,255,.04)}
+table.fin .fin-in:focus{border-color:var(--acc);background:rgba(235,76,81,.10)}
+table.fin .fin-in::placeholder{color:var(--mute);font-style:italic;opacity:.8}
 table.fin td.fxln{cursor:pointer}
 table.fin td.fxln:hover{color:var(--acc)}
-.fin-in{width:78px;padding:2px 4px;font-size:12.5px;text-align:right}
 .fxhint{font-size:11px;font-weight:400;margin-left:4px}
 .fxadd{margin-left:6px;padding:0 6px!important;line-height:16px}
 .fin-cards .fin-k{min-width:150px;padding:12px 16px!important}
@@ -712,7 +714,9 @@ function finChart(rev, exp, profit) {
   return s + `</svg><div class="mute" style="font-size:12px;margin-top:4px"><span style="color:#3fb37f">■</span> приход &nbsp; <span style="color:#eb4c51">■</span> разходи &nbsp; ● печалба</div>`;
 }
 const fcells = (a, cls = '') => a.map(v => `<td class="fxn ${cls}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt ${cls}">${fhas(a) ? fnum(fsum(a)) : ''}</td>`;
-const fedit = (l, a, extra = '') => a.map((v, i) => `<td class="fxn fxe ${extra}" data-act="fincell" data-l="${l.id}" data-m="${i + 1}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt">${fhas(a) ? fnum(fsum(a)) : ''}</td>`;
+const fraw = v => v == null ? '' : String(Math.round(v * 100) / 100).replace('.', ',');
+const finInp = (lid, m, v, ph = '') => `<td class="fxn fxc"><input class="fin-in" data-l="${lid}" data-m="${m}" value="${fraw(v)}" placeholder="${ph}" autocomplete="off" spellcheck="false"></td>`;
+const fedit = (l, a) => a.map((v, i) => finInp(l.id, i + 1, v)).join('') + `<td class="fxn fxt">${fhas(a) ? fnum(fsum(a)) : ''}</td>`;
 function finRender() {
   const main = $('#main'); if (!main) return;
   const hdr = `<tr><th class="fxl">Перо</th>${FIN_MON.map(m => `<th class="fxn">${m}</th>`).join('')}<th class="fxn">Общо</th></tr>`;
@@ -738,7 +742,7 @@ function finRender() {
     else { cards = sumCard('Разходи', c.exp); }
     if (FIN.sheet === 'Боян Петров' || FIN.sheet === 'Лерин') {
       body += `<tr class="fxh"><td class="fxl" colspan="14">Приход</td></tr>`;
-      body += `<tr><td class="fxl">Посещения <span class="mute fxhint">сиво = от приложението</span></td>${c.vl ? c.visits.map((v, i) => `<td class="fxn fxe ${c.vsheet[i] !== v ? 'fxauto' : ''}" data-act="fincell" data-l="${c.vl.id}" data-m="${i + 1}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt">${fnum(fsum(c.visits))}</td>` : fcells(c.visits)}</tr>`;
+      body += `<tr><td class="fxl">Посещения <span class="mute fxhint">сиво = от приложението</span></td>${c.vl ? c.visits.map((v, i) => c.vsheet[i] !== v && (FIN.sheet === 'Масажно' || FIN.y * 12 + i >= 2026 * 12 + 10) && c.vapp[i] != null ? `<td class="fxn fxauto" title="от приложението">${fnum(v)}</td>` : finInp(c.vl.id, i + 1, c.vsheet[i], c.vapp[i] != null ? fnum(c.vapp[i]) : '')).join('') + `<td class="fxn fxt">${fnum(fsum(c.visits))}</td>` : fcells(c.visits)}</tr>`;
       body += `<tr><td class="fxl">Средна цена на посещение</td>${c.pl ? fedit(c.pl, c.price).replace(/<td class="fxn fxt">[^<]*<\/td>$/, '<td class="fxn fxt"></td>') : fcells(c.price)}</tr>`;
       body += `<tr class="fxmut"><td class="fxl">Оценка: посещения × цена</td>${fcells(c.est)}</tr>`;
       body += `<tr><td class="fxl">Реални плащания (приложение)</td>${fcells(c.pay)}</tr>`;
@@ -746,7 +750,7 @@ function finRender() {
     }
     if (FIN.sheet === 'Масажно') {
       body += `<tr class="fxh"><td class="fxl" colspan="14">Приход</td></tr>`;
-      body += `<tr><td class="fxl">Посещения <span class="mute fxhint">сиво = от приложението</span></td>${c.vl ? c.visits.map((v, i) => `<td class="fxn fxe ${c.vsheet[i] !== v ? 'fxauto' : ''}" data-act="fincell" data-l="${c.vl.id}" data-m="${i + 1}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt">${fnum(fsum(c.visits))}</td>` : fcells(c.visits)}</tr>`;
+      body += `<tr><td class="fxl">Посещения <span class="mute fxhint">сиво = от приложението</span></td>${c.vl ? c.visits.map((v, i) => c.vsheet[i] !== v && (FIN.sheet === 'Масажно' || FIN.y * 12 + i >= 2026 * 12 + 10) && c.vapp[i] != null ? `<td class="fxn fxauto" title="от приложението">${fnum(v)}</td>` : finInp(c.vl.id, i + 1, c.vsheet[i], c.vapp[i] != null ? fnum(c.vapp[i]) : '')).join('') + `<td class="fxn fxt">${fnum(fsum(c.visits))}</td>` : fcells(c.visits)}</tr>`;
       body += `<tr class="fxs"><td class="fxl">Приход</td>${c.il ? fedit(c.il, c.rev) : fcells(c.rev)}</tr>`;
     }
     c.cats.forEach(k => {
@@ -768,8 +772,58 @@ function finRender() {
     <div class="row fin-cards" style="margin-bottom:12px">${cards}</div>
     ${chart ? `<div class="card" style="margin-bottom:12px">${chart}</div>` : ''}
     <div class="card fin-wrap"><table class="fin"><thead>${hdr}</thead><tbody>${body}</tbody></table></div>
-    <div class="mute" style="margin-top:8px;font-size:12px">Цъкни върху число, за да го промениш (Enter запазва, празно изтрива). Сивите числа идват автоматично от приложението. Цъкни върху име на перо, за да го преименуваш или изтриеш.</div>`;
+    <div class="mute" style="margin-top:8px;font-size:12px">Работи като Excel: пиши направо в клетките, стрелките и Enter местят, Tab — надясно. Можеш да копираш цял блок от Excel и да го поставиш (Ctrl/⌘+V) — попълва се надолу и надясно. Записва се автоматично. Сивите числа идват от приложението. Цъкни върху име на перо, за да го преименуваш или изтриеш.</div>`;
   $('#fin-y').onchange = e => { FIN.y = +e.target.value; finView(); };
+  finBindGrid();
+  if (FIN.focus) { const t = document.querySelector(`.fin-in[data-l="${FIN.focus.l}"][data-m="${FIN.focus.m}"]`); if (t) { t.focus(); t.select(); } }
+}
+const finParse = raw => { raw = String(raw).trim().replace(/[\s\u00a0€]/g, ''); if (raw === '') return ''; if (/^-?[\d.]+,\d+$/.test(raw)) raw = raw.replace(/\./g, '').replace(',', '.'); else raw = raw.replace(',', '.'); let n = Number(raw); if (isNaN(n) && /^[\d.+\-*/() ]+$/.test(raw)) { try { n = Function(`"use strict";return (${raw})`)(); } catch (e) { n = NaN; } } return isFinite(n) ? Math.round(n * 10000) / 10000 : NaN; };
+async function finSaveMany(list) {
+  const up = [], del = [];
+  for (const { l, m, v } of list) {
+    const cur = (FIN.vals[l] || {})[m];
+    if (v === '') { if (cur != null) del.push({ l, m }); }
+    else if (cur !== v) up.push({ line_id: l, y: FIN.y, m, amount: v, updated_at: new Date().toISOString() });
+  }
+  if (!up.length && !del.length) return false;
+  if (up.length) { const { error } = await sb.from('fin_values').upsert(up, { onConflict: 'line_id,y,m' }); if (error) { fail(error, 'Не се записа'); return true; } up.forEach(r => { (FIN.vals[r.line_id] = FIN.vals[r.line_id] || {})[r.m] = r.amount; }); }
+  for (const d of del) { const { error } = await sb.from('fin_values').delete().match({ line_id: d.l, y: FIN.y, m: d.m }); if (error) { fail(error, 'Не се изтри'); break; } delete FIN.vals[d.l][d.m]; }
+  return true;
+}
+function finGrid() { const rows = []; document.querySelectorAll('table.fin tbody tr').forEach(tr => { const ins = [...tr.querySelectorAll('.fin-in')]; if (ins.length) rows.push(ins); }); return rows; }
+function finCellAt(rows, r, m) { if (r < 0 || r >= rows.length) return null; return rows[r].find(x => +x.dataset.m === m) || null; }
+function finPos(inp, rows) { const r = rows.findIndex(a => a.includes(inp)); return { r, m: +inp.dataset.m }; }
+function finBindGrid() {
+  const t = document.querySelector('table.fin'); if (!t || t.dataset.b) return; t.dataset.b = '1';
+  t.addEventListener('focusin', e => { const i = e.target.closest('.fin-in'); if (!i) return; FIN.focus = { l: i.dataset.l, m: i.dataset.m }; i.select(); });
+  t.addEventListener('change', async e => {
+    const i = e.target.closest('.fin-in'); if (!i) return;
+    const v = finParse(i.value); if (Number.isNaN(v)) { toast('Невалидно число'); i.value = fraw((FIN.vals[i.dataset.l] || {})[i.dataset.m]); return; }
+    if (await finSaveMany([{ l: +i.dataset.l, m: +i.dataset.m, v }])) finRender();
+  });
+  t.addEventListener('keydown', e => {
+    const i = e.target.closest('.fin-in'); if (!i) return;
+    const rows = finGrid(), p = finPos(i, rows); let to = null;
+    const atStart = i.selectionStart === 0 && i.selectionEnd === 0, atEnd = i.selectionStart === i.value.length;
+    const full = i.selectionStart === 0 && i.selectionEnd === i.value.length;
+    if (e.key === 'ArrowDown' || e.key === 'Enter') { for (let r = p.r + 1; r < rows.length && !to; r++) to = finCellAt(rows, r, p.m); }
+    else if (e.key === 'ArrowUp') { for (let r = p.r - 1; r >= 0 && !to; r--) to = finCellAt(rows, r, p.m); }
+    else if (e.key === 'ArrowRight' && (atEnd || full)) to = rows[p.r][rows[p.r].indexOf(i) + 1] || null;
+    else if (e.key === 'ArrowLeft' && (atStart || full)) to = rows[p.r][rows[p.r].indexOf(i) - 1] || null;
+    else if (e.key === 'Escape') { i.value = fraw((FIN.vals[i.dataset.l] || {})[i.dataset.m]); i.blur(); return; }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && full && i.value) { i.value = ''; e.preventDefault(); return; }
+    if (to) { e.preventDefault(); to.focus(); }
+  });
+  t.addEventListener('paste', async e => {
+    const i = e.target.closest('.fin-in'); if (!i) return;
+    const txt = (e.clipboardData || window.clipboardData).getData('text'); if (!/[\t\n]/.test(txt.trim())) return;
+    e.preventDefault();
+    const data = txt.replace(/\r/g, '').replace(/\n$/, '').split('\n').map(r => r.split('\t'));
+    const rows = finGrid(), p = finPos(i, rows), list = []; let bad = 0;
+    data.forEach((cells, dr) => cells.forEach((c, dc) => { const t2 = finCellAt(rows, p.r + dr, p.m + dc); if (!t2) return; const v = finParse(c); if (Number.isNaN(v)) { bad++; return; } list.push({ l: +t2.dataset.l, m: +t2.dataset.m, v }); }));
+    if (await finSaveMany(list)) finRender();
+    toast(`Поставени ${list.length} клетки${bad ? ` · ${bad} невалидни пропуснати` : ''}`);
+  });
 }
 function finCellEdit(td) {
   if (td.querySelector('input')) return;
@@ -805,14 +859,19 @@ async function finXls() {
   for (const s of FIN_SHEETS) {
     FIN.sheet = s; finRender();
     const t = document.querySelector('table.fin'); t.querySelectorAll('.fxhint, .fxadd').forEach(n => n.remove());
-    X.utils.book_append_sheet(wb, X.utils.table_to_sheet(t, { raw: false }), FIN_SHEET_LBL[s].slice(0, 31));
+    const aoa = [...t.querySelectorAll('tr')].map(tr => [...tr.children].map((td, ci) => {
+      const inp = td.querySelector('input'); let v = (inp ? inp.value : td.textContent).trim();
+      if (ci === 0 || v === '') return v;
+      const n = Number(v.replace(/[\s\u00a0]/g, '').replace(',', '.')); return isNaN(n) ? v : n;
+    }));
+    const ws = X.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 34 }].concat(Array(13).fill({ wch: 10 }));
+    X.utils.book_append_sheet(wb, ws, FIN_SHEET_LBL[s].slice(0, 31));
   }
   FIN.sheet = save; finRender();
   X.writeFile(wb, `NLT финанси ${FIN.y}.xlsx`);
 }
 async function finAct(act, el) {
   if (act === 'finsheet') { FIN.sheet = el.dataset.s; return finRender(); }
-  if (act === 'fincell') return finCellEdit(el);
   if (act === 'finxls') { try { await finXls(); } catch (e) { fail(e, 'Не се изтегли'); } return; }
   if (act === 'finadd') {
     modal.show(`<h2>Ново перо · ${esc(el.dataset.c)}</h2><input id="fin-nm" placeholder="Име на перото (напр. Наем склад)" style="width:100%"><div class="row" style="margin-top:12px"><button class="pri" data-act="finaddok" data-c="${esc(el.dataset.c)}">Добави</button><button data-act="close">Отказ</button></div>`);
