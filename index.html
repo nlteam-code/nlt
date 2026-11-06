@@ -586,7 +586,7 @@ function renderStaff() {
       ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Задачи'], ['rewards', 'Награди']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['reports', 'Отчети']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <select id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
-    ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="logout">Изход</button></div>
+    ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="mypw" title="Смени своята парола">Парола</button><button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
   <div class="wrap" id="main"></div>`;
   const as = $('#asel'); if (as) as.onchange = e => {
@@ -1206,7 +1206,7 @@ async function openClient(id, tab) {
       <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент, иначе Чакащ)'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => `<option value="${v}" ${v === (x.status === 'Lead' ? 'Active' : x.status) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     </div>
     <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
-    <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button>${S.owner ? '<button class="sm" style="margin-left:auto;color:var(--bad);border-color:var(--bad)" data-act="cdel">Изтрий клиента</button>' : ''}</div>
+    <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button>${S.owner && x.user_id ? `<button class="sm" data-act="cpw" data-uid="${x.user_id}" data-nm="${esc(x.name)}">Нова парола</button>` : ''}${S.owner ? '<button class="sm" style="margin-left:auto;color:var(--bad);border-color:var(--bad)" data-act="cdel">Изтрий клиента</button>' : ''}</div>
     ${S.owner ? `<div class="mute" style="margin-top:10px">Баланс: <b style="color:${bal > 0 ? 'var(--bad)' : 'var(--ok)'}">${bal > 0 ? 'Дължимо ' + money(bal) : bal < 0 ? 'Аванс ' + money(-bal) : 'Изравнено'}</b></div>` : ''}
     </div>
 
@@ -1844,7 +1844,7 @@ function trainerDialog(id) {
     <label class="f">Статус<select id="tr-act"><option value="1" ${t.active ? 'selected' : ''}>Активен</option><option value="0" ${!t.active ? 'selected' : ''}>Неактивен</option></select></label></div>
     <div style="margin:10px 0" class="row">Обекти: ${LOCS.map(l => `<label><input type="checkbox" class="tr-loc" value="${esc(l)}" ${(t.locations || []).includes(l) ? 'checked' : ''}> ${esc(l)}</label>`).join(' ')}</div>
     <label class="f">Бележки<textarea id="tr-notes" rows="2">${esc(t.notes || '')}</textarea></label>
-    <div class="row" style="margin-top:12px"><button class="pri" data-act="trsave">Запази</button>${id !== 'new' ? '<span class="sp"></span><button class="danger" data-act="trdel">Изтрий</button>' : ''}</div></div>`);
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="trsave">Запази</button>${S.owner && t.user_id ? `<button class="sm" data-act="cpw" data-uid="${t.user_id}" data-nm="${esc(t.name)}">Нова парола</button>` : ''}${id !== 'new' ? '<span class="sp"></span><button class="danger" data-act="trdel">Изтрий</button>' : ''}</div></div>`);
 }
 async function saveTrainer() {
   const id = $('#trd').dataset.id;
@@ -2342,7 +2342,32 @@ function clientHistory() {
 function clientProfile() {
   const me = S.me.row;
   cSheet(`<div class="c-prof"><div class="c-av big">${esc((me.name || '?').trim()[0] || '?')}</div><b>${esc(me.name)}</b><span class="c-mute">${esc(me.email || '')}</span>${me.location ? `<span class="c-mute">${esc(me.location)}</span>` : ''}</div>
-    <button class="c-btn outline wide" data-act="logout">Изход</button>`);
+    <button class="c-btn outline wide" data-act="mypw">Смени паролата</button>
+    <button class="c-btn outline wide" data-act="logout">Изход</button>
+    <a class="c-btn plain wide" href="privacy.html" target="_blank" style="text-align:center;text-decoration:none">Политика за поверителност</a>
+    <button class="c-btn plain wide" data-act="cdelme" style="color:var(--c-bad,#e5484d)">Изтрий профила ми</button>`);
+}
+function pwForm(uid, nm) {
+  const self = !uid;
+  return `<div id="pwd" data-uid="${uid || ''}"><h2 style="margin:0 0 6px">${self ? 'Смяна на паролата' : 'Нова парола за ' + esc(nm || '')}</h2>
+    <p class="mute c-mute" style="margin:0 0 10px">${self ? 'С новата парола влизаш с имейл и парола. Входът с код по имейл продължава да работи.' : 'Кажи новата парола на човека лично. След това той може да я смени сам.'}</p>
+    <input id="pw1" type="password" autocomplete="new-password" placeholder="Нова парола (поне 8 знака)" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--c-line,#555);font-size:16px;margin-bottom:8px;box-sizing:border-box">
+    <input id="pw2" type="password" autocomplete="new-password" placeholder="Повтори паролата" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--c-line,#555);font-size:16px;margin-bottom:10px;box-sizing:border-box">
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:12px"><input type="checkbox" id="pwshow"> Покажи паролата</label>
+    <button class="pri c-btn solid wide" data-act="pwsave">Запази паролата</button></div>`;
+}
+function pwOpen(uid, nm) {
+  if (document.body.classList.contains('cm') || S.me?.role === 'client') cSheet(pwForm(uid, nm)); else modal.show(pwForm(uid, nm));
+  setTimeout(() => { const sh = $('#pwshow'); if (sh) sh.onchange = () => ['#pw1', '#pw2'].forEach(q => { $(q).type = sh.checked ? 'text' : 'password'; }); $('#pw1')?.focus(); }, 50);
+}
+async function pwSave() {
+  const uid = $('#pwd').dataset.uid, a = $('#pw1').value, b = $('#pw2').value;
+  if (a.length < 8) return toast('Паролата трябва да е поне 8 знака.');
+  if (a !== b) return toast('Двете пароли не съвпадат.');
+  const { error } = uid ? await sb.rpc('admin_set_password', { p_user: uid, p_password: a }) : await sb.auth.updateUser({ password: a });
+  if (error) return toast(/same|different/i.test(error.message || '') ? 'Новата парола трябва да е различна от старата.' : 'Не се смени: ' + (error.message || ''));
+  if (document.getElementById('c-sheet')) closeSheet(); else modal.close();
+  toast('Паролата е сменена ✓');
 }
 function clientAsk(sid) {
   const s = C.classes.find(x => x.id === sid); if (!s) return;
@@ -2969,6 +2994,13 @@ document.addEventListener('click', async e => {
       case 'trnew': trainerDialog('new'); break;
       case 'tredit': trainerDialog(el.dataset.id); break;
       case 'trsave': await saveTrainer(); break;
+      case 'mypw': closeSheet(); pwOpen(null); break;
+      case 'cpw': if (S.owner) { modal.close(); pwOpen(el.dataset.uid, el.dataset.nm); } break;
+      case 'pwsave': await pwSave(); break;
+      case 'cdelme': {
+        if (!confirm('Да изтрием ли профила ти за вход в приложението?\n\nНяма да можеш да влизаш с този имейл, докато не се регистрираш отново. Историята на тренировките и плащанията остава в клуба, както изисква законът. Ако искаш да изтрием и тях, пиши ни на gym@newleveltraining.bg.')) break;
+        const { error } = await sb.rpc('delete_my_account'); if (error) return toast('Не се изтри: ' + (error.message || ''));
+        closeSheet(); await sb.auth.signOut(); S.me = null; S.view = null; toast('Профилът е изтрит'); loginView(); break; }
       case 'trdel': if (confirm('Да се изтрие ли служителят? Ако има часове, по-добре го направи неактивен.')) { const { error } = await sb.from('staff').delete().eq('id', $('#trd').dataset.id); if (error) return fail(error, 'Не се изтри (има свързани часове — направи го неактивен)'); S.staff = (await sb.from('staff').select('*').order('name')).data; modal.close(); teamView(); } break;
       case 'sub': S.sub = el.dataset.v; settingsView(); break;
       case 'policysave': await savePolicy(); break;
