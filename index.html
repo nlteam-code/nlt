@@ -1454,7 +1454,7 @@ function drawClients() {
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
     <select id="cl-loc"><option value="all">Двата обекта</option>${LOCS.map(l => `<option ${S.cloc === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
     <select id="cf"><option value="all">Без друг филтър</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option><option value="mo" ${S.cfilter === 'mo' ? 'selected' : ''}>Само масажи</option></select>
-    ${S.owner ? '<button data-act="cemails" title="Имейлите на показания списък, готови за скрито копие (BCC)">Имейли за писмо</button>' : ''}<button class="pri" data-act="newclient">+ Нов клиент</button></div>
+    ${S.owner ? '<button data-act="cemails" title="Имейлите на показания списък, готови за скрито копие (BCC)">Имейли за писмо</button><button data-act="cnoprof" title="Клиенти без профил в приложението · повторна покана">Без профил</button>' : ''}<button class="pri" data-act="newclient">+ Нов клиент</button></div>
     <div class="chips" style="margin-bottom:8px"><button class="${S.csts.length ? '' : 'on'}" data-act="cstat" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${S.csts.includes(k) ? 'on' : ''}" data-act="cstat" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
     <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.csts.length ? ' · ' + S.csts.map(k => CST[k]).join(', ') : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
     <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Телефон</th><th>Пакет</th><th title="Активирал профила си в приложението">Профил</th></tr></thead><tbody>
@@ -1557,6 +1557,38 @@ async function sendInvite(email, quiet) {
   const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
   if (error) { toast('Поканата не е изпратена: ' + (/rate|seconds/i.test(error.message) ? 'изчакай минута и опитай пак.' : error.message)); return false; }
   toast('Поканата е изпратена до ' + email); return true;
+}
+/* ── клиенти без профил в приложението + покана до всички ── */
+function noProfList() {
+  const L = S.clients.filter(c => !c.massage_only && !c.user_id && c.status !== 'Inactive');
+  const send = L.filter(c => c.email && /^\S+@\S+\.\S+$/.test(c.email.trim()) && (c.status === 'Active' || c.status === 'Paused' || cstat(c) === 'active'));
+  return { L, send, lead: L.filter(c => !send.includes(c) && c.email), noMail: L.filter(c => !c.email) };
+}
+function noProfView() {
+  const { L, send, lead, noMail } = noProfList(), r = D.inv;
+  const row = c => `<tr><td><a data-act="client" data-id="${c.id}">${esc(c.name)}</a></td><td>${esc(c.email || '—')}</td><td>${esc(c.location || '')}</td><td>${esc(CST[cstat(c)] || '')}</td><td>${r && r.ok.includes((c.email || '').trim().toLowerCase()) ? '<span class="chip ok">изпратена</span>' : r && r.err[(c.email || '').trim().toLowerCase()] ? `<span class="chip bad" title="${esc(r.err[(c.email || '').trim().toLowerCase()])}">грешка</span>` : ''}</td></tr>`;
+  const tbl = (h, a) => a.length ? `<h3 style="margin:14px 0 6px">${h} · ${a.length}</h3><div class="tw" style="max-height:260px;overflow:auto"><table><thead><tr><th>Клиент</th><th>Имейл</th><th>Обект</th><th>Статус</th><th></th></tr></thead><tbody>${a.map(row).join('')}</tbody></table></div>` : '';
+  modal.show(`<h2>Без профил в приложението · ${L.length}</h2>
+    <div class="mute">Клиенти (без неактивните), които още не са влезли в приложението. Поканата е писмото „Добре дошъл в NLT“ с код за първи вход.</div>
+    <div class="row" style="margin:10px 0">${r && !r.done ? `<span>Изпращане… ${r.ok.length + Object.keys(r.err).length}/${r.total}</span><button data-act="cinvstop">Спри</button>` : `<button class="pri" data-act="cinvall" ${send.length ? '' : 'disabled'}>Изпрати покана на всички (${send.length})</button>`}${r && r.done ? `<span class="mute">Изпратени ${r.ok.length}${Object.keys(r.err).length ? ` · грешки ${Object.keys(r.err).length}` : ''}</span>` : ''}</div>
+    <div class="mute" style="font-size:12px">Пращат се по една на 15 секунди (лимит на пощата) — ${Math.ceil(send.length / 4)} мин. Не затваряй страницата докато свърши.</div>
+    ${tbl('Ще получат покана (активни, на пауза или с текущ пакет)', send)}${tbl('Потенциални (Lead) без пакет — не се пращат', lead)}${tbl('Без имейл — въведи имейл в профила им', noMail)}`, true);
+}
+async function inviteAll() {
+  const { send } = noProfList(); if (!send.length) return;
+  if (!confirm(`Да се изпрати покана за приложението на ${send.length} клиента?`)) return;
+  const em = [...new Set(send.map(c => c.email.trim().toLowerCase()))];
+  D.inv = { ok: [], err: {}, total: em.length, done: false }; D.invStop = false; noProfView();
+  for (const e of em) {
+    if (D.invStop) break;
+    let { error } = await sb.auth.signInWithOtp({ email: e, options: { shouldCreateUser: true } });
+    if (error && /rate|seconds|security purposes/i.test(error.message)) { await new Promise(r => setTimeout(r, 65000)); ({ error } = await sb.auth.signInWithOtp({ email: e, options: { shouldCreateUser: true } })); }
+    if (error) D.inv.err[e] = error.message; else D.inv.ok.push(e);
+    if (modal.open() && $('#modal h2')?.textContent.startsWith('Без профил')) noProfView();
+    await new Promise(r => setTimeout(r, 15000));
+  }
+  D.inv.done = true; toast(`Поканите са изпратени: ${D.inv.ok.length}${Object.keys(D.inv.err).length ? ` · грешки ${Object.keys(D.inv.err).length}` : ''}`);
+  if (modal.open() && $('#modal h2')?.textContent.startsWith('Без профил')) noProfView();
 }
 async function saveClient() {
   const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, source: $('#c-src') ? $('#c-src').value : undefined, notes: $('#c-notes').value.trim() || null };
@@ -2326,7 +2358,7 @@ async function clientApp() {
   const mq = sb.from('massage_bookings').select('*').eq('client_id', me.id).gte('date', t).order('date').order('start_time');
   const [pk, bk, cl, set, mm, wl] = await Promise.all([
     sb.from('package_status').select('*').eq('client_id', me.id).order('end_date', { ascending: false }),
-    sb.from('bookings').select('id,status,late,session_id,sessions!inner(id,date,start_time,duration_min,kind,title,location,cancelled)').eq('client_id', me.id).gte('sessions.date', t).order('date', { foreignTable: 'sessions' }),
+    sb.from('bookings').select('id,status,late,session_id,created_at,sessions!inner(id,date,start_time,duration_min,kind,title,location,cancelled)').eq('client_id', me.id).gte('sessions.date', t).order('date', { foreignTable: 'sessions' }),
     sb.from('sessions').select('id,date,start_time,title,location,capacity,kind,cancelled').eq('kind', 'group').eq('cancelled', false).gte('date', t).lte('date', to).order('date').order('start_time'),
     sb.from('settings').select('*'),
     mq, wq
@@ -2357,8 +2389,29 @@ async function clientApp() {
   if (!S.previewClient) {
     const g = await sb.from('client_consents').select('id').eq('client_id', me.id).eq('version', CONSENT_V).limit(1);
     if (!g.error && !(g.data && g.data.length)) return consentGate();
+    if ((me.phone || '').replace(/\D/g, '').length < 9) return phoneGate();
   }
   renderClient();
+}
+
+/* ── задължителен телефон при влизане ── */
+function phoneGate() {
+  const me = S.me.row;
+  $('#app').innerHTML = `<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span></header><main class="c-main" style="padding-bottom:40px">
+    <h2 class="c-title">Телефонен номер</h2>
+    <div class="c-note">Въведи телефона си, за да можем да се свържем с теб при промяна в графика.</div>
+    <label class="c-k" for="ph-in">Телефон</label>
+    <input id="ph-in" type="tel" inputmode="tel" autocomplete="tel" placeholder="08XX XXX XXX" value="${esc(me.phone || '')}" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--c-line,#ccc);font-size:16px;margin-bottom:14px">
+    <button class="c-btn solid wide" data-act="cphone">Запази и продължи</button>
+    <button class="c-btn plain wide" data-act="logout">Изход</button></main></div>`;
+  const i = $('#ph-in'); i.focus(); i.addEventListener('keydown', e => { if (e.key === 'Enter') phoneSave(); });
+}
+async function phoneSave() {
+  const v = ($('#ph-in')?.value || '').trim(), d = v.replace(/\D/g, '');
+  if (d.length < 9 || d.length > 15 || !/^\+?[0-9 ()\-\/]+$/.test(v)) return toast('Въведи валиден телефонен номер.');
+  const { error } = await sb.rpc('set_my_phone', { p_phone: v });
+  if (error) return fail(error, 'Номерът не се записа');
+  S.me.row.phone = v; toast('Записано'); clientApp();
 }
 
 /* ── условия и съгласие с подпис (преди влизане в приложението) ── */
@@ -2712,13 +2765,17 @@ async function clientBook(sid) {
 function clientCancelDialog(bid, sid) {
   if (S.previewClient) return toast('Само преглед — промените са изключени.');
   const b = C.bookings.find(x => x.id === bid); if (!b) return;
-  const must = C.policy.mustResched !== false;
+  const start = new Date(`${b.sessions.date}T${hm(b.sessions.start_time)}:00`);
+  const until = b.created_at ? new Date(Math.min(new Date(b.created_at).getTime() + 24 * 3600e3, start.getTime())) : null;
+  const grace = !!until && until > new Date();
+  const must = !grace && C.policy.mustResched !== false;
   const pk = C.pkgs.find(p => p.kind === 'group' && p.start_date <= b.sessions.date && p.end_date >= b.sessions.date);
   const opts = C.classes.filter(s => !s.mine && s.free !== 0 && s.date !== b.sessions.date && pk && s.date >= pk.start_date && s.date <= pk.end_date);
   const hrs = C.cv.cancelMinHours ?? 12;
+  const untilTxt = grace ? `${fmt(ymd(until))} ${pad(until.getHours())}:${pad(until.getMinutes())}` : '';
   modal.show(`<h2>Отказ от час</h2><div class="mute">${fmtLong(b.sessions.date)} · ${hm(b.sessions.start_time)}</div>
-    <p>${must ? `Часът трябва да се презапише за друг ден в рамките на абонамента. Отказ по-късно от ${hrs} ч. преди началото се брои като проведен.` : 'Можеш да се откажеш или да преместиш часа.'}</p>
-    <label class="f">Нов час<select id="re-sel">${must ? '' : '<option value="">— само отказ —</option>'}${opts.map(s => `<option value="${s.id}">${fmtLong(s.date)} · ${hm(s.start_time)} (${s.free ?? '?'} места)</option>`).join('')}</select></label>
+    <p>${grace ? `Записал си се наскоро — можеш да откажеш часа без последствия до <b>${untilTxt}</b> (24 ч. след записването). Посещението се връща в абонамента ти.` : must ? `Часът трябва да се презапише за друг ден в рамките на абонамента. Отказ по-късно от ${hrs} ч. преди началото се брои като проведен.` : 'Можеш да се откажеш или да преместиш часа.'}</p>
+    <label class="f">${grace ? 'Премести в друг час (по желание)' : 'Нов час'}<select id="re-sel">${must ? '' : '<option value="">— само отказ —</option>'}${opts.map(s => `<option value="${s.id}">${fmtLong(s.date)} · ${hm(s.start_time)} (${s.free ?? '?'} места)</option>`).join('')}</select></label>
     ${must && !opts.length ? '<div class="err">Няма свободни часове за друг ден в рамките на абонамента ти.</div>' : ''}
     <div class="row" style="margin-top:12px"><button class="pri" data-act="cdo" data-bid="${bid}" ${must && !opts.length ? 'disabled' : ''}>Потвърди</button></div>`);
 }
@@ -3194,6 +3251,9 @@ document.addEventListener('click', async e => {
       case 'perm': { const v = el.checked, { error } = await sb.from('staff').update({ [el.dataset.p]: v }).eq('id', el.dataset.s); if (error) { el.checked = !v; return fail(error, 'Правото не се записа'); } const t = S.staff.find(x => x.id === el.dataset.s); if (t) t[el.dataset.p] = v; toast(v ? 'Правото е дадено' : 'Правото е махнато'); break; }
       case 'pradd': case 'prdel': case 'pmstat': case 'pcsv': payAct(act, el); break;
       case 'rwclaim': { if (S.previewClient) return toast('Само преглед.'); const { error } = await sb.rpc('claim_reward', { p_level: +el.dataset.id }); if (error) return fail(error, 'Не се получи'); toast('Заявено'); clientApp(); break; }
+      case 'cnoprof': noProfView(); break;
+      case 'cinvall': inviteAll(); break;
+      case 'cinvstop': D.invStop = true; break;
       case 'cemails': {
         const L = (S.clist || []).filter(c => !c.massage_only), ok = L.filter(c => c.email && c.email.includes('@')), em = [...new Set(ok.map(c => c.email.trim().toLowerCase()))], no = L.filter(c => !(c.email && c.email.includes('@')));
         const chunks = []; for (let i = 0; i < em.length; i += 90) chunks.push(em.slice(i, i + 90));
@@ -3325,6 +3385,7 @@ document.addEventListener('click', async e => {
       case 'ics': downloadIcs(el.dataset.id); break;
       case 'cbook': await clientBook(el.dataset.id); break;
       case 'ccancel': clientCancelDialog(el.dataset.bid, el.dataset.sid); break;
+      case 'cphone': await phoneSave(); break;
       case 'cdo': await clientCancel(el.dataset.bid); break;
       case 'blate': break;
     }
