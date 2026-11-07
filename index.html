@@ -212,6 +212,7 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-price{display:flex;align-items:baseline;gap:6px;margin-top:16px}
 .c-price b{font:800 44px Montserrat,sans-serif;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
 .c-price span{font-size:14px;color:rgba(255,255,255,.66)}
+.c-price{flex-wrap:wrap}.c-pv{margin-left:auto;align-self:center;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;text-align:right}.c-pv b{font:800 18px Montserrat,sans-serif!important;letter-spacing:-.02em;color:#fff}.c-pv span{font-size:12px;color:rgba(255,255,255,.66)}
 .c-badge{position:absolute;top:16px;right:16px;font:700 11px Roboto,sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:#fff;background:linear-gradient(135deg,var(--c-coral),#f0645f);box-shadow:0 4px 12px rgba(235,76,81,.4)}
 .c-plan.c-single{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .c-plan.c-single .c-price{margin-top:0}
@@ -2811,7 +2812,7 @@ function clientServices() {
   <h3 class="c-h">Месечни абонаменти</h3>
   <div class="c-plans">${SVC.plans.map(([n, k, pg, ps, badge]) => `<section class="c-plan ${badge ? 'hot' : ''}">${badge ? `<span class="c-badge">${badge}</span>` : ''}
     <div class="c-plan-n">${n}</div><div class="c-plan-k">${k} тренировки месечно</div>
-    <div class="c-price"><b>${g ? pg : ps}</b><span>€ / месец</span></div></section>`).join('')}</div>
+    <div class="c-price"><b>${g ? pg : ps}</b><span>€ / месец</span><div class="c-pv"><b>${((g ? pg : ps) / k).toFixed(2).replace('.', ',')} €</b><span>на посещение</span></div></div></section>`).join('')}</div>
   <h3 class="c-h">Еднократно посещение</h3>
   ${(([n, s, pr]) => `<section class="c-plan c-single"><div><div class="c-plan-n">${n}</div><div class="c-plan-k">${s}</div></div><div class="c-price"><b>${pr}</b><span>€</span></div></section>`)(SVC.single[g ? 0 : 1])}
   <div class="c-note" style="text-align:center">За абонамент или въпроси — питай треньора си в залата.</div>`;
