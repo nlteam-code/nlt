@@ -1764,12 +1764,12 @@ async function loadCancelCard() {
     ${top.map(([id, n]) => `<div class="fe"><span>${esc(cname(id))}</span><span class="chip">${n}</span></div>`).join('') || '<div class="mute">Няма отказани часове.</div>'}`;
 }
 function actCardHtml(acts) {
-  const FEEDS = { cancel: 'Отказан', change: 'Сменен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит' }, dd = parse(D.day);
+  const FEEDS = { cancel: 'Отказан', change: 'Сменен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' }, dd = parse(D.day);
   const cnt = t => acts.filter(e => e.type === t).length, shown = acts.filter(e => D.filter === 'all' || e.type === D.filter);
   const chip = (v, l, extra = '') => `<button class="sm ${D.filter === v ? 'on' : ''}" data-act="afilter" data-v="${v}">${l}${extra}</button>`;
   return `<div class="card" style="margin-bottom:12px"><h2>Дневна активност <span class="mute" style="font-weight:400">· ${esc((S.me.row.locations || []).join(', '))}</span></h2>
     <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
-    <div class="chips">${chip('all', 'Всички', S.owner ? ` ${acts.length}` : '')}${chip('cancel', 'Отказани', S.owner ? ` ${cnt('cancel')}` : '')}${chip('change', 'Сменени', S.owner ? ` ${cnt('change')}` : '')}${chip('attended', 'Проведени', S.owner ? ` ${cnt('attended')}` : '')}${chip('new', 'Записани', S.owner ? ` ${cnt('new')}` : '')}</div>
+    <div class="chips">${chip('all', 'Всички', S.owner ? ` ${acts.length}` : '')}${chip('cancel', 'Отказани', S.owner ? ` ${cnt('cancel')}` : '')}${chip('change', 'Сменени', S.owner ? ` ${cnt('change')}` : '')}${chip('attended', 'Проведени', S.owner ? ` ${cnt('attended')}` : '')}${chip('new', 'Записани', S.owner ? ` ${cnt('new')}` : '')}${chip('activated', 'Нови профили', ` ${cnt('activated')}`)}</div>
     <div style="max-height:340px;overflow:auto">${shown.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден.</div>'}</div></div>`;
 }
 async function nextClients() {
@@ -2061,7 +2061,7 @@ async function dashView() {
     svg += `<text x="${cx}" y="${H - 8}" text-anchor="middle" ${x === cur ? 'style="fill:var(--ink);font-weight:700"' : ''}>${MSHORT[+x.slice(5, 7) - 1]}</text>`; });
   svg += '</svg>';
   // дневна активност
-  const FEEDS = { cancel: 'Отказан', change: 'Сменен', paid: 'Платен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит' };
+  const FEEDS = { cancel: 'Отказан', change: 'Сменен', paid: 'Платен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' };
   const acts = act.data || [], cnt = t => acts.filter(e => e.type === t).length;
   const shownActs = acts.filter(e => D.filter === 'all' || e.type === D.filter);
   const dd = parse(D.day);
@@ -2072,7 +2072,7 @@ async function dashView() {
     <div class="cols">
       <div class="card"><h2>Дневна активност</h2>
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
-        <div class="chips">${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}</div>
+        <div class="chips">${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}${chip('afilter', 'activated', 'Нови профили', D.filter, ` ${cnt('activated')}`)}</div>
         <div style="max-height:340px;overflow:auto">${shownActs.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
       <div class="card"><h2>Прогноза за месеца</h2>
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="dmonth" data-d="-1">‹</button><b>${mLabel(D.month)}</b><button class="sm" data-act="dmonth" data-d="1">›</button></div>
