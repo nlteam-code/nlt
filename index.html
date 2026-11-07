@@ -1512,6 +1512,9 @@ async function openClient(id, tab) {
     </div>
 
     <div class="cpane" data-p="pkgs" ${T === 'pkgs' ? '' : 'hidden'}>
+    <h3 style="margin-top:0">Назначи услуга</h3>
+    <div class="row"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
+      <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
     <h3>История на абонаментите</h3>
     ${pk.map(p => { const left = p.total - p.used; return `<div class="pk"><div style="min-width:180px"><b>${esc(p.package_name || (p.kind === 'solo' ? 'Персонални' : 'Групови'))}</b> ${pstate(p)}${arm[p.id] && arm[p.id].source === 'auto' ? ' <span class="chip">авто</span>' : ''}<br><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}${S.owner ? ' · ' + money(p.price) : ''}</span></div>
       <div class="bar2"><i style="width:${Math.min(100, p.used / p.total * 100)}%"></i></div><span>${p.used}/${p.total}${left <= 0 ? ' · изчерпан' : ''}</span>
@@ -1521,9 +1524,6 @@ async function openClient(id, tab) {
     ${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).length ? `<h3>Платени абонаменти · PT Minder</h3>${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).map(p => `<div class="bk"><div class="nm">${fmt(p.date)} · ${esc(p.category)} · <b>${money(p.amount)}</b></div></div>`).join('')}` : ''}
     <h3>Хронология</h3>
     ${subHistory(pk, [...past.filter(b => b.status === 'done').map(b => ({ date: b.sessions.date, kind: b.sessions.kind })), ...arch.filter(h => !h.bad).map(h => ({ date: h.date }))], S.owner ? { pays, chs } : null, true)}
-    <h3>Назначи услуга</h3>
-    <div class="row"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
-      <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
     </div>
 
     <div class="cpane" data-p="visits" ${T === 'visits' ? '' : 'hidden'}>
