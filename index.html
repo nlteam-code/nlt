@@ -456,6 +456,12 @@ const VISIT_PRICE = 37;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
 const LOCS = ['Боян Петров', 'Лерин'];
+/* бонуси */
+const GPLACE = { 'Лерин': 'ChIJuU-P7SaFqkARxch53fm9qYk', 'Боян Петров': 'ChIJdRay5-6FqkARlJTme3lbhBU' };
+const reviewUrl = loc => 'https://search.google.com/local/writereview?placeid=' + (GPLACE[loc] || GPLACE['Лерин']);
+const BON_K = { review: 'Ревю в Google', referral: 'Препоръка', loyalty: '3 абонамента подред' };
+const BON_R = { massage30: 'Безплатен 30-мин масаж', discount10: '−10% за абонамент' };
+const BON_S = { pending: ['warn', 'за проверка'], available: ['ok', 'наличен'], used: ['', 'използван'], rejected: ['bad', 'отказан'] };
 
 /* ───────── помощни ───────── */
 const $ = (s, r = document) => r.querySelector(s);
@@ -587,7 +593,7 @@ sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') loginView('', 
 /* ═════════════════ ПЕРСОНАЛ ═════════════════ */
 async function staffApp() {
   const [c, p, s, q] = await Promise.all([
-    sb.from('clients').select('id,name,phone,email,status,location,notes,user_id').order('name').range(0, 4999),
+    sb.from('clients').select('id,name,phone,email,status,location,notes,user_id,referred_by').order('name').range(0, 4999),
     sb.from('packages').select('*').order('sort_order'),
     sb.from('staff').select('*').order('name'),
     sb.from('settings').select('*')
@@ -1478,6 +1484,9 @@ async function openClient(id, tab) {
   ]);
   if (c.error) return fail(c.error, 'Клиентът не се отвори');
   const arm = {}; (arq && arq.data || []).forEach(r => arm[r.id] = r);
+  const bonq = await sb.from('bonuses').select('*').eq('client_id', id).order('created_at', { ascending: false });
+  const bons = bonq.error ? [] : (bonq.data || []), disc = bons.find(b => b.status === 'available' && b.reward === 'discount10');
+  const friends = S.clients.filter(c => c.referred_by === id);
   const x = c.data, pk = cp.data || [], pays = pay.data || [], chs = chg.data || [], t0 = today();
   const sumPk = pk.reduce((a, p) => a + Number(p.price || 0), 0), sumCh = chs.reduce((a, p) => a + Number(p.amount), 0), sumPay = pays.reduce((a, p) => a + Number(p.amount), 0);
   const bal = sumPk + sumCh - sumPay;
@@ -1503,6 +1512,7 @@ async function openClient(id, tab) {
       <label class="f">Телефон<input id="c-phone" value="${esc(x.phone || '')}"></label>
       <label class="f">Имейл<input id="c-email" value="${esc(x.email || '')}"><button type="button" class="sm" style="margin-top:4px;align-self:flex-start" data-act="cinvite">Изпрати покана</button></label>
       <label class="f">Локация<select id="c-loc">${LOCS.map(l => `<option ${l === x.location ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="f">Препоръчан от<select id="c-ref"><option value="">— никой —</option>${S.clients.filter(c => c.id !== x.id).slice().sort((a, b) => a.name.localeCompare(b.name, 'bg')).map(c => `<option value="${c.id}" ${c.id === x.referred_by ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
       <label class="f">Откъде идва<select id="c-src">${['Уебсайт', 'Препоръка', 'Instagram', 'Facebook', 'Google', 'Друго'].map(v => `<option ${v === (x.source || 'Уебсайт') ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент, иначе Чакащ)'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => `<option value="${v}" ${v === (x.status === 'Lead' ? 'Active' : x.status) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     </div>
@@ -1515,6 +1525,13 @@ async function openClient(id, tab) {
     <h3 style="margin-top:0">Назначи услуга</h3>
     <div class="row"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
       <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
+    ${disc ? `<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="np-bon" value="${disc.id}" checked> Приложи бонус <b>−10%</b> (${esc(BON_K[disc.kind])})</label>` : ''}
+    <h3>Бонуси</h3>
+    ${bons.map(b => `<div class="bk"><div class="nm"><b>${esc(BON_K[b.kind])}</b>${b.friend_id ? ' · ' + esc(cname(b.friend_id)) : ''} — ${b.reward ? esc(BON_R[b.reward]) : '<i>чака избор: 10% или масаж</i>'} <span class="chip ${BON_S[b.status][0]}">${BON_S[b.status][1]}</span> <span class="mute">${fmt(String(b.created_at).slice(0, 10))}</span></div>
+      ${b.status === 'pending' ? `<button class="sm pri" data-act="bonok" data-id="${b.id}">Потвърди</button> <button class="sm" data-act="bonno" data-id="${b.id}">Откажи</button>` : ''}
+      ${b.status === 'available' && b.kind === 'referral' && !b.reward ? `<button class="sm" data-act="bonch" data-id="${b.id}" data-r="discount10">10%</button> <button class="sm" data-act="bonch" data-id="${b.id}" data-r="massage30">Масаж</button>` : ''}
+      ${b.status === 'available' && b.reward ? `<button class="sm" data-act="bonuse" data-id="${b.id}">Използван</button>` : ''}</div>`).join('') || '<div class="mute">Няма бонуси.</div>'}
+    ${friends.length ? `<div class="mute" style="margin-top:6px">Препоръчал: ${friends.map(f => esc(f.name)).join(', ')}</div>` : ''}
     <h3>История на абонаментите</h3>
     ${pk.map(p => { const left = p.total - p.used; return `<div class="pk"><div style="min-width:180px"><b>${esc(p.package_name || (p.kind === 'solo' ? 'Персонални' : 'Групови'))}</b> ${pstate(p)}${arm[p.id] && arm[p.id].source === 'auto' ? ' <span class="chip">авто</span>' : ''}<br><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}${S.owner ? ' · ' + money(p.price) : ''}</span></div>
       <div class="bar2"><i style="width:${Math.min(100, p.used / p.total * 100)}%"></i></div><span>${p.used}/${p.total}${left <= 0 ? ' · изчерпан' : ''}</span>
@@ -1558,6 +1575,17 @@ async function sendInvite(email, quiet) {
   if (error) { toast('Поканата не е изпратена: ' + (/rate|seconds/i.test(error.message) ? 'изчакай минута и опитай пак.' : error.message)); return false; }
   toast('Поканата е изпратена до ' + email); return true;
 }
+/* ── бонуси: действия на персонала ── */
+async function bonusAct(act, el) {
+  const id = +el.dataset.id, now = new Date().toISOString();
+  const r = act === 'bonch' ? await sb.rpc('choose_bonus', { p_id: id, p_reward: el.dataset.r })
+    : await sb.from('bonuses').update(act === 'bonok' ? { status: 'available', handled_by: S.me.row.id }
+      : act === 'bonno' ? { status: 'rejected', handled_by: S.me.row.id, used_at: now }
+      : { status: 'used', used_at: now, handled_by: S.me.row.id }).eq('id', id);
+  if (r.error) return fail(r.error, 'Не се записа');
+  toast({ bonok: 'Потвърден', bonno: 'Отказан', bonuse: 'Отбелязан като използван', bonch: 'Избрано' }[act]);
+  if ($('#cl')) await openClient(cid(), 'pkgs'); else if (S.tab === 'rewards') rewardsView();
+}
 /* ── клиенти без профил в приложението + покана до всички ── */
 function noProfList() {
   const L = S.clients.filter(c => !c.massage_only && !c.user_id && c.status !== 'Inactive');
@@ -1591,7 +1619,7 @@ async function inviteAll() {
   if (modal.open() && $('#modal h2')?.textContent.startsWith('Без профил')) noProfView();
 }
 async function saveClient() {
-  const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, source: $('#c-src') ? $('#c-src').value : undefined, notes: $('#c-notes').value.trim() || null };
+  const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, source: $('#c-src') ? $('#c-src').value : undefined, referred_by: $('#c-ref') ? ($('#c-ref').value || null) : undefined, notes: $('#c-notes').value.trim() || null };
   if (!p.name) return toast('Името е задължително.');
   const { error } = await sb.from('clients').update(p).eq('id', cid());
   if (error) return fail(error, 'Не се записа');
@@ -1602,8 +1630,11 @@ async function saveClient() {
 async function addPackage() {
   const p = S.packages.find(x => x.id === $('#np-sel').value), start = $('#np-start').value;
   if (!p || !start) return;
-  const { error } = await sb.from('client_packages').insert({ client_id: cid(), package_id: p.id, kind: p.kind, start_date: start, end_date: pkgEnd(start, p), total: p.sessions || p.classes, price: p.price });
-  if (error) return fail(error, 'Не се добави'); toast('Пакетът е добавен'); afterClient();
+  const bon = $('#np-bon')?.checked ? +$('#np-bon').value : null, price = bon ? Math.round(p.price * 90) / 100 : p.price;
+  const { data: ins, error } = await sb.from('client_packages').insert({ client_id: cid(), package_id: p.id, kind: p.kind, start_date: start, end_date: pkgEnd(start, p), total: p.sessions || p.classes, price }).select('id').single();
+  if (error) return fail(error, 'Не се добави');
+  if (bon) { const r = await sb.from('bonuses').update({ status: 'used', used_pkg: ins.id, used_at: new Date().toISOString(), handled_by: S.me.row.id }).eq('id', bon); if (r.error) toast('Пакетът е добавен, но бонусът не се отбеляза'); }
+  toast(bon ? `Пакетът е добавен с −10% (${money(price)})` : 'Пакетът е добавен'); afterClient();
 }
 function newClientDialog() {
   modal.show(`<h2>Нов клиент</h2><div class="grid2">
@@ -1903,6 +1934,8 @@ async function rewardsView() {
   const [lv, st, cl, ov] = await Promise.all([sb.from('reward_levels').select('*').order('visits'), sb.from('reward_settings').select('count_from').eq('id', 1).maybeSingle(), sb.from('reward_claims').select('*, clients(name,location)').order('created_at', { ascending: false }).limit(300), sb.rpc('reward_overview')]);
   const er = lv.error || cl.error || ov.error; if (er) return fail(er, 'Наградите не се заредиха');
   RW.levels = lv.data || []; RW.claims = cl.data || []; RW.over = ov.data || []; RW.from = st.data?.count_from || RW.from;
+  const bq = await sb.from('bonuses').select('*').in('status', ['pending', 'available']).order('created_at', { ascending: false }).limit(300); RW.bons = bq.error ? null : bq.data || [];
+  const bc = await sb.from('settings').select('value').eq('key', 'bonus').maybeSingle(); RW.bcfg = bc.data?.value || {};
   rewardsRender();
 }
 function rewardsRender() {
@@ -1919,6 +1952,12 @@ function rewardsRender() {
   near.sort((a, b) => a.left - b.left);
   const pRow = x => `<div class="bk"><div class="nm"><b>${esc(x.clients?.name || '')}</b> <span class="mute">· ${esc(x.clients?.location || '')} · ${esc(lvById[x.level_id]?.visits || '')} тренировки</span><br>${esc(lvById[x.level_id]?.title || '')}</div><button class="sm pri" data-act="rwgive" data-id="${x.id}">Отпусни</button><button class="sm" data-act="rwno" data-id="${x.id}">Откажи</button></div>`;
   main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Награди</b><span class="mute">посещения се броят от ${fmt(RW.from)}</span></div>
+    ${RW.bons ? (() => { const bp = RW.bons.filter(b => b.status === 'pending'), ba = RW.bons.filter(b => b.status === 'available'); const bn = b => `<b>${esc(cname(b.client_id))}</b> <span class="mute">· ${esc(BON_K[b.kind])}${b.friend_id ? ' (' + esc(cname(b.friend_id)) + ')' : ''} · ${fmt(String(b.created_at).slice(0, 10))}</span>`;
+      return `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 6px">Бонуси · ревю за проверка ${bp.length} · налични ${ba.length}</h3>
+      <div class="mute" style="margin-bottom:6px">Ревю в Google → безплатен 30-мин масаж (провери ревюто в Google профила на обекта) · Препоръка → 10% или масаж по избор</div>
+      ${S.owner ? `<label style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="checkbox" data-act="bonloy" ${RW.bcfg?.loyalty ? 'checked' : ''}> Лоялност: 3 абонамента подред (пауза до 7 дни) → 10% <span class="chip ${RW.bcfg?.loyalty ? 'ok' : ''}">${RW.bcfg?.loyalty ? 'включена' : 'изключена'}</span></label>` : ''}
+      ${bp.map(b => `<div class="bk"><div class="nm">${bn(b)}</div><a class="sm" target="_blank" rel="noopener" href="https://www.google.com/maps/place/?q=place_id:${GPLACE[b.location] || GPLACE['Лерин']}">Виж ревютата</a> <button class="sm pri" data-act="bonok" data-id="${b.id}">Потвърди</button> <button class="sm" data-act="bonno" data-id="${b.id}">Откажи</button></div>`).join('')}
+      ${ba.map(b => `<div class="bk"><div class="nm">${bn(b)} — ${b.reward ? esc(BON_R[b.reward]) : '<i>чака избор</i>'}</div>${b.reward ? `<button class="sm" data-act="bonuse" data-id="${b.id}">Използван</button>` : ''}</div>`).join('') || (bp.length ? '' : '<div class="mute">Няма.</div>')}</div>`; })() : ''}
     <div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 6px">Искат награда · ${pend.length}</h3>${pend.map(pRow).join('') || '<div class="mute">Няма чакащи.</div>'}</div>
     <div class="grid2" style="margin-bottom:14px">
       <div class="card"><h3 style="margin:0 0 6px">Достигнали, още не са поискали · ${reached.length}</h3>${reached.slice(0, 40).map(({ c, l }) => `<div class="bk"><div class="nm"><b>${esc(c.name)}</b> <span class="mute">· ${c.visits} тренировки</span><br>${esc(l.title)} <span class="mute">(${l.visits})</span></div><button class="sm" data-act="rwdirect" data-c="${c.client_id}" data-l="${l.id}">Отпусни</button></div>`).join('') || '<div class="mute">Няма.</div>'}${reached.length > 40 ? `<div class="mute">Показани са първите 40.</div>` : ''}</div>
@@ -2374,8 +2413,9 @@ async function clientApp() {
       .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   } catch (e) { C.chs = []; C.pays = []; C.done = []; C.recent = []; }
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
+  try { const bq = await sb.from('bonuses').select('*').eq('client_id', me.id).order('created_at', { ascending: false }); C.bons = bq.error ? null : bq.data || []; } catch (e) { C.bons = null; }
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
-  C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {};
+  C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {}; C.bcfg = (set.data || []).find(s => s.key === 'bonus')?.value || {};
   const ids = (cl.data || []).map(s => s.id);
   const sp = ids.length ? await sb.from('session_spaces').select('*').in('session_id', ids) : { data: [] };
   const free = Object.fromEntries((sp.data || []).map(r => [r.session_id, r]));
@@ -2526,6 +2566,33 @@ function weightCard() {
     <div style="display:flex;align-items:center;gap:14px;justify-content:space-between"><div><b style="font-size:26px">${(+last.weight_kg).toFixed(1)} кг</b><div class="c-mute" style="font-size:12px">${fmt(last.day)}${w.length > 1 ? ` · ${sign}${Math.abs(diff).toFixed(1)} кг от началото` : ''}</div></div>
     ${pts.length > 1 ? `<svg viewBox="0 0 100 32" width="110" height="36" preserveAspectRatio="none" aria-hidden="true"><polyline points="${xy}" fill="none" stroke="var(--c-coral,#eb4c51)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>` : ''}</div></section>`;
 }
+function bonusStreak() {
+  const ps = (C.pkgs || []).slice().sort((a, b) => b.start_date.localeCompare(a.start_date)); if (!ps.length) return 0;
+  const lastLoy = (C.bons || []).filter(b => b.kind === 'loyalty').map(b => ps.find(p => p.id === b.pkg_id)).filter(Boolean).sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+  let n = 1, cur = ps[0];
+  for (let i = 1; i < ps.length; i++) { const p = ps[i]; if ((parse(cur.start_date) - parse(p.end_date)) / 864e5 > 8 && p.used < p.total) break; if (lastLoy && p.start_date <= lastLoy.start_date) break; n++; cur = p; }
+  if (lastLoy && ps[0].start_date <= lastLoy.start_date) return 0;
+  return Math.min(n, 3);
+}
+function bonusCard(me) {
+  if (!C.bons) return '';
+  const av = C.bons.filter(b => b.status === 'available'), rev = C.bons.find(b => b.kind === 'review' && b.status !== 'rejected'), st = C.bcfg?.loyalty ? bonusStreak() : 0;
+  const avRow = b => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--c-line,rgba(0,0,0,.08))"><div><b>${b.reward ? esc(BON_R[b.reward]) : 'Избери награда'}</b><div class="c-note" style="margin:2px 0 0">${esc(BON_K[b.kind])}${b.kind === 'referral' && b.friend_id ? ' · благодарим за препоръката!' : ''}${b.reward === 'discount10' ? ' · важи за следващия ти абонамент' : b.reward === 'massage30' ? ' · кажи на рецепцията, за да ти запишем час' : ''}</div></div>
+    ${b.kind === 'referral' && !b.reward ? `<div style="display:flex;gap:6px"><button class="c-btn solid sm" data-act="bonpick" data-id="${b.id}" data-r="discount10">−10%</button><button class="c-btn glass sm" data-act="bonpick" data-id="${b.id}" data-r="massage30">Масаж</button></div>` : '<span class="c-done">🎁</span>'}</div>`;
+  return `<section class="c-card"><div class="c-k">Бонуси</div>
+    ${av.map(avRow).join('')}
+    <div style="padding:8px 0;border-top:1px solid var(--c-line,rgba(0,0,0,.08))"><b>Безплатен 30-мин масаж за ревю</b>
+      ${!rev ? `<div class="c-note" style="margin:2px 0 8px">Напиши ревю за ${esc(me.location || 'залата')} в Google и натисни „Написах ревю“.</div><div style="display:flex;gap:6px;flex-wrap:wrap"><a class="c-btn solid sm" target="_blank" rel="noopener" href="${esc(reviewUrl(me.location))}">Напиши ревю</a><button class="c-btn glass sm" data-act="bonrev">Написах ревю</button></div>`
+        : rev.status === 'pending' ? '<div class="c-note" style="margin:2px 0 0">Благодарим! Проверяваме ревюто и ще ти потвърдим масажа.</div>' : '<div class="c-note" style="margin:2px 0 0">Получен ✓</div>'}</div>
+    <div style="padding:8px 0;border-top:1px solid var(--c-line,rgba(0,0,0,.08))"><b>Препоръчай приятел</b><div class="c-note" style="margin:2px 0 0">Когато приятелят ти си купи абонамент, избираш: −10% от следващия ти абонамент или безплатен масаж. Нека каже на рецепцията, че идва от теб.</div></div>
+    ${C.bcfg?.loyalty ? `<div style="padding:8px 0 0;border-top:1px solid var(--c-line,rgba(0,0,0,.08))"><b>3 абонамента подред → −10%</b><div class="c-note" style="margin:2px 0 6px">Подновявай без прекъсване (до 7 дни пауза). Подред: ${st} от 3</div><div class="c-bar"><i style="width:${Math.max(4, Math.round(st / 3 * 100))}%"></i></div></div>` : ''}
+  </section>`;
+}
+async function bonusReviewClaim() {
+  if (S.previewClient) return toast('Само преглед.');
+  const { error } = await sb.rpc('claim_review_bonus'); if (error) return fail(error, 'Не се записа');
+  toast('Благодарим! Ще проверим ревюто.'); clientApp();
+}
 function massageCard(t) {
   const m = (C.massages || []).filter(x => x.status === 'booked' && x.date >= t)[0];
   if (!m) return '';
@@ -2552,6 +2619,7 @@ function clientHome(me, t, act) {
       <div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.total - main.left} от ${main.total}</b><span>изразходени посещения · остават ${main.left}</span></div></div>
       <div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>`
     : ''}
+  ${bonusCard(me)}
   ${rewardCard()}
   ${massageCard(t)}
   ${weightCard()}
@@ -3252,6 +3320,10 @@ document.addEventListener('click', async e => {
       case 'pradd': case 'prdel': case 'pmstat': case 'pcsv': payAct(act, el); break;
       case 'rwclaim': { if (S.previewClient) return toast('Само преглед.'); const { error } = await sb.rpc('claim_reward', { p_level: +el.dataset.id }); if (error) return fail(error, 'Не се получи'); toast('Заявено'); clientApp(); break; }
       case 'cnoprof': noProfView(); break;
+      case 'bonok': case 'bonno': case 'bonuse': case 'bonch': await bonusAct(act, el); break;
+      case 'bonrev': await bonusReviewClaim(); break;
+      case 'bonloy': { const on = !RW.bcfg?.loyalty; if (on && !confirm('Да се включи ли лоялността? Клиентите с 3 абонамента подред ще получават −10% автоматично.')) { el.checked = false; break; } const { error } = await sb.from('settings').upsert({ key: 'bonus', value: { ...(RW.bcfg || {}), loyalty: on } }); if (error) return fail(error, 'Не се записа'); toast(on ? 'Лоялността е включена' : 'Лоялността е изключена'); rewardsView(); break; }
+      case 'bonpick': { if (S.previewClient) return toast('Само преглед.'); const { error } = await sb.rpc('choose_bonus', { p_id: +el.dataset.id, p_reward: el.dataset.r }); if (error) return fail(error, 'Не се записа'); toast('Избрано'); clientApp(); break; }
       case 'cinvall': inviteAll(); break;
       case 'cinvstop': D.invStop = true; break;
       case 'cemails': {
