@@ -410,6 +410,12 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .pg-cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 @media(max-width:640px){.pg-wf{grid-template-columns:1fr 1fr}.pg-wf .pg-btn{grid-column:1/3;width:100%;min-height:50px;font-size:16px}}
 .cm .pg-wf{grid-template-columns:1fr 1fr}.cm .pg-wf .pg-btn{grid-column:1/3;width:100%;min-height:50px;font-size:16px}
+.wc-head .wc-pts{display:flex;align-items:baseline;gap:8px;margin:4px 0}.wc-head .wc-pts b{font-size:40px;font-weight:800;color:var(--pg-acc)}.wc-head .wc-pts span{color:var(--pg-mute)}
+.wc-days{display:flex;gap:6px;overflow:auto;margin-bottom:10px}.wc-days .pg-tb{flex:1;padding:8px 6px}
+.wc-opts{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.wc-opt{text-align:left;border:1px solid var(--pg-line);background:var(--pg-card);color:var(--pg-ink);border-radius:14px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit}.wc-opt span{font-size:12px;color:var(--pg-mute)}.wc-opt.on{border-color:var(--pg-acc);box-shadow:0 0 0 1px var(--pg-acc) inset}
+.wc-or{text-align:center;font-size:12px;color:var(--pg-mute)}
+.wc-form{display:grid;grid-template-columns:1fr 1fr;gap:8px}.wc-form select{grid-column:1/3}.wc-form .pg-btn{grid-column:1/3;min-height:50px}.wc-form input,.wc-form select{font:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:1px solid var(--pg-line);background:var(--pg-card);color:var(--pg-ink);width:100%;min-width:0;-webkit-appearance:none;appearance:none}
+.wc-wk{display:flex;align-items:center;gap:6px;padding:4px 0}.wc-wk span{width:64px;font-size:13px;color:var(--pg-mute)}.wc-wk i{flex:1;text-align:center;font-style:normal;font-weight:700;padding:6px 0;border-radius:10px;background:var(--pg-line);color:var(--pg-mute)}.wc-wk i.on{background:color-mix(in srgb,var(--pg-acc) 22%,transparent);color:var(--pg-ink)}
 .pg-wf input[type=date]{-webkit-appearance:none;appearance:none;min-height:48px;max-width:100%;display:block}
 /* дата във формат ДД/ММ/ГГГГ върху стандартното поле */
 .dwrap{position:relative;display:inline-block;min-width:0}
@@ -1855,7 +1861,7 @@ function pgvClients() {
   const list = base.filter(c => !sts.length || sts.includes(cstat(c))).sort((a, b) => ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(a)] - ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
   const stCls = { active: 'ok', wait: 'warn', pause: '', inactive: '' }, todoN = pgvTasks().filter(x => !PGV.done.has(`${x.cid}|${x.k}|${x.ref}`)).length;
   main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="sp"></span>
-    <div class="chips" style="margin:0"><button class="on" data-act="pgmode" data-m="clients">Клиенти</button><button data-act="pgmode" data-m="tasks">Задачи · ${todoN}</button></div></div>
+    <div class="chips" style="margin:0"><button class="on" data-act="pgmode" data-m="clients">Клиенти</button><button data-act="pgmode" data-m="tasks">Задачи · ${todoN}</button><button data-act="wcmode" data-m="wc">Предизвикателство</button></div></div>
     <div class="row" style="margin-bottom:10px;flex-wrap:wrap"><input id="pgq" placeholder="Търси клиент…" value="${esc(D.pgq || '')}" style="flex:1;min-width:200px">
     <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     <div class="chips" style="margin-bottom:8px"><button class="${sts.length ? '' : 'on'}" data-act="pgst" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${sts.includes(k) ? 'on' : ''}" data-act="pgst" data-k="${k}">${l} · ${base.filter(c => cstat(c) === k).length}</button>`).join('')}</div>
@@ -1866,6 +1872,7 @@ function pgvClients() {
 }
 function pgvRender() {
   const main = $('#main'); if (!main) return;
+  if (D.pgm === 'wc') return wcStaff();
   if (D.pgm !== 'tasks') return pgvClients();
   const all = pgvTasks().filter(x => D.pgl === 'all' || x.loc === D.pgl);
   const key = x => `${x.cid}|${x.k}|${x.ref}`, isDone = x => PGV.done.has(key(x));
@@ -1873,7 +1880,7 @@ function pgvRender() {
   const shown = all.filter(x => D.pgk === 'all' || x.k === D.pgk);
   const todo = shown.filter(x => !isDone(x)).sort((a, b) => a.pr - b.pr || a.name.localeCompare(b.name, 'bg')), dn = shown.filter(isDone);
   const row = x => `<div class="bk ptask"><label style="display:flex;align-items:center;gap:10px;flex:1;min-width:240px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px" data-act="ptoggle" data-c="${x.cid}" data-k="${x.k}" data-r="${esc(x.ref)}" ${isDone(x) ? 'checked' : ''}><span><b>${esc(x.name)}</b> <span class="mute">· ${esc(x.loc)}</span><br>${esc(x.what)} <span class="mute">— ${esc(x.sub)}</span></span></label><button class="sm" data-act="pgopen" data-id="${x.cid}">Отвори прогреса</button></div>`;
-  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="mute">${PGV.data.length} клиента с включен модул</span><span class="sp"></span><div class="chips" style="margin:0"><button data-act="pgmode" data-m="clients">Клиенти</button><button class="on" data-act="pgmode" data-m="tasks">Задачи</button></div><span class="sp"></span>
+  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="mute">${PGV.data.length} клиента с включен модул</span><span class="sp"></span><div class="chips" style="margin:0"><button data-act="pgmode" data-m="clients">Клиенти</button><button class="on" data-act="pgmode" data-m="tasks">Задачи</button><button data-act="wcmode" data-m="wc">Предизвикателство</button></div><span class="sp"></span>
     <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     ${PGV.ok ? '' : '<div class="card" style="margin-bottom:12px;border-color:var(--bad)">Отмятането още не е включено (липсва таблицата за задачи). Списъкът се вижда, но отметките няма да се запазват.</div>'}
     <div class="chips">${PGK.map(([k, l]) => `<button class="${D.pgk === k ? 'on' : ''}" data-act="pgkind" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
@@ -2419,7 +2426,7 @@ async function clientApp() {
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
   try { const bq = await sb.from('bonuses').select('*').eq('client_id', me.id).order('created_at', { ascending: false }); C.bons = bq.error ? null : bq.data || []; } catch (e) { C.bons = null; }
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
-  C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {}; C.bcfg = (set.data || []).find(s => s.key === 'bonus')?.value || {};
+  C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.wcCfg = (set.data || []).find(s => s.key === 'challenge')?.value || null; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {}; C.bcfg = (set.data || []).find(s => s.key === 'bonus')?.value || {};
   const ids = (cl.data || []).map(s => s.id);
   const sp = ids.length ? await sb.from('session_spaces').select('*').in('session_id', ids) : { data: [] };
   const free = Object.fromEntries((sp.data || []).map(r => [r.session_id, r]));
@@ -2555,7 +2562,7 @@ function cSession(b, t) {
 }
 
 const PROG_LOCKED = false, REW_LOCKED = true;
-const PG_CLIENT_TABS = [['weight', 'Тегло']]; // клиентите виждат само теглото; останалите раздели са на пауза
+const PG_CLIENT_TABS = [['weight', 'Тегло'], ['chal', 'Предизвикателство']]; // клиентите виждат само теглото; останалите раздели са на пауза
 function progLocked(title = 'Прогрес', sub = 'Скоро ще можеш да следиш теглото, измерванията и тестовете си тук.') {
   return `<h2 class="c-title">${title}</h2><div class="lockbox"><div class="lockfake" aria-hidden="true"><div class="lf-row"><i style="width:38%"></i><i style="width:22%"></i></div><svg viewBox="0 0 300 110" preserveAspectRatio="none"><path d="M0 90 C40 80 70 70 110 60 S190 40 230 30 S280 20 300 14" fill="none" stroke="currentColor" stroke-width="4"/></svg><div class="lf-row"><i style="width:60%"></i></div><div class="lf-row"><i style="width:45%"></i><i style="width:30%"></i></div></div><div class="lockmsg"><b>Услугата все още не е активна</b><span>${sub}</span></div></div>`;
 }
@@ -2637,6 +2644,7 @@ function clientHome(me, t, act) {
       <div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.total - main.left} от ${main.total}</b><span>изразходени посещения · остават ${main.left}</span></div></div>
       <div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>`
     : ''}
+  ${wcHomeCard()}
   ${bonusCard(me)}
   ${rewardCard()}
   ${massageCard(t)}
@@ -2842,7 +2850,7 @@ function renderClient() {
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
     <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
-  if (C.tab === 'prog') { PG.tab = 'weight'; pgBoot(false, me.id, 'pg', me.user_id || null); }
+  if (C.tab === 'prog') { if (!PG_CLIENT_TABS.some(x => x[0] === PG.tab)) PG.tab = 'weight'; pgBoot(false, me.id, 'pg', me.user_id || null); }
 }
 async function clientBook(sid) {
   closeSheet(); if (S.previewClient) return toast('Само преглед — записването е изключено.');
@@ -2870,6 +2878,136 @@ async function clientCancel(bid) {
   const ns = $('#re-sel').value || null;
   const { error } = await sb.rpc('cancel_booking', { p_booking: bid, p_new_session: ns });
   if (error) return fail(error, 'Отказът не успя'); modal.close(); toast('Готово'); clientApp();
+}
+
+/* ═════════════════ ПРЕДИЗВИКАТЕЛСТВО (NLT Winter Challenge) ═════════════════ */
+const WC = { ex: null, cfg: null, res: null, cid: null, loading: false, err: null, sres: null, sloc: null };
+const WC_DAYS = ['', 'Понеделник', 'Вторник', 'Сряда', 'Четвъртък', 'Петък'];
+const wcSec = s => { s = String(s || '').trim().replace(',', '.'); if (!s) return null; if (s.includes(':') || s.includes('.')) { const [a, b] = s.split(/[:.]/); const m = +a, x = +(b || 0); if (isNaN(m) || isNaN(x) || x >= 60) return null; return m * 60 + x; } const n = +s; return isNaN(n) ? null : n * 60; };
+const wcMmss = v => `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`;
+const wcVal = (e, v) => e?.kind === 'time' ? wcMmss(+v) : `${+v} ${e?.unit || ''}`.trim();
+function wcWeek(day) { const st = WC.cfg?.start; if (!st) return 0; return Math.floor((parse(day) - parse(st)) / (7 * 864e5)) + 1; }
+function wcEnd() { const c = WC.cfg || {}; return c.start ? ymd(addDays(parse(c.start), (c.weeks || 4) * 7 - 3)) : null; }
+function wcRule(e) {
+  if (e.kind === 'time') return `${+e.tmax} мин → 1 т. … ${+e.tmin} мин → 10 т.`;
+  const v = Array.isArray(e.variants) ? e.variants : [];
+  const mult = v.filter(x => +x.m !== 1).map(x => `${x.k.toLowerCase()} ×${x.m}`).join(', ');
+  return `${+e.per === 1 ? '1 т. за всяко повторение' : '1 т. за всеки ' + (+e.per) + ' ' + e.unit}${mult ? ' · ' + mult : ''}`;
+}
+async function wcLoad(cid) {
+  WC.loading = true; WC.err = null;
+  try {
+    const [ex, cfg, res] = await Promise.all([
+      sb.from('challenge_ex').select('*').order('weekday').order('opt'),
+      sb.from('settings').select('value').eq('key', 'challenge').maybeSingle(),
+      cid ? sb.from('challenge_results').select('*').eq('client_id', cid).order('day', { ascending: false }).order('created_at', { ascending: false }) : Promise.resolve({ data: [] })
+    ]);
+    const er = [ex, cfg, res].find(r => r.error); if (er) throw er.error;
+    WC.ex = ex.data || []; WC.cfg = cfg.data?.value || null; WC.res = res.data || []; WC.cid = cid;
+  } catch (e) { WC.err = e.message || String(e); }
+  WC.loading = false;
+}
+/* най-добрите точки за всеки ден от всяка седмица (броят се одобрените) */
+function wcTotals(rows, exById) {
+  const best = {};
+  rows.filter(r => r.status === 'approved').forEach(r => { const e = exById[r.ex_id]; if (!e) return; const w = wcWeek(r.day); if (w < 1 || w > (WC.cfg?.weeks || 4)) return; const k = w + '|' + e.weekday; best[k] = Math.max(best[k] || 0, +r.points); });
+  return { best, total: Object.values(best).reduce((a, x) => a + x, 0) };
+}
+function wcClientTab() {
+  const me = S.me.row;
+  if (WC.cid !== me.id && !WC.loading) { wcLoad(me.id).then(pgRender); return '<div class="pg-empty">Зареждане…</div>'; }
+  if (WC.loading) return '<div class="pg-empty">Зареждане…</div>';
+  if (WC.err) return `<div class="pg-empty">Предизвикателството още не е готово.<br><small>${esc(WC.err)}</small></div>`;
+  const cfg = WC.cfg; if (!cfg || cfg.active === false) return '<div class="pg-empty">В момента няма активно предизвикателство.</div>';
+  const loc = me.location && LOCS.includes(me.location) ? me.location : 'Боян Петров';
+  const ex = WC.ex.filter(e => e.location === loc), byId = Object.fromEntries(WC.ex.map(e => [e.id, e]));
+  const t = today(), wk = Math.min(Math.max(wcWeek(t), 1), cfg.weeks || 4), started = t >= cfg.start, ended = t > wcEnd();
+  const wd = (parse(t).getDay() + 6) % 7 + 1, dSel = WC.day || (wd <= 5 ? wd : 1);
+  const opts = ex.filter(e => e.weekday === dSel), eSel = opts.find(e => e.id === WC.exSel) || opts[0];
+  const tot = wcTotals(WC.res, byId), pend = WC.res.filter(r => r.status === 'pending');
+  const weekRow = w => `<div class="wc-wk"><span>Седм. ${w}</span>${[1, 2, 3, 4, 5].map(d => { const p = tot.best[w + '|' + d]; return `<i class="${p ? 'on' : ''}" title="${WC_DAYS[d]}">${p ? p : '·'}</i>`; }).join('')}</div>`;
+  const st = { pending: ['чака одобрение', 'warn'], approved: ['одобрен', 'ok'], rejected: ['отхвърлен', 'bad'] };
+  const form = !started ? `<div class="pg-empty">Започва на ${fmt(cfg.start)}.</div>` : ended ? '<div class="pg-empty">Предизвикателството приключи. Благодарим, че участва!</div>' : `
+    <div class="pg-sm pg-mute" style="margin-bottom:8px">Всеки ден избираш едно от двете упражнения. Резултатът се брои, след като треньорът го одобри.</div>
+    <div class="wc-days">${[1, 2, 3, 4, 5].map(d => `<button class="pg-tb ${d === dSel ? 'on' : ''}" data-act="wcday" data-d="${d}">${WC_DAYS[d].slice(0, 3)}</button>`).join('')}</div>
+    <div class="wc-opts">${opts.map(e => `<button class="wc-opt ${e.id === eSel?.id ? 'on' : ''}" data-act="wcex" data-id="${e.id}"><b>${esc(e.name)}</b><span>${esc(wcRule(e))}</span></button>`).join('<div class="wc-or">или</div>')}</div>
+    ${eSel ? `<div class="wc-form">${Array.isArray(eSel.variants) && eSel.variants.length ? `<select id="wc-var">${eSel.variants.map(v => `<option>${esc(v.k)}</option>`).join('')}</select>` : ''}
+      <input id="wc-v" ${eSel.kind === 'time' ? 'inputmode="numeric" placeholder="мм:сс (напр. 4:31)"' : `type="number" inputmode="numeric" min="1" placeholder="${esc(eSel.unit || '')}"`}>
+      <input id="wc-d" type="date" min="${cfg.start}" max="${t}" value="${t}">
+      <button class="pg-btn" data-act="wcsave" data-id="${eSel.id}">Изпрати резултата</button></div>` : ''}`;
+  const list = WC.res.length ? WC.res.slice(0, 30).map(r => { const e = byId[r.ex_id], s = st[r.status] || ['', '']; return `<div class="pg-li"><span>${fmt(r.day)}</span><div style="flex:1;min-width:0"><b>${esc(e?.name || '')}</b><div class="pg-sm pg-mute">${esc(wcVal(e, r.value))}${r.variant ? ' · ' + esc(r.variant) : ''}${r.pr ? ' · 🏆 личен рекорд +3' : ''}</div></div><b>${+r.points} т.</b>${pgChip(s[0], s[1])}${r.status === 'pending' ? `<button class="pg-ico bad" data-act="wcdel" data-id="${r.id}" aria-label="Изтрий">✕</button>` : ''}</div>`; }).join('') : '<div class="pg-empty">Още нямаш резултати.</div>';
+  return `<section class="pg-card wc-head"><div><div class="pg-sm pg-mute">${esc(cfg.name || 'Предизвикателство')} · ${fmt(cfg.start)} – ${fmt(wcEnd())}</div>
+      <div class="wc-pts"><b>${tot.total}</b><span>точки${pend.length ? ` · ${pend.length} чакат одобрение` : ''}</span></div>
+      <div class="pg-sm pg-mute">${[started && !ended ? `Седмица ${wk} от ${cfg.weeks || 4}` : '', esc(loc), 'Личен рекорд: +3 т.'].filter(Boolean).join(' · ')}</div></div></section>
+    <section class="pg-card"><h3 class="pg-h">Запиши резултат</h3>${form}</section>
+    <section class="pg-card"><h3 class="pg-h">Точки по дни</h3>${Array.from({ length: cfg.weeks || 4 }, (_, i) => weekRow(i + 1)).join('')}<div class="pg-sm pg-mute" style="margin-top:6px">Брои се най-добрият одобрен резултат за всеки ден.</div></section>
+    <section class="pg-card"><h3 class="pg-h">Моите резултати</h3>${list}</section>`;
+}
+async function wcClientSave(exId) {
+  if (S.previewClient) return toast('Само преглед — промените са изключени.');
+  const e = WC.ex.find(x => x.id === +exId); if (!e) return;
+  const raw = $('#wc-v').value, val = e.kind === 'time' ? wcSec(raw) : +raw, day = $('#wc-d').value;
+  if (!val || val <= 0) return toast(e.kind === 'time' ? 'Въведи време като мм:сс, напр. 4:31' : 'Въведи резултат');
+  if (!day || day > today() || day < WC.cfg.start) return toast('Избери дата в рамките на предизвикателството');
+  const { error } = await sb.from('challenge_results').insert({ client_id: S.me.row.id, ex_id: e.id, day, value: val, variant: $('#wc-var')?.value || null });
+  if (error) return fail(error, 'Не се записа');
+  toast('Изпратено — треньорът ще го одобри'); await wcLoad(S.me.row.id); pgRender();
+}
+function wcHomeCard() {
+  const cfg = (C.wcCfg || null); if (!cfg || cfg.active === false) return '';
+  const t = today(); if (t < ymd(addDays(parse(cfg.start), -7)) || t > ymd(addDays(parse(cfg.start), (cfg.weeks || 4) * 7))) return '';
+  return `<section class="c-card" data-act="wcgo" style="cursor:pointer"><div class="c-k">${esc(cfg.name || 'Предизвикателство')}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b style="font-size:20px">${t < cfg.start ? 'Започва ' + fmt(cfg.start) : '4 седмици · ' + (cfg.weeks || 4) * 5 + ' предизвикателства'}</b><div class="c-mute" style="font-size:13px;margin-top:2px">Запиши резултата си и събирай точки</div></div>${ic('chart', 24)}</div></section>`;
+}
+/* ── служители: одобряване и въвеждане ── */
+async function wcStaff() {
+  const main = $('#main'); if (!main) return;
+  main.innerHTML = '<div class="mute">Зареждане…</div>';
+  await wcLoad(null);
+  const r = await sb.from('challenge_results').select('*').order('created_at', { ascending: false }).limit(1000);
+  if (WC.err || r.error) { main.innerHTML = `<div class="card">Предизвикателството още не е настроено в базата.<br><small class="mute">${esc(WC.err || r.error.message)}</small></div>`; return; }
+  WC.sres = r.data || [];
+  const byId = Object.fromEntries(WC.ex.map(e => [e.id, e])), loc = D.pgl === 'all' ? null : D.pgl;
+  const inLoc = x => { const c = S.clients.find(c => c.id === x.client_id); return !loc || c?.location === loc; };
+  const pend = WC.sres.filter(x => x.status === 'pending' && inLoc(x));
+  const clients = S.clients.filter(c => c.status !== 'Inactive' && !c.massage_only && (!loc || c.location === loc)).sort((a, b) => a.name.localeCompare(b.name, 'bg'));
+  const exL = WC.ex.filter(e => e.location === (loc || D.wcl || 'Боян Петров'));
+  const lb = {}; WC.sres.forEach(x => { if (inLoc(x)) (lb[x.client_id] ||= []).push(x); });
+  const board = Object.entries(lb).map(([cid, rows]) => ({ cid, ...wcTotals(rows, byId), n: rows.filter(x => x.status === 'approved').length })).filter(x => x.n).sort((a, b) => b.total - a.total);
+  const row = x => { const e = byId[x.ex_id]; return `<tr><td>${fmt(x.day)}</td><td><b>${esc(cname(x.client_id))}</b></td><td>${esc(e?.name || '')}<div class="mute" style="font-size:12px">${esc(e?.location || '')} · ${WC_DAYS[e?.weekday] || ''}</div></td><td>${esc(wcVal(e, x.value))}${x.variant ? '<div class="mute" style="font-size:12px">' + esc(x.variant) + '</div>' : ''}</td><td><b>${+x.points}</b>${x.pr ? ' 🏆' : ''}</td>`; };
+  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">${esc(WC.cfg?.name || 'Предизвикателство')}</b><span class="mute">${WC.cfg ? fmt(WC.cfg.start) + ' – ' + fmt(wcEnd()) : ''}</span><span class="sp"></span>
+    <div class="chips" style="margin:0"><button data-act="wcmode" data-m="clients">Клиенти</button><button data-act="wcmode" data-m="tasks">Задачи</button><button class="on" data-act="wcmode" data-m="wc">Предизвикателство${pend.length ? ' · ' + pend.length : ''}</button></div></div>
+    <div class="row" style="margin-bottom:10px"><div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="wcloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="card" style="margin-bottom:12px"><h3 style="margin:0 0 8px">Чакат одобрение · ${pend.length}</h3>
+      ${pend.length ? `<div class="tw"><table><thead><tr><th>Дата</th><th>Клиент</th><th>Упражнение</th><th>Резултат</th><th>Точки</th><th></th></tr></thead><tbody>${pend.map(x => row(x) + `<td style="white-space:nowrap"><button class="sm pri" data-act="wcok" data-id="${x.id}">Одобри</button> <button class="sm" data-act="wcno" data-id="${x.id}">Отхвърли</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="mute">Няма нови резултати.</div>'}</div>
+    <div class="card" style="margin-bottom:12px"><h3 style="margin:0 0 8px">Въведи резултат</h3>
+      <div class="grid2" style="align-items:end">
+        <label class="f">Клиент<select id="wcs-c"><option value="">— избери —</option>${clients.map(c => `<option value="${c.id}">${esc(c.name)}${loc ? '' : ' · ' + esc(c.location || '')}</option>`).join('')}</select></label>
+        ${loc ? '' : `<label class="f">Обект (упражнения)<select id="wcs-l">${LOCS.map(l => `<option ${l === (D.wcl || 'Боян Петров') ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`}
+        <label class="f">Упражнение<select id="wcs-e">${exL.map(e => `<option value="${e.id}">${WC_DAYS[e.weekday].slice(0, 3)} · ${esc(e.name)}</option>`).join('')}</select></label>
+        <label class="f">Вариант<select id="wcs-v"><option value="">—</option>${[...new Set(exL.flatMap(e => (e.variants || []).map(v => v.k)))].map(v => `<option>${esc(v)}</option>`).join('')}</select></label>
+        <label class="f">Резултат (време мм:сс или брой)<input id="wcs-r" placeholder="4:31 / 45"></label>
+        <label class="f">Дата<input type="date" id="wcs-d" value="${today()}" max="${today()}"></label>
+      </div><div class="row" style="margin-top:10px"><button class="pri" data-act="wcadd">Запиши (одобрен)</button><span class="mute">Точките и личният рекорд се смятат автоматично.</span></div></div>
+    <div class="card" style="margin-bottom:12px"><h3 style="margin:0 0 8px">Класиране${loc ? ' · ' + esc(loc) : ''}</h3>
+      ${board.length ? `<div class="tw"><table><thead><tr><th>#</th><th>Клиент</th><th>Точки</th><th>Одобрени резултати</th></tr></thead><tbody>${board.map((b, i) => `<tr><td>${i + 1}</td><td><b>${esc(cname(b.cid))}</b></td><td><b>${b.total}</b></td><td>${b.n}</td></tr>`).join('')}</tbody></table></div>` : '<div class="mute">Още няма одобрени резултати.</div>'}
+      <div class="mute" style="margin-top:6px">Клиентите виждат само своите точки.</div></div>
+    <div class="card"><h3 style="margin:0 0 8px">Последни одобрени / отхвърлени</h3>
+      <div class="tw"><table><thead><tr><th>Дата</th><th>Клиент</th><th>Упражнение</th><th>Резултат</th><th>Точки</th><th></th></tr></thead><tbody>${WC.sres.filter(x => x.status !== 'pending' && inLoc(x)).slice(0, 60).map(x => row(x) + `<td>${x.status === 'rejected' ? '<span class="chip">отхвърлен</span>' : ''} <button class="sm" data-act="wcrm" data-id="${x.id}">Изтрий</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  const ls = $('#wcs-l'); if (ls) ls.onchange = e => { D.wcl = e.target.value; wcStaff(); };
+}
+async function wcStaffAdd() {
+  const cid = $('#wcs-c').value, exId = +$('#wcs-e').value, e = WC.ex.find(x => x.id === exId);
+  if (!cid) return toast('Избери клиент'); if (!e) return toast('Избери упражнение');
+  const raw = $('#wcs-r').value, val = e.kind === 'time' ? wcSec(raw) : +String(raw).replace(',', '.'), day = $('#wcs-d').value;
+  if (!val || val <= 0) return toast(e.kind === 'time' ? 'Въведи време като мм:сс' : 'Въведи брой');
+  const vv = $('#wcs-v').value, variant = (e.variants || []).some(v => v.k === vv) ? vv : ((e.variants || [])[0]?.k || null);
+  const { error } = await sb.from('challenge_results').insert({ client_id: cid, ex_id: exId, day, value: val, variant, status: 'approved' });
+  if (error) return fail(error, 'Не се записа'); toast('Записано'); wcStaff();
+}
+async function wcSetStatus(id, status) {
+  const { error } = await sb.from('challenge_results').update({ status }).eq('id', id);
+  if (error) return fail(error, 'Не се промени'); toast(status === 'approved' ? 'Одобрено' : 'Отхвърлено'); wcStaff();
 }
 
 /* ═════════════════ ПРОГРЕС (без финанси) ═════════════════ */
@@ -2994,12 +3132,15 @@ function pgWeightStats() {
 function pgRender() {
   const el = document.getElementById(PG.elId); if (!el) return;
   const D = PG.D, consent = !!D.profile?.consent_at;
-  if (!PG.staff && !consent) { el.innerHTML = pgConsent(); return; }
-  if (!PG.staff) PG.tab = 'weight';
+
   const tabs = PG.staff ? PG_TABS : PG_CLIENT_TABS;
+  if (!PG.staff && !tabs.some(x => x[0] === PG.tab)) PG.tab = 'weight';
+  const strip = tabs.length > 1 ? `<div class="pg-tabs">${tabs.map(([k, l]) => `<button class="pg-tb ${PG.tab === k ? 'on' : ''}" data-act="pgtab" data-t="${k}">${l}</button>`).join('')}</div>` : '';
+  if (!PG.staff && PG.tab === 'chal') { el.innerHTML = strip + wcClientTab(); return; }
+  if (!PG.staff && !consent) { el.innerHTML = strip + pgConsent(); return; }
   const body = { weight: pgWeightTab, meas: pgMeasTab, quiz: pgQuizTab, check: pgCheckTab, photos: pgPhotosTab, profile: pgProfileTab }[PG.tab]();
   el.innerHTML = `${PG.staff && !consent ? '<div class="pg-note">Клиентът още не е дал съгласие за обработка на здравни данни в приложението. Данните по-долу може да са въведени от служител.</div>' : ''}
-    ${tabs.length > 1 ? `<div class="pg-tabs">${tabs.map(([k, l]) => `<button class="pg-tb ${PG.tab === k ? 'on' : ''}" data-act="pgtab" data-t="${k}">${l}</button>`).join('')}</div>` : ''}${body}`;
+    ${strip}${body}`;
   if (PG.tab === 'photos') pgLoadPhotos();
 }
 function pgConsent() {
@@ -3250,6 +3391,7 @@ async function pgAct(act, el) {
       const paths = D.photos.map(x => x.path); if (paths.length) await sb.storage.from('progress-photos').remove(paths);
       const { error } = await sb.rpc('progress_delete_mine'); if (error) throw error; PG.ed = {}; PG.tab = 'weight'; toast('Данните са изтрити'); await pgReload();
     });
+    default: return 'nohandle';
   }
 }
 async function pgQSave(status, quiet) {
@@ -3300,7 +3442,7 @@ document.addEventListener('click', async e => {
   }
   e.preventDefault();
   try {
-    if (act.startsWith('pg')) { await pgAct(act, el); return; }
+    if (act.startsWith('pg') && (await pgAct(act, el)) !== 'nohandle') return;
     if (act.startsWith('fin')) { await finAct(act, el); return; }
     switch (act) {
       case 'close': modal.close(); break;
@@ -3478,6 +3620,17 @@ document.addEventListener('click', async e => {
       case 'ics': downloadIcs(el.dataset.id); break;
       case 'cbook': await clientBook(el.dataset.id); break;
       case 'ccancel': clientCancelDialog(el.dataset.bid, el.dataset.sid); break;
+      case 'wcgo': C.tab = 'prog'; PG.tab = 'chal'; renderClient(); window.scrollTo(0, 0); break;
+      case 'wcday': WC.day = +el.dataset.d; WC.exSel = null; pgRender(); break;
+      case 'wcex': WC.exSel = +el.dataset.id; pgRender(); break;
+      case 'wcsave': await wcClientSave(el.dataset.id); break;
+      case 'wcdel': { if (S.previewClient) { toast('Само преглед — промените са изключени.'); break; } const { error } = await sb.from('challenge_results').delete().eq('id', el.dataset.id); if (error) fail(error, 'Не се изтри'); else { await wcLoad(S.me.row.id); pgRender(); } break; }
+      case 'wcmode': D.pgm = el.dataset.m; pgvRender(); break;
+      case 'wcloc': D.pgl = el.dataset.l; wcStaff(); break;
+      case 'wcok': await wcSetStatus(el.dataset.id, 'approved'); break;
+      case 'wcno': await wcSetStatus(el.dataset.id, 'rejected'); break;
+      case 'wcadd': await wcStaffAdd(); break;
+      case 'wcrm': { if (!confirm('Да се изтрие ли резултатът?')) break; const { error } = await sb.from('challenge_results').delete().eq('id', el.dataset.id); if (error) fail(error, 'Не се изтри'); else wcStaff(); break; }
       case 'cphone': await phoneSave(); break;
       case 'cdo': await clientCancel(el.dataset.bid); break;
       case 'blate': break;
