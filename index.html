@@ -2042,7 +2042,8 @@ function cStreak() {
   return n;
 }
 function rewardCard() {
-  if (REW_LOCKED) return `<section class="c-card"><div class="c-k">Награди</div><div style="filter:blur(6px);opacity:.6;pointer-events:none" aria-hidden="true"><b style="font-size:26px">12</b> · още 13 до награда</div><div class="mute" style="margin-top:6px">Услугата все още не е активна</div></section>`;
+  if (REW_LOCKED) return ''; // наградите са спрени
+  if (false) return `<section class="c-card"><div class="c-k">Награди</div><div style="filter:blur(6px);opacity:.6;pointer-events:none" aria-hidden="true"><b style="font-size:26px">12</b> · още 13 до награда</div><div class="mute" style="margin-top:6px">Услугата все още не е активна</div></section>`;
   const R = C.rw; if (!R || !R.levels.length) return '';
   const nx = R.levels.find(l => l.visits > R.visits), prevV = [...R.levels].reverse().find(l => l.visits <= R.visits)?.visits || 0;
   const open = R.levels.filter(l => l.visits <= R.visits && !R.claims.some(c => c.level_id === l.id));
@@ -2576,8 +2577,9 @@ function bonusStreak() {
   if (lastLoy && ps[0].start_date <= lastLoy.start_date) return 0;
   return Math.min(n, 3);
 }
+const BON_OFF = true; // бонусите са спрени (8.11.2026)
 function bonusCard(me) {
-  if (!C.bons) return '';
+  if (BON_OFF || !C.bons) return '';
   const av = C.bons.filter(b => b.status === 'available'), rev = C.bons.find(b => b.kind === 'review' && b.status !== 'rejected'), st = C.bcfg?.loyalty ? bonusStreak() : 0;
   const avRow = b => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--c-line,rgba(0,0,0,.08))"><div><b>${b.reward ? esc(BON_R[b.reward]) : 'Избери награда'}</b><div class="c-note" style="margin:2px 0 0">${esc(BON_K[b.kind])}${b.kind === 'referral' && b.friend_id ? ' · благодарим за препоръката!' : ''}${b.reward === 'discount10' ? ' · важи за следващия ти абонамент' : b.reward === 'massage30' ? ' · кажи на рецепцията, за да ти запишем час' : ''}</div></div>
     ${b.kind === 'referral' && !b.reward ? `<div style="display:flex;gap:6px"><button class="c-btn solid sm" data-act="bonpick" data-id="${b.id}" data-r="discount10">−10%</button><button class="c-btn glass sm" data-act="bonpick" data-id="${b.id}" data-r="massage30">Масаж</button></div>` : '<span class="c-done">🎁</span>'}</div>`;
@@ -2601,12 +2603,24 @@ function massageCard(t) {
   return `<section class="c-card" data-act="cnav" data-t="mine" style="cursor:pointer"><div class="c-k">Масаж · Лерин</div>
     <div style="display:flex;gap:14px;align-items:center"><div class="c-ct" style="font-size:24px;font-weight:700">${hm(m.start_time)}</div><div><div class="c-st">${esc(m.service)}</div><div class="c-ss">${esc(dayWord(m.date, t))} · плащане на място</div></div></div></section>`;
 }
+function cBalance() {
+  const sumPk = (C.pkgs || []).reduce((a, p) => a + Number(p.price || 0), 0), sumCh = (C.chs || []).reduce((a, x) => a + Number(x.amount), 0), sumPay = (C.pays || []).reduce((a, x) => a + Number(x.amount), 0);
+  return Math.round((sumPk + sumCh - sumPay) * 100) / 100;
+}
+function payReminder() {
+  const bal = cBalance(); if (!(bal > 0.5)) return '';
+  return `<section class="c-card c-due" data-act="cnav" data-t="pkg" style="cursor:pointer;border:1px solid var(--c-coral);background:color-mix(in srgb,var(--c-coral) 12%,var(--c-card))">
+    <div class="c-k" style="color:var(--c-coral)">Напомняне за плащане</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b style="font-size:26px">${eur(bal)}</b><div class="c-mute" style="font-size:13px;margin-top:2px">неплатен абонамент / посещения</div></div>${ic('ring', 26)}</div>
+    <div class="c-note" style="margin-top:8px">Моля, плати при следващото си посещение в залата — в брой или по банков път. Ако вече си платил, пиши ни във Viber на 0895 748 765.</div></section>`;
+}
 function clientHome(me, t, act) {
   const nb = C.bookings[0], first = (me.name || '').split(' ')[0];
   const warn = act.filter(p => p.left <= 2 || p.days <= 7);
   const main = act.slice().sort((a, b) => a.end_date.localeCompare(b.end_date))[0];
   const se = nb?.sessions;
   return `<div class="c-hello"><span>${greet()},</span><b>${esc(first)}</b></div>
+  ${payReminder()}
   ${nb ? `<section class="c-hero">
       <div class="c-hero-k">${untilText(se) ? `<i class="c-live"></i>${untilText(se)}` : 'Следваща тренировка'}</div>
       <div class="c-hero-t">${hm(se.start_time)}</div>
