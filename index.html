@@ -2551,7 +2551,8 @@ function cSession(b, t) {
     </div></div>`;
 }
 
-const PROG_LOCKED = true, REW_LOCKED = true;
+const PROG_LOCKED = false, REW_LOCKED = true;
+const PG_CLIENT_TABS = [['weight', 'Тегло']]; // клиентите виждат само теглото; останалите раздели са на пауза
 function progLocked(title = 'Прогрес', sub = 'Скоро ще можеш да следиш теглото, измерванията и тестовете си тук.') {
   return `<h2 class="c-title">${title}</h2><div class="lockbox"><div class="lockfake" aria-hidden="true"><div class="lf-row"><i style="width:38%"></i><i style="width:22%"></i></div><svg viewBox="0 0 300 110" preserveAspectRatio="none"><path d="M0 90 C40 80 70 70 110 60 S190 40 230 30 S280 20 300 14" fill="none" stroke="currentColor" stroke-width="4"/></svg><div class="lf-row"><i style="width:60%"></i></div><div class="lf-row"><i style="width:45%"></i><i style="width:30%"></i></div></div><div class="lockmsg"><b>Услугата все още не е активна</b><span>${sub}</span></div></div>`;
 }
@@ -2820,11 +2821,12 @@ function clientServices() {
 function renderClient() {
   closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
-  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? progLocked() : C.tab === 'svc' ? clientServices() : clientHome(me, t, act);
+  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? `<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>` : C.tab === 'svc' ? clientServices() : clientHome(me, t, act);
   const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['svc', 'tag', 'Услуги'], ['prog', 'chart', 'Прогрес']];
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
     <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
+  if (C.tab === 'prog') { PG.tab = 'weight'; pgBoot(false, me.id, 'pg', me.user_id || null); }
 }
 async function clientBook(sid) {
   closeSheet(); if (S.previewClient) return toast('Само преглед — записването е изключено.');
@@ -2977,31 +2979,33 @@ function pgRender() {
   const el = document.getElementById(PG.elId); if (!el) return;
   const D = PG.D, consent = !!D.profile?.consent_at;
   if (!PG.staff && !consent) { el.innerHTML = pgConsent(); return; }
+  if (!PG.staff) PG.tab = 'weight';
+  const tabs = PG.staff ? PG_TABS : PG_CLIENT_TABS;
   const body = { weight: pgWeightTab, meas: pgMeasTab, quiz: pgQuizTab, check: pgCheckTab, photos: pgPhotosTab, profile: pgProfileTab }[PG.tab]();
   el.innerHTML = `${PG.staff && !consent ? '<div class="pg-note">Клиентът още не е дал съгласие за обработка на здравни данни в приложението. Данните по-долу може да са въведени от служител.</div>' : ''}
-    <div class="pg-tabs">${PG_TABS.map(([k, l]) => `<button class="pg-tb ${PG.tab === k ? 'on' : ''}" data-act="pgtab" data-t="${k}">${l}</button>`).join('')}</div>${body}`;
+    ${tabs.length > 1 ? `<div class="pg-tabs">${tabs.map(([k, l]) => `<button class="pg-tb ${PG.tab === k ? 'on' : ''}" data-act="pgtab" data-t="${k}">${l}</button>`).join('')}</div>` : ''}${body}`;
   if (PG.tab === 'photos') pgLoadPhotos();
 }
 function pgConsent() {
   return `<section class="pg-card"><h3 class="pg-h">Прогрес и здравни данни</h3>
-    <p>В този раздел записваш тегло, обиколки, отговори на въпросник за хранене, сън и стрес, седмичен чек-ин и снимки. Това са <b>здравни данни</b>.</p>
-    <p>Виждат ги само ти и треньорите и администраторите на NLT, за да следят напредъка ти и да коригират плана. Не се споделят с трети страни. Снимките се пазят в защитено хранилище.</p>
-    <p>Можеш да изтриеш всичко по всяко време от „Профил“ → „Изтрий моите данни за прогрес“.</p>
+    <p>${PG.staff || PG_CLIENT_TABS.length > 1 ? 'В този раздел записваш тегло, обиколки, отговори на въпросник за хранене, сън и стрес, седмичен чек-ин и снимки.' : 'В този раздел записваш теглото си и виждаш графика как се променя.'} Това са <b>здравни данни</b>.</p>
+    <p>Виждат ги само ти и треньорите и администраторите на NLT, за да следят напредъка ти и да коригират плана. Не се споделят с трети страни.${PG.staff || PG_CLIENT_TABS.length > 1 ? ' Снимките се пазят в защитено хранилище.' : ''}</p>
+    <p>${PG.staff || PG_CLIENT_TABS.length > 1 ? 'Можеш да изтриеш всичко по всяко време от „Профил“ → „Изтрий моите данни за прогрес“.' : 'Можеш да изтриеш всеки запис по всяко време с ✕ до него.'}</p>
     <button class="pg-btn" data-act="pgconsent">Съгласен/на съм</button></section>`;
 }
 
 /* Тегло */
 function pgWeightTab() {
   const s = pgWeightStats(), w = PG.D.weights, e = PG.ed.w || {};
-  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>средно за 7 дни</small></div><div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div><div><span>До целта</span><b>${s.left == null ? '—' : pgF(s.left) + ' кг'}</b><small>${s.tgt ? 'цел ' + pgF(s.tgt) : 'няма цел'}</small></div></div>
+  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>средно за 7 дни</small></div><div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div>${!PG.staff && s.tgt == null ? '' : `<div><span>До целта</span><b>${s.left == null ? '—' : pgF(s.left) + ' кг'}</b><small>${s.tgt ? 'цел ' + pgF(s.tgt) : 'няма цел'}</small></div>`}</div>
     ${s.pace ? `<div class="pg-pace">Темпо: ${pgChip(s.pace[0], s.pace[1])} <span class="pg-mute">${s.pct > 0 ? '+' : ''}${pgF(s.pct * 100, 2)}% спрямо предходната седмица</span></div>` : ''}${s.hint ? `<div class="pg-mute pg-sm">${esc(s.hint)}</div>` : ''}` : '<div class="pg-empty">Въведи първото си тегло.</div>';
   const lst = w.slice().reverse().slice(0, 14).map(x => `<div class="pg-li"><span>${fmt(x.day)}</span><b>${pgF(x.weight_kg)} кг</b>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgwedit" data-d="${x.day}" data-v="${x.weight_kg}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgwdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>`).join('');
   return `<section class="pg-card"><h3 class="pg-h">${PG.staff ? 'Тегло' : 'Тегло днес'}</h3>
     <div class="pg-wf"><input id="pg-wv" type="number" inputmode="decimal" step="0.1" min="30" max="300" placeholder="кг" value="${esc(e.v ?? '')}" aria-label="Тегло в кг"><input id="pg-wd" type="date" max="${today()}" value="${e.d || today()}" aria-label="Дата"><button class="pg-btn" data-act="pgwsave">Запиши</button></div>
     <div class="pg-mute pg-sm">Сутрин, на гладно, след тоалетна, по бельо, на един и същ кантар. Един запис на ден — повторният го презаписва.</div></section>
+    ${s.n ? `<section class="pg-card"><h3 class="pg-h">${PG.staff ? 'Графика' : 'Твоят резултат'}</h3>${pgChart([{ name: 'Дневно', pts: w.map(x => ({ d: x.day, v: Number(x.weight_kg) })), dotsOnly: true, r: 2.6 }, { name: '7-дневна средна', pts: s.ma, dots: false, w: 2.6 }], { goal: s.tgt, label: 'Тегло' })}</section>` : ''}
     <section class="pg-card">${stats}</section>
-    ${s.n ? `<section class="pg-card"><h3 class="pg-h">Графика</h3>${pgChart([{ name: 'Дневно', pts: w.map(x => ({ d: x.day, v: Number(x.weight_kg) })), dotsOnly: true, r: 2.6 }, { name: '7-дневна средна', pts: s.ma, dots: false, w: 2.6 }], { goal: s.tgt, label: 'Тегло' })}</section>
-    <section class="pg-card"><h3 class="pg-h">Последни записи</h3>${lst}</section>` : ''}`;
+    ${s.n ? `<section class="pg-card"><h3 class="pg-h">Последни записи</h3>${lst}</section>` : ''}`;
 }
 /* Обиколки */
 function pgMeasTab() {
