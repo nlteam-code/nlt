@@ -2543,7 +2543,7 @@ function closeSheet() { document.getElementById('c-sheet')?.remove(); }
 function cSession(b, t) {
   const se = b.sessions, grp = se.kind === 'group', d = parse(se.date);
   return `<div class="c-sess">
-    <div class="c-when"><b>${hm(se.start_time)}</b><span>${d.getDate()} ${d.toLocaleDateString('bg-BG', { month: 'short' })}</span></div>
+    <div class="c-when"><b>${hm(se.start_time)}</b></div>
     <div class="c-sinfo"><div class="c-st">${esc(se.title || (grp ? 'Групова тренировка' : 'Персонална тренировка'))}</div>
       <div class="c-ss">${esc(dayWord(se.date, t))}${se.location ? ' · ' + esc(se.location) : ''}</div></div>
     <div class="c-acts">
