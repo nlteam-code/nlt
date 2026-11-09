@@ -1358,8 +1358,9 @@ function dupDialog(id) {
     <div class="row" style="margin-top:12px"><button class="pri" data-act="dupsave">Създай копие</button></div></div>`);
 }
 async function sessClients(id) {
-  const { data: s, error } = await sb.from('sessions').select('*,bookings(id,status,late,use_plan,price,client_id)').eq('id', id).single();
+  const { data: s, error } = await sb.from('sessions').select('*,bookings(id,status,late,use_plan,client_id)').eq('id', id).single();
   if (error) return fail(error, 'Часът не се отвори');
+  const { data: pr } = await sb.rpc('session_booking_prices', { p_session: id }); const pm = {}; (pr || []).forEach(r => pm[r.id] = r.price); s.bookings.forEach(b => b.price = pm[b.id] ?? null);
   D.scs = s; const bks = s.bookings.slice().sort((a, b) => (a.status === 'cancelled') - (b.status === 'cancelled') || cname(a.client_id).localeCompare(cname(b.client_id), 'bg'));
   const vp = visitPrice(s.kind), ST = { booked: 'записан', done: 'проведен', cancelled: 'отказ' };
   const mode = b => b.use_plan ? 'plan' : Number(b.price || 0) > 0 ? 'single' : 'free';
