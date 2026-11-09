@@ -448,6 +448,11 @@ table.fin td.fxln:hover{color:var(--acc)}
 .fin-cards .fin-k b{font-size:20px;display:block;margin-top:2px}
 .fin-cards b.bad{color:var(--bad)}
 .fin-cards b.ok{color:#3fb37f}
+.ctx{position:fixed;z-index:1000;min-width:220px;max-height:80vh;overflow:auto;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px}
+.ctx button{display:block;width:100%;text-align:left;background:none;border:0;box-shadow:none;padding:7px 10px;border-radius:8px;color:inherit;font:inherit;font-size:14px;cursor:pointer;min-height:0}
+.ctx button:hover{background:var(--grp)}
+.ctx-h{font-weight:700;padding:6px 10px 4px;font-size:13px}
+.ctx-s{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);padding:8px 10px 2px;border-top:1px solid var(--line);margin-top:4px}
 </style>
 </head>
 <body>
@@ -1324,6 +1329,48 @@ function drawGrid() {
 }
 
 /* ── детайл на час ── */
+/* ── Десен бутон върху час: бързи действия (дубликат, клиенти, отмяна, треньор, локация, таксуване) ── */
+const trName = id => ((S.staff || []).find(t => t.id === id) || {}).name || '';
+function ctxClose() { const m = document.getElementById('ctx'); if (m) m.remove(); }
+function ctxMenu(x, y, id) {
+  ctxClose(); const s = (S.sessions || []).find(e => e.id === id); if (!s) return;
+  const trs = (S.staff || []).filter(t => t.active !== false);
+  const n = (s.bookings || []).filter(b => b.status !== 'cancelled').length;
+  const it = (act, label, extra = '') => `<button data-act="${act}" data-id="${id}" ${extra}>${label}</button>`;
+  const m = document.createElement('div'); m.id = 'ctx'; m.className = 'ctx';
+  m.innerHTML = `<div class="ctx-h">${hm(s.start_time)} · ${esc(s.title || KIND[s.kind])}</div>
+    ${it('cxcl', `👥 Клиенти (${n}) и таксуване`)}${it('cxdup', '⧉ Дубликат')}${it('cxcan', s.cancelled ? '↺ Върни часа' : '⊘ Отмени часа')}
+    <div class="ctx-s">Треньор</div>${trs.map(t => it('cxtr', (t.id === s.trainer_id ? '✓ ' : '　') + esc(t.name), `data-v="${t.id}"`)).join('')}
+    <div class="ctx-s">Локация</div>${LOCS.map(l => it('cxloc', (l === s.location ? '✓ ' : '　') + esc(l), `data-v="${esc(l)}"`)).join('')}
+    <div class="ctx-s"></div>${it('sess', '✎ Отвори часа')}`;
+  document.body.appendChild(m);
+  const r = m.getBoundingClientRect(); m.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px'; m.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
+}
+document.addEventListener('contextmenu', e => { const ev = e.target.closest('#grid .ev'); if (!ev || !ev.dataset.id) return; e.preventDefault(); ctxMenu(e.clientX, e.clientY, ev.dataset.id); });
+document.addEventListener('click', e => { if (!document.getElementById('ctx')) return; if (e.target.closest('#ctx')) setTimeout(ctxClose, 0); else ctxClose(); }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') ctxClose(); });
+window.addEventListener('scroll', ctxClose, true);
+function dupDialog(id) {
+  const s = (S.sessions || []).find(e => e.id === id); if (!s) return;
+  modal.show(`<div id="dp" data-id="${id}"><h2>Дубликат · ${esc(s.title || KIND[s.kind])}</h2>
+    <div class="mute" style="margin-bottom:8px">Копие на часа (без записаните клиенти) — ${esc(s.location)}, ${esc(trName(s.trainer_id))}</div>
+    <div class="grid2"><label class="f">Дата<input type="date" id="dp-date" value="${s.date}"></label><label class="f">Начало<input type="time" step="900" id="dp-time" value="${hm(s.start_time)}"></label></div>
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="dupsave">Създай копие</button></div></div>`);
+}
+async function sessClients(id) {
+  const { data: s, error } = await sb.from('sessions').select('*,bookings(id,status,late,use_plan,client_id)').eq('id', id).single();
+  if (error) return fail(error, 'Часът не се отвори');
+  const { data: pr } = await sb.rpc('session_booking_prices', { p_session: id }); const pm = {}; (pr || []).forEach(r => pm[r.id] = r.price); s.bookings.forEach(b => b.price = pm[b.id] ?? null);
+  D.scs = s; const bks = s.bookings.slice().sort((a, b) => (a.status === 'cancelled') - (b.status === 'cancelled') || cname(a.client_id).localeCompare(cname(b.client_id), 'bg'));
+  const vp = visitPrice(s.kind), ST = { booked: 'записан', done: 'проведен', cancelled: 'отказ' };
+  const mode = b => b.use_plan ? 'plan' : Number(b.price || 0) > 0 ? 'single' : 'free';
+  modal.show(`<div id="sc" data-sid="${s.id}"><h2>Клиенти · ${hm(s.start_time)} · ${esc(fmtLong(s.date))}</h2>
+    <div class="mute" style="margin-bottom:10px">${esc(s.title || KIND[s.kind])} · ${esc(s.location)} · ${esc(trName(s.trainer_id))}${s.cancelled ? ' · <b style="color:var(--bad)">Отменен</b>' : ''}</div>
+    ${bks.map(b => `<div class="bk"><div class="nm"><a href="#" data-act="client" data-id="${b.client_id}">${esc(cname(b.client_id))}</a> <span class="chip${b.status === 'cancelled' ? ' bad' : ''}">${ST[b.status] || b.status}${b.late ? ', късен' : ''}</span></div>
+      <div class="seg" title="Как се таксува посещението">${[['plan', 'Абонамент'], ['single', 'Еднократно ' + money(mode(b) === 'single' ? Number(b.price) : vp)], ['free', 'Безплатно']].map(([m, l]) => `<button class="${mode(b) === m ? 'on' : ''}" data-act="bpay" data-bid="${b.id}" data-m="${m}">${l}</button>`).join('')}</div></div>`).join('') || '<div class="mute">Няма записани клиенти.</div>'}
+    <p class="mute" style="margin-top:10px">„Абонамент“ — отчита се от абонамента. „Еднократно“ — таксува се (веднага, ако часът е започнал; иначе при започване). „Безплатно“ — без такса и без посещение от абонамента.</p>
+    <div class="row"><button data-act="sess" data-id="${s.id}">✎ Отвори часа</button></div></div>`);
+}
 async function openSession(id) {
   const { data: s, error } = await sb.from('sessions').select('*,bookings(id,status,late,use_plan,client_id)').eq('id', id).single();
   if (error) return fail(error, 'Часът не се отвори');
@@ -3560,6 +3607,33 @@ document.addEventListener('click', async e => {
         weekView(); break; }
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
       case 'newsess': newSessionDialog(); break;
+      case 'cxcl': await sessClients(el.dataset.id); break;
+      case 'cxdup': dupDialog(el.dataset.id); break;
+      case 'dupsave': { const id = $('#dp').dataset.id, d = $('#dp-date').value, t = $('#dp-time').value; if (!d || !t) return toast('Въведи дата и час.');
+        const { data: s, error: e1 } = await sb.from('sessions').select('*').eq('id', id).single(); if (e1) return fail(e1, 'Часът не се намери');
+        const cp = { kind: s.kind, trainer_id: s.trainer_id, location: s.location, title: s.title, description: s.description, notes: s.notes, workout: s.workout, category: s.category, green: s.green, capacity: s.capacity, duration_min: s.duration_min, date: d, start_time: t.length === 5 ? t + ':00' : t };
+        const { error } = await sb.from('sessions').insert(cp); if (error) return fail(error, 'Копието не се създаде');
+        logEvent('change', `Дубликат на час ${fmt(d)} ${t}: ${s.title || KIND[s.kind]}`); modal.close(); toast(`Създадено копие за ${fmt(d)} ${t}`); weekView(); break; }
+      case 'cxcan': { const s = (S.sessions || []).find(e => e.id === el.dataset.id); if (!s) break; const n = (s.bookings || []).filter(b => b.status !== 'cancelled').length;
+        if (!s.cancelled && !confirm(`Да отменя ли часа ${hm(s.start_time)} на ${fmt(s.date)}?${n ? `\n\nЗаписани клиенти: ${n}.` : ''}`)) break;
+        const { error } = await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', s.id); if (error) return fail(error, 'Не се промени');
+        logEvent('change', `${s.cancelled ? 'Върнат' : 'Отменен'} час ${fmt(s.date)} ${hm(s.start_time)}`); toast(s.cancelled ? 'Часът е върнат' : 'Часът е отменен'); weekView(); break; }
+      case 'cxtr': { const s = (S.sessions || []).find(e => e.id === el.dataset.id); if (!s || s.trainer_id === el.dataset.v) break;
+        const { error } = await sb.from('sessions').update({ trainer_id: el.dataset.v }).eq('id', s.id); if (error) return fail(error, 'Треньорът не се смени');
+        logEvent('change', `Треньор ${trName(el.dataset.v)} за час ${fmt(s.date)} ${hm(s.start_time)}`); toast(`Треньор: ${trName(el.dataset.v)}`); weekView(); break; }
+      case 'cxloc': { const s = (S.sessions || []).find(e => e.id === el.dataset.id), v = el.dataset.v; if (!s || s.location === v) break;
+        if (!confirm(`Да преместя ли часа ${hm(s.start_time)} на ${fmt(s.date)} в ${v}?`)) break;
+        const { error } = await sb.from('sessions').update({ location: v }).eq('id', s.id); if (error) return fail(error, 'Локацията не се смени');
+        logEvent('change', `Час ${fmt(s.date)} ${hm(s.start_time)} преместен в ${v}`); toast(`Часът е преместен в ${v}`); weekView(); break; }
+      case 'bpay': { const s = D.scs, bid = el.dataset.bid, m = el.dataset.m, b = s && s.bookings.find(x => x.id === bid); if (!b) break;
+        const upd = m === 'plan' ? { use_plan: true, price: null } : m === 'free' ? { use_plan: false, price: 0 } : { use_plan: false, price: visitPrice(s.kind) };
+        await sb.rpc('remove_visit_charge', { p_booking: bid });
+        const { error } = await sb.from('bookings').update(upd).eq('id', bid); if (error) return fail(error, 'Не се промени');
+        const started = new Date(s.date + 'T' + s.start_time) <= new Date();
+        if (m === 'single' && started && b.status !== 'cancelled') { const [y, mo, d] = s.date.split('-'); const { error: e2 } = await sb.from('charges').insert({ client_id: b.client_id, amount: upd.price, date: s.date, booking_id: bid, note: `Еднократно посещение ${d}/${mo}/${y} ${hm(s.start_time)}` }); if (e2) fail(e2, 'Таксата не се записа'); }
+        if (m !== 'plan' && b.use_plan) await sb.rpc('undo_renewal', { p_client: b.client_id, p_kind: s.kind });
+        logEvent('change', `${cname(b.client_id)} · ${fmt(s.date)} ${hm(s.start_time)}: ${m === 'plan' ? 'по абонамент' : m === 'free' ? 'безплатно' : 'еднократно ' + money(upd.price)}`);
+        toast(m === 'plan' ? 'По абонамент' : m === 'free' ? 'Без такса' : `Таксувано ${money(upd.price)}${started ? '' : ' (при започване на часа)'}`); await sessClients(s.id); weekView(); break; }
       case 'nsave': await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked }); break;
       case 'ssave': await saveSession(); break;
       case 'mv': await moveSession(+el.dataset.dm); break;
