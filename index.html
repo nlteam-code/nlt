@@ -461,7 +461,9 @@ const CFG = window.NLT_CFG || {
   key: 'sb_publishable_RilZiN2LHMDZyc34pl3wwQ_L5SdjaJf'
 };
 const sb = supabase.createClient(CFG.url, CFG.key);
-const VISIT_PRICE = 37;
+const VISIT_PRICE = 37; // еднократно 1:1
+const GROUP_VISIT_PRICE = 33; // еднократно посещение в група
+const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
 const LOCS = ['Боян Петров', 'Лерин'];
@@ -2374,9 +2376,9 @@ async function bookClient(sid, cid2, auto, seriesMode) {
   if (!hasPlan) {
     if (!auto) {
       const why = (ps || []).length ? 'пакетът му е изчерпан' : 'няма ' + (s.kind === 'solo' ? 'пакет с персонални тренировки' : 'пакет с групови класове') + ' за тази дата';
-      if (!confirm(`${cname(cid2)}: ${why}.\n\nOK = добави като еднократно посещение (${money(VISIT_PRICE)}).\nОтказ = не добавяй.`)) return false;
+      if (!confirm(`${cname(cid2)}: ${why}.\n\nOK = добави като еднократно посещение (${money(visitPrice(s.kind))}).\nОтказ = не добавяй.`)) return false;
     }
-    use_plan = false; price = VISIT_PRICE;
+    use_plan = false; price = visitPrice(s.kind);
   }
   let bid;
   if (ex) { const r = await sb.from('bookings').update({ status: 'booked', late: false, use_plan, price }).eq('id', ex.id).select('id').single(); if (r.error) { fail(r.error, 'Не се добави'); return false; } bid = r.data.id; }
