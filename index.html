@@ -1504,7 +1504,7 @@ async function openClient(id, tab) {
     sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).lt('sessions.date', today()).order('date', { foreignTable: 'sessions', ascending: false }).limit(500),
     sb.from('hist_visits').select('id,date,time,title,location,status').eq('client_id', id).order('date', { ascending: false }).limit(1000),
     S.owner ? sb.from('hist_money').select('date,amount,method,category,note').eq('client_id', id).order('date', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
-    sb.from('client_packages').select('id,auto_renew,source').eq('client_id', id)
+    sb.from('client_packages').select('id,auto_renew,source,frozen_at,frozen_days').eq('client_id', id)
   ]);
   if (c.error) return fail(c.error, 'Клиентът не се отвори');
   const arm = {}; (arq && arq.data || []).forEach(r => arm[r.id] = r);
@@ -1557,9 +1557,10 @@ async function openClient(id, tab) {
       ${b.status === 'available' && b.reward ? `<button class="sm" data-act="bonuse" data-id="${b.id}">Използван</button>` : ''}</div>`).join('') || '<div class="mute">Няма бонуси.</div>'}
     ${friends.length ? `<div class="mute" style="margin-top:6px">Препоръчал: ${friends.map(f => esc(f.name)).join(', ')}</div>` : ''}
     <h3>История на абонаментите</h3>
-    ${pk.map(p => { const left = p.total - p.used; return `<div class="pk"><div style="min-width:180px"><b>${esc(p.package_name || (p.kind === 'solo' ? 'Персонални' : 'Групови'))}</b> ${pstate(p)}${arm[p.id] && arm[p.id].source === 'auto' ? ' <span class="chip">авто</span>' : ''}<br><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}${S.owner ? ' · ' + money(p.price) : ''}</span></div>
+    ${pk.map(p => { const left = p.total - p.used; return `<div class="pk"><div style="min-width:180px"><b>${esc(p.package_name || (p.kind === 'solo' ? 'Персонални' : 'Групови'))}</b> ${pstate(p)}${arm[p.id] && arm[p.id].source === 'auto' ? ' <span class="chip">авто</span>' : ''}${arm[p.id] && arm[p.id].frozen_at ? ` <span class="chip warn">❄ замразен от ${fmt(arm[p.id].frozen_at)}</span>` : ''}<br><span class="mute">${fmt(p.start_date)} – ${fmt(p.end_date)}${S.owner ? ' · ' + money(p.price) : ''}</span></div>
       <div class="bar2"><i style="width:${Math.min(100, p.used / p.total * 100)}%"></i></div><span>${p.used}/${p.total}${left <= 0 ? ' · изчерпан' : ''}</span>
       <button class="sm" data-act="cpauto" data-id="${p.id}" data-on="${arm[p.id] && arm[p.id].auto_renew === false ? 0 : 1}" title="Автоматично подновяване">${arm[p.id] && arm[p.id].auto_renew === false ? '⟳ изкл.' : '⟳ авто'}</button>
+      ${S.owner ? `<button class="sm" data-act="cpfrz" data-id="${p.id}" data-on="${arm[p.id] && arm[p.id].frozen_at ? 1 : 0}" title="Замразяване: посещенията се пазят, а след размразяване краят се мести с дните на замразяването">${arm[p.id] && arm[p.id].frozen_at ? 'Размрази' : '❄ Замрази'}</button>` : ''}
       <button class="sm" data-act="tledit" data-ty="pkg" data-id="${p.id}" title="Промени деня на започване">Редактирай</button>
       <button class="sm danger" data-act="cpdel" data-id="${p.id}">✕</button></div>`; }).join('') || '<div class="mute">Няма абонаменти.</div>'}
     ${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).length ? `<h3>Платени абонаменти · PT Minder</h3>${archMoney.filter(p => /груп|персон|абонам|пакет|тренир/i.test(p.category || '')).map(p => `<div class="bk"><div class="nm">${fmt(p.date)} · ${esc(p.category)} · <b>${money(p.amount)}</b></div></div>`).join('')}` : ''}
@@ -3574,6 +3575,11 @@ document.addEventListener('click', async e => {
       case 'cinvite': { const em = ($('#c-email')?.value || '').trim(); if (!confirm(`Да изпратя имейл с код за вход до ${em}?`)) break; await sendInvite(em); break; }
       case 'cpadd': await addPackage(); break;
       case 'cpauto': await sb.from('client_packages').update({ auto_renew: el.dataset.on !== '1' }).eq('id', el.dataset.id); await afterClient(); toast(el.dataset.on === '1' ? 'Автоматичното подновяване е спряно' : 'Автоматичното подновяване е включено'); break;
+      case 'cpfrz': { if (!S.owner) break; const on = el.dataset.on !== '1';
+        if (!confirm(on ? 'Да замразя ли абонамента?\n\nОставащите посещения се пазят, клиентът минава в „Пауза“. При размразяване краят на абонамента се удължава с дните на замразяването.' : 'Да размразя ли абонамента? Краят се удължава с дните, в които е бил замразен.')) break;
+        const { data, error } = await sb.rpc('freeze_package', { p_id: el.dataset.id, p_on: on }); if (error) { fail(error, 'Не се промени'); break; }
+        logEvent('change', `Абонамент ${on ? 'замразен' : 'размразен'}: ${cname(cid())}`); const cc = S.clients.find(c => c.id === cid()); if (cc) cc.status = on ? 'Paused' : (cc.status === 'Paused' ? 'Active' : cc.status);
+        await afterClient(); toast('Абонаментът е ' + data); break; }
       case 'cpdel': if (confirm('Да се изтрие ли пакетът?')) { await sb.from('client_packages').delete().eq('id', el.dataset.id); await afterClient(); } break;
       case 'payadd': { const a = +$('#pay-amt').value; if (!a) return toast('Въведи сума.'); const ps = await paySubConfirm(cid(), 'pay', a); if (!ps) break; await sb.from('payments').insert({ client_id: cid(), amount: a, method: $('#pay-m').value, date: $('#pay-d').value || today(), note: $('#pay-note').value.trim() || ps.note || null }); logEvent('paid', `Плащане ${money(a)} (${$('#pay-m').value}): ${cname(cid())}`); await afterClient(); break; }
       case 'paydel': await sb.from('payments').delete().eq('id', el.dataset.id); await afterClient(); break;
