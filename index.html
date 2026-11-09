@@ -1753,7 +1753,7 @@ function payCardBody() {
     <div class="chips">${S.owner ? `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}${ch('ptab', 'hist', 'История', D.tab)}` : `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length}`)}${ch('ptab', 'hist', 'История на плащанията', D.tab)}`}</div>
     <div class="tw" id="paytw" style="max-height:340px;overflow:auto"><table><thead><tr><th>Клиент</th><th>${D.tab === 'due' ? 'Дължимо' : D.tab === 'credit' ? 'В кредит' : 'Баланс'}</th><th>Обект</th><th>Пакет</th><th></th></tr></thead><tbody>
     ${list.slice(0, 150).map(r => `<tr data-cid="${r.c.id}"><td><b>${esc(r.c.name)}</b></td><td>${D.tab === 'due' ? `<span class="neg">−${eur(r.bal)}</span>` : D.tab === 'credit' ? `<span class="pos">+${eur(-r.bal)}</span>` : eur(0)}</td><td class="mute">${esc(r.c.location || '—')}</td><td>${pkgChip(curPkg(r.c.id))}</td>
-    <td style="white-space:nowrap">${D.tab === 'due' ? `<button class="sm pri" data-act="quickpay" data-id="${r.c.id}" data-amt="${r.bal}">Платено</button> ` : ''}<button class="sm" data-act="client" data-id="${r.c.id}">Отвори</button></td></tr>`).join('') || '<tr><td colspan="5" class="mute">Няма.</td></tr>'}</tbody></table></div>
+    <td style="white-space:nowrap">${D.tab === 'due' ? `<button class="sm pri" data-act="quickpay" data-id="${r.c.id}" data-amt="${r.bal}">Платено</button> ` : ''}<button class="sm" data-act="client" data-id="${r.c.id}">Отвори</button>${D.tab === 'due' ? ` <button class="sm danger" data-act="debtdel" data-id="${r.c.id}" data-amt="${r.bal}" title="Отписва дължимото — клиентът става изравнен">Изтрий дълга</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="mute">Няма.</td></tr>'}</tbody></table></div>
     <p class="mute">Дължимото = цени на пакетите + такси − плащания. Клиенти без пакети, такси и плащания не се показват.</p>`;
 }
 function redrawPay() {
@@ -3585,6 +3585,10 @@ document.addEventListener('click', async e => {
         await afterClient(); toast('Абонаментът е ' + data); break; }
       case 'cpdel': if (confirm('Да се изтрие ли пакетът?')) { await sb.from('client_packages').delete().eq('id', el.dataset.id); await afterClient(); } break;
       case 'payadd': { const a = +$('#pay-amt').value; if (!a) return toast('Въведи сума.'); const ps = await paySubConfirm(cid(), 'pay', a); if (!ps) break; await sb.from('payments').insert({ client_id: cid(), amount: a, method: $('#pay-m').value, date: $('#pay-d').value || today(), note: $('#pay-note').value.trim() || ps.note || null }); logEvent('paid', `Плащане ${money(a)} (${$('#pay-m').value}): ${cname(cid())}`); await afterClient(); break; }
+      case 'debtdel': { const id = el.dataset.id, a = +el.dataset.amt;
+        if (!confirm(`Да изтрия ли дълга на ${cname(id)} (${money(a)})?\n\nКлиентът става изравнен. Таксите, абонаментите и плащанията остават в историята, а в сметката му се добавя корекция „Отписан дълг“.`)) break;
+        const { data, error } = await sb.rpc('write_off_debt', { p_client: id }); if (error) { fail(error, 'Дългът не се изтри'); break; }
+        logEvent('change', `Отписан дълг ${money(+data || a)}: ${cname(id)}`); toast(`Дългът на ${cname(id)} е изтрит`); await refreshBal(); redrawPay(); break; }
       case 'paydel': { const p = (D.ecl && D.ecl.pays || []).find(x => x.id === el.dataset.id);
         if (!confirm(`Да изтрия ли плащането${p ? ` ${money(p.amount)} от ${fmt(p.date)}` : ''} на ${cname(cid())}?\n\nТова не може да се върне.`)) break;
         const { error, count } = await sb.from('payments').delete({ count: 'exact' }).eq('id', el.dataset.id);
