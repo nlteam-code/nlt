@@ -1251,15 +1251,25 @@ async function massageDone(id) {
 
 /* ── седмичен график ── */
 const H0 = 6, H1 = 21, HH = 48;
+/* Изглед на графика: 3 / 5 / 7 дни (запомня се на устройството) */
+function calSpan() {
+  if (![3, 5, 7].includes(S.span)) { let v = 7; try { v = +localStorage.getItem('nlt-span') || 7; } catch (e) {} S.span = [3, 5, 7].includes(v) ? v : 7; if (S.span !== 7) S.week = parse(today()); }
+  return S.span;
+}
+const isAdm = () => S.owner || (S.me && S.me.row && S.me.row.role === 'admin');
 async function weekView() {
   if (S.waitOpen === undefined) S.waitOpen = true;
   if (!S.pstat || !S.pstat.length) S.pstat = await loadPstat();
-  const a = ymd(S.week), b = ymd(addDays(S.week, 6));
+  const sp = calSpan();
+  const a = ymd(S.week), b = ymd(addDays(S.week, (S.massage ? 7 : sp) - 1));
   const main = $('#main');
   if (S.massage) { main.innerHTML = weekBar(a, b) + `<div id="mbox" class="mute">Зареждане…</div>`; return massageView(); }
   main.innerHTML = `<div class="row" style="margin-bottom:10px">
     <button data-act="wk" data-d="-7">←</button><button data-act="wk" data-d="0">Днес</button><button data-act="wk" data-d="7">→</button>
-    <b id="wlabel">${fmt(a)} – ${fmt(b)}</b><span class="sp"></span>
+    <b id="wlabel">${fmt(a)} – ${fmt(b)}</b>
+    <span class="seg" title="Колко дни да се виждат">${[3, 5, 7].map(n => `<button class="${sp === n ? 'on' : ''}" data-act="span" data-n="${n}">${n} дни</button>`).join('')}</span>
+    ${isAdm() ? `<select id="trsel" title="Покажи графика на един треньор"><option value="">Всички треньори</option>${(S.staff || []).filter(t => t.active !== false).map(t => `<option value="${t.id}"${S.trf === t.id ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}</select>` : ''}
+    <span class="sp"></span>
     <button class="sm ${S.massage ? 'pri' : ''}" data-act="mtoggle" title="Масажно студио (само Лерин)">Масажно</button><button class="sm" data-act="wtoggle">Клиенти</button><button class="pri" data-act="newsess">+ Нов час</button></div><div class="wkl"><aside id="wbtn">${waitHtml()}</aside><div id="grid" class="mute">Зареждане…</div></div>`;
   const { data, error } = await sb.from('sessions')
     .select('*,bookings(id,status,client_id,use_plan)').eq('location', S.loc).gte('date', a).lte('date', b).order('start_time');
@@ -1281,13 +1291,12 @@ function layoutDay(evs) {
 }
 function drawGrid() {
   const grid = $('#grid'); if (!grid) return;
-  const evs = S.sessions;
+  const evs = S.sessions.filter(e => !S.trf || !isAdm() || e.trainer_id === S.trf);
+  const sp = calSpan();
   let h0 = H0, h1 = H1;
   evs.forEach(e => { h0 = Math.min(h0, Math.floor(mins(e.start_time) / 60)); h1 = Math.max(h1, Math.ceil((mins(e.start_time) + (e.duration_min || 60)) / 60)); });
   const total = (h1 - h0) * HH;
-  const days = [...Array(7)].map((_, i) => addDays(S.week, i));
-  const showWE = evs.some(e => { const w = (parse(e.date).getDay() + 6) % 7; return w >= 5; });
-  const shown = days.filter((_, i) => i < 5 || showWE);
+  const shown = [...Array(sp)].map((_, i) => addDays(S.week, i));
   let lines = '', labels = '';
   for (let h = h0; h <= h1; h++) {
     lines += `<div class="hl" style="top:${(h - h0) * HH}px"></div>`;
@@ -3541,7 +3550,10 @@ document.addEventListener('click', async e => {
       case 'kchart': D.kchart = el.dataset.k; kpiView(); break;
       case 'klist': D.klist = el.dataset.k; kpiView(); break;
       case 'krisk': D.krisk = !D.krisk; drawKpiClients(); break;
-      case 'wk': S.week = el.dataset.d === '0' ? monday(new Date()) : addDays(S.week, +el.dataset.d); weekView(); break;
+      case 'wk': { const sp = S.massage ? 7 : calSpan(), d = +el.dataset.d; S.week = d === 0 ? (sp === 7 ? monday(new Date()) : parse(today())) : addDays(S.week, Math.sign(d) * sp); weekView(); break; }
+      case 'span': { const n = +el.dataset.n, t = parse(today()); S.span = n; try { localStorage.setItem('nlt-span', n); } catch (e) {}
+        if (n === 7) S.week = monday(S.week); else if (ymd(t) >= ymd(S.week) && ymd(t) <= ymd(addDays(S.week, 6))) S.week = t;
+        weekView(); break; }
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
       case 'newsess': newSessionDialog(); break;
       case 'nsave': await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked }); break;
@@ -3675,6 +3687,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', async e => {
   if (e.target.dataset && e.target.dataset.pspk) { const p = (D.psub || []).find(x => x.id === e.target.value), sd = $('#' + e.target.dataset.pspk + '-sd'); if (p && sd) sd.value = p.start_date; return; }
+  if (e.target.id === 'trsel') { S.trf = e.target.value || null; drawGrid(); return; }
   if (e.target.id === 'phm') { D.phm = e.target.value; D.phist = null; redrawPay(); loadPayHist(); return; }
   if (e.target.dataset && e.target.dataset.act === 'wall') { S.wall = e.target.checked; $('#wbtn').innerHTML = waitHtml(); return; }
   if (e.target.id === 'klist-sel') { D.klist = e.target.value; return kpiView(); }
