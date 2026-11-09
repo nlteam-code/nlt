@@ -1825,16 +1825,16 @@ function redrawPay() {
 const psName = p => { const k = (S.packages || []).find(x => x.id === p.package_id); return k ? k.name : (p.kind === 'solo' ? 'Персонални тренировки' : 'Групови тренировки'); };
 async function paySubHtml(id, pfx) {
   const { data } = await sb.from('client_packages').select('id,kind,start_date,end_date,package_id').eq('client_id', id).order('start_date', { ascending: false }).order('created_at', { ascending: false }).limit(4);
-  const L = data || []; D.psub = L;
-  if (!L.length) return '<div class="mute" style="margin:6px 0">Клиентът няма абонамент — плащането ще се запише без дата на абонамент.</div>';
+  const L = (data || []).filter(p => p.end_date >= today()); D.psub = L;
+  const none = '<option value="">Не е за абонамент (еднократни посещения / аванс)</option>';
   return `<div style="margin:8px 0;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:10px">
-    <label class="f">Плащането е за абонамент<select id="${pfx}-pk" data-pspk="${pfx}">${L.map((p, i) => `<option value="${p.id}"${i ? '' : ' selected'}>${esc(psName(p))} · ${fmt(p.start_date)} – ${fmt(p.end_date)}</option>`).join('')}</select></label>
-    <label class="f">Абонаментът започва на<input id="${pfx}-sd" type="date" value="${L[0].start_date}"></label>
-    <div class="mute" style="font-size:12px">Потвърди датата с клиента. Ако е различна, смени я — краят на абонамента се мести със същия брой дни.</div></div>`;
+    <label class="f">Плащането е за<select id="${pfx}-pk" data-pspk="${pfx}">${L.map((p, i) => `<option value="${p.id}"${i ? '' : ' selected'}>Абонамент ${esc(psName(p))} · ${fmt(p.start_date)} – ${fmt(p.end_date)}</option>`).join('')}${none}</select></label>
+    <div id="${pfx}-sdw" style="${L.length ? '' : 'display:none'}"><label class="f">Абонаментът започва на<input id="${pfx}-sd" type="date" value="${L.length ? L[0].start_date : ''}"></label>
+    <div class="mute" style="font-size:12px">Потвърди датата с клиента. Ако е различна, смени я — краят на абонамента се мести със същия брой дни.</div></div></div>`;
 }
 async function paySubConfirm(id, pfx, amt) {
   const sel = $(`#${pfx}-pk`);
-  if (!sel) return confirm(`Да запиша плащане ${money(amt)} за ${cname(id)}?`) ? {} : null;
+  if (!sel || !sel.value) return confirm(`Да запиша плащане ${money(amt)} за ${cname(id)}?${sel ? '\n\n(Не е за абонамент — еднократни посещения / аванс)' : ''}`) ? {} : null;
   const p = (D.psub || []).find(x => x.id === sel.value), sd = $(`#${pfx}-sd`).value;
   if (!p || !sd) { toast('Въведи датата, от която започва абонаментът.'); return null; }
   if (!confirm(`Плащане ${money(amt)} · ${cname(id)}\n\nАбонамент: ${psName(p)}\nЗапочва на: ${fmt(sd)}${sd !== p.start_date ? `  (сменяш от ${fmt(p.start_date)})` : ''}\n\nПотвърждаваш ли, че абонаментът на клиента започва на тази дата?`)) return null;
@@ -3788,7 +3788,7 @@ document.addEventListener('click', async e => {
   } catch (err) { fail(err, 'Грешка'); }
 });
 document.addEventListener('change', async e => {
-  if (e.target.dataset && e.target.dataset.pspk) { const p = (D.psub || []).find(x => x.id === e.target.value), sd = $('#' + e.target.dataset.pspk + '-sd'); if (p && sd) sd.value = p.start_date; return; }
+  if (e.target.dataset && e.target.dataset.pspk) { const f = e.target.dataset.pspk, p = (D.psub || []).find(x => x.id === e.target.value), sd = $('#' + f + '-sd'), w = $('#' + f + '-sdw'); if (w) w.style.display = p ? '' : 'none'; if (p && sd) sd.value = p.start_date; return; }
   if (e.target.id === 'trsel') { S.trf = e.target.value || null; drawGrid(); return; }
   if (e.target.id === 'phm') { D.phm = e.target.value; D.phist = null; redrawPay(); loadPayHist(); return; }
   if (e.target.dataset && e.target.dataset.act === 'wall') { S.wall = e.target.checked; $('#wbtn').innerHTML = waitHtml(); return; }
