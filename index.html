@@ -1525,7 +1525,7 @@ async function openClient(id, tab) {
   const vpk = (d, kind) => { const c = pk.filter(q => q.start_date <= d && q.end_date >= d && (!kind || q.kind === kind)).sort((a, b) => a.start_date.localeCompare(b.start_date))[0]; return c ? `<span class="chip" title="Към кой абонамент се брои">${esc(c.package_name || 'Абонамент')} · ${fmt(c.start_date)}–${fmt(c.end_date)}${S.owner && c.price ? ' · ' + eur(c.price) : ''}</span>` : '<span class="chip warn">извън абонамент</span>'; };
   const ledger = [...pays.map(p => ({ d: p.date, plus: true, a: p.amount, t: `${esc(p.method || '')} ${esc(p.note || '')}`, id: p.id, act: 'paydel' })), ...chs.map(p => ({ d: p.date, plus: false, a: p.amount, t: esc(p.note || 'Такса'), id: p.id, act: 'chdel' }))].sort((a, b) => String(b.d).localeCompare(String(a.d)));
   D.ecl = { id: x.id, pk, pays, chs, past, arch }; const T = tab || 'profile';
-  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес']].concat(S.owner ? [['pays', 'Плащания']] : []);
+  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес']].concat([['pays', 'Плащания']]);
   modal.show(`<div id="cl" data-cid="${x.id}" data-uid="${x.user_id || ''}">
     <h2>${esc(x.name)}</h2>
     <div class="chips" style="margin-bottom:10px">${tabs.map(([k, l]) => `<button class="sm ${T === k ? 'on' : ''}" data-act="cltab" data-t="${k}">${l}</button>`).join('')}</div>
@@ -1588,7 +1588,10 @@ async function openClient(id, tab) {
       <select id="pay-m"><option>В брой</option><option>Банков път</option></select><input id="pay-d" type="date" value="${today()}" title="Дата на плащането"><input id="pay-note" placeholder="Бележка" style="flex:1;min-width:120px">
       <button data-act="payadd">+ Плащане</button></div>
     <div class="row" style="margin-top:6px"><input type="number" id="chg-amt" placeholder="Сума" style="width:90px" step="0.01"><input id="chg-note" placeholder="Такса – за какво" style="flex:1;min-width:120px"><button data-act="chgadd">+ Такса</button></div>
-    </div>` : ''}
+    </div>` : `<div class="cpane" data-p="pays" ${T === 'pays' ? '' : 'hidden'}>
+    <h3>Плащания</h3>
+    <div style="max-height:320px;overflow:auto">${pays.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).map(p => `<div class="bk"><div class="nm"><b style="color:var(--ok)">+ ${money(p.amount)}</b> · ${fmt(p.date)} · ${esc(p.method || '')} ${esc(p.note || '')}</div><button class="sm danger" data-act="paydel" data-id="${p.id}" title="Изтрий плащането">✕</button></div>`).join('') || '<div class="mute">Няма плащания.</div>'}</div>
+    </div>`}
   </div>`, true);
   if (S.owner) paySubHtml(x.id, 'pay').then(h => { const e = $('#pay-sub'); if (e) e.innerHTML = h; });
   if (x.user_id) sb.from('client_consents').select('accepted_at,signed_name,version').eq('client_id', x.id).order('accepted_at', { ascending: false }).limit(1).then(r => { const el = $('#cl h2'); if (!el) return; const c0 = r.data && r.data[0]; el.insertAdjacentHTML('afterend', `<div class="mute" style="font-size:12px;margin:-4px 0 8px">${c0 ? `Подписани условия: ${fmt(String(c0.accepted_at).slice(0, 10))} · ${esc(c0.signed_name)}` : 'Още не е подписал условията'}</div>`); });
@@ -3582,7 +3585,11 @@ document.addEventListener('click', async e => {
         await afterClient(); toast('Абонаментът е ' + data); break; }
       case 'cpdel': if (confirm('Да се изтрие ли пакетът?')) { await sb.from('client_packages').delete().eq('id', el.dataset.id); await afterClient(); } break;
       case 'payadd': { const a = +$('#pay-amt').value; if (!a) return toast('Въведи сума.'); const ps = await paySubConfirm(cid(), 'pay', a); if (!ps) break; await sb.from('payments').insert({ client_id: cid(), amount: a, method: $('#pay-m').value, date: $('#pay-d').value || today(), note: $('#pay-note').value.trim() || ps.note || null }); logEvent('paid', `Плащане ${money(a)} (${$('#pay-m').value}): ${cname(cid())}`); await afterClient(); break; }
-      case 'paydel': await sb.from('payments').delete().eq('id', el.dataset.id); await afterClient(); break;
+      case 'paydel': { const p = (D.ecl && D.ecl.pays || []).find(x => x.id === el.dataset.id);
+        if (!confirm(`Да изтрия ли плащането${p ? ` ${money(p.amount)} от ${fmt(p.date)}` : ''} на ${cname(cid())}?\n\nТова не може да се върне.`)) break;
+        const { error, count } = await sb.from('payments').delete({ count: 'exact' }).eq('id', el.dataset.id);
+        if (error) { fail(error, 'Плащането не се изтри'); break; } if (!count) { toast('Нямаш права да изтриеш това плащане.'); break; }
+        logEvent('change', `Изтрито плащане${p ? ' ' + money(p.amount) + ' от ' + fmt(p.date) : ''}: ${cname(cid())}`); await afterClient(); toast('Плащането е изтрито'); break; }
       case 'chgadd': { const a = +$('#chg-amt').value; if (!a) return toast('Въведи сума.'); await sb.from('charges').insert({ client_id: cid(), amount: a, note: $('#chg-note').value.trim() || null }); await afterClient(); break; }
       case 'chdel': await sb.from('charges').delete().eq('id', el.dataset.id); await afterClient(); break;
       case 'newclient': newClientDialog(); break;
