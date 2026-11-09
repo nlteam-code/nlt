@@ -1463,13 +1463,23 @@ async function createSession(f) {
   const row = { kind: f.kind, trainer_id: f.trainer, location: S.loc, title: f.title || null, capacity: f.kind === 'solo' ? 1 : (f.cap || null), green: f.kind === 'solo', duration_min: f.dur };
   if (f.repeat) {
     const wd = (parse(f.date).getDay() + 6) % 7;
-    const { error } = await sb.from('series').insert({ kind: f.kind, trainer_id: f.trainer, location: S.loc, weekday: wd, start_time: f.time, title: row.title, capacity: row.capacity, green: row.green, starts_on: f.date });
+    const { data: ser, error } = await sb.from('series').insert({ kind: f.kind, trainer_id: f.trainer, location: S.loc, weekday: wd, start_time: f.time, title: row.title, capacity: row.capacity, green: row.green, starts_on: f.date }).select('id').single();
     if (error) return fail(error, 'Не се създаде');
     const r = await sb.rpc('extend_series', { horizon_weeks: 53 });
     if (r.error) return fail(r.error, 'Не се разписа напред');
+    if (f.client && ser) {
+      const { data: ss } = await sb.from('sessions').select('id').eq('series_id', ser.id).gte('date', f.date).order('date');
+      const ids = (ss || []).map(x => x.id); modal.close();
+      if (ids.length && await bookClient(ids[0], f.client, false)) {
+        let n = 1; for (let i = 1; i < ids.length; i++) { if (i % 10 === 0) toast(`Записвам ${cname(f.client)}… ${i}/${ids.length}`); if (await bookClient(ids[i], f.client, true, true)) n++; }
+        toast(n > 1 ? `Часът е създаден · ${cname(f.client)} е записан(а) за ${n} седмици` : `Часът е създаден · ${cname(f.client)} е записан(а) само за първата седмица (няма абонамент за повтарящи се часове)`);
+      } else toast('Часът е създаден');
+      weekView(); return;
+    }
   } else {
-    const { error } = await sb.from('sessions').insert({ ...row, date: f.date, start_time: f.time });
+    const { data: ns, error } = await sb.from('sessions').insert({ ...row, date: f.date, start_time: f.time }).select('id').single();
     if (error) return fail(error, 'Не се създаде');
+    if (f.client && ns) { modal.close(); const ok = await bookClient(ns.id, f.client, false); toast(ok ? `Часът е създаден · ${cname(f.client)} е записан(а)` : 'Часът е създаден (без клиент)'); weekView(); return; }
   }
   modal.close(); toast('Часът е създаден'); weekView();
 }
@@ -1481,8 +1491,9 @@ function newSessionDialog(date, time) {
     <label class="f">Продължителност (мин)<input type="number" id="n-dur" value="60" step="5"></label>
     <label class="f">Треньор<select id="n-tr">${S.staff.filter(t => t.active).map(t => `<option value="${t.id}" ${t.id === S.me.row.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
     <label class="f">Заглавие<input id="n-title" placeholder="напр. Кондиция"></label>
-    <label class="f">Места<input type="number" id="n-cap" value="${S.policy?.capacity || 16}" min="1"></label>
+    <label class="f" id="n-capw">Места<input type="number" id="n-cap" value="${S.policy?.capacity || 16}" min="1"></label>
   </div>
+  <label class="f" style="margin-top:8px">Клиент <span class="mute">— по избор, записва се веднага (за персонален час)</span><input id="n-cq" placeholder="Търси клиент по име…" autocomplete="off"><input type="hidden" id="n-cid"><div id="n-res" class="res hide"></div></label>
   <label class="row" style="margin-top:10px"><input type="checkbox" id="n-rep"> Повтаряй всяка седмица (53 седмици напред)</label>
   <div class="row" style="margin-top:12px"><button class="pri" data-act="nsave">Създай</button></div>`);
 }
@@ -3634,7 +3645,7 @@ document.addEventListener('click', async e => {
         if (m !== 'plan' && b.use_plan) await sb.rpc('undo_renewal', { p_client: b.client_id, p_kind: s.kind });
         logEvent('change', `${cname(b.client_id)} · ${fmt(s.date)} ${hm(s.start_time)}: ${m === 'plan' ? 'по абонамент' : m === 'free' ? 'безплатно' : 'еднократно ' + money(upd.price)}`);
         toast(m === 'plan' ? 'По абонамент' : m === 'free' ? 'Без такса' : `Таксувано ${money(upd.price)}${started ? '' : ' (при започване на часа)'}`); await sessClients(s.id); weekView(); break; }
-      case 'nsave': await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked }); break;
+      case 'nsave': { if ($('#n-cq').value.trim() && !$('#n-cid').value) return toast('Избери клиента от списъка.'); await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked, client: $('#n-cid').value || null }); break; }
       case 'ssave': await saveSession(); break;
       case 'mv': await moveSession(+el.dataset.dm); break;
       case 'scancel': { const { data: s } = await sb.from('sessions').select('cancelled').eq('id', sessId()).single(); await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', sessId()); await refreshAfter(sessId()); break; }
@@ -3785,6 +3796,20 @@ document.addEventListener('change', async e => {
   const el = e.target.closest('[data-act=blate]');
   if (el) { const bid = el.closest('.bk').dataset.bid; await sb.from('bookings').update({ late: el.checked }).eq('id', bid); await refreshAfter(sessId()); }
 });
+document.addEventListener('input', e => {
+  if (e.target.id !== 'n-cq') return;
+  $('#n-cid').value = ''; const q = e.target.value.trim().toLowerCase(), box = $('#n-res');
+  if (q.length < 2) { box.classList.add('hide'); return; }
+  const m = S.clients.filter(c => c.name.toLowerCase().includes(q)).sort((a, b) => (a.status === 'Inactive') - (b.status === 'Inactive')).slice(0, 8);
+  box.innerHTML = m.map(c => `<div data-npick="${c.id}">${esc(c.name)} <span class="mute">${esc(c.phone || '')}${c.status === 'Inactive' ? ' · неактивен' : ''}</span></div>`).join('') || '<div class="mute">Няма резултат</div>';
+  box.classList.remove('hide');
+});
+document.addEventListener('click', e => {
+  const p = e.target.closest('[data-npick]'); if (!p) return;
+  $('#n-cid').value = p.dataset.npick; $('#n-cq').value = cname(p.dataset.npick); $('#n-res').classList.add('hide');
+  if ($('#n-kind').value === 'solo' && !$('#n-title').value.trim()) $('#n-title').placeholder = cname(p.dataset.npick);
+});
+document.addEventListener('change', e => { if (e.target.id === 'n-kind') { const w = $('#n-capw'); if (w) w.hidden = e.target.value === 'solo'; } });
 document.addEventListener('input', e => {
   if (e.target.id !== 'add-q') return;
   const q = e.target.value.trim().toLowerCase(), box = $('#add-res');
