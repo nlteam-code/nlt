@@ -2236,8 +2236,8 @@ async function dashView() {
         <div class="stat2"><div><b>${eur(st.proj)}</b><span>Прогнозен приход</span></div><div><b>${eur(st.done)}</b><span>Реализиран до момента</span></div><div><b>${st.n_done} / ${st.n}</b><span>Проведени / всички посещения</span></div><div><b>${eur(st.n ? st.proj / st.n : 0)}</b><span>Средна цена на посещение</span></div></div>
         <p class="mute">${diff === null ? 'Няма данни за предишния месец.' : `Спрямо ${mLabel(shiftM(D.month, -1))}: ${diff >= 0 ? '+' : ''}${diff}% (${eur(pv.proj)}).`} Цената на пакета ÷ броя посещения в него; еднократните — по тяхната цена. Отказаните не се броят.</p></div>
     </div>
-    <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
+    <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
     <div class="card" style="margin-bottom:12px"><h2>Финансова графика по месеци</h2>
       <div class="chips">${chip('ctab', 'pay', 'Плащания', D.chart)}${chip('ctab', 'chg', 'Такси', D.chart)}${chip('ctab', 'proj', 'Прогноза по посещения', D.chart)}</div>${svg}</div>
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
