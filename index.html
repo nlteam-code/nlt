@@ -3809,7 +3809,7 @@ document.addEventListener('click', e => {
   $('#n-cid').value = p.dataset.npick; $('#n-cq').value = cname(p.dataset.npick); $('#n-res').classList.add('hide');
   if ($('#n-kind').value === 'solo' && !$('#n-title').value.trim()) $('#n-title').placeholder = cname(p.dataset.npick);
 });
-document.addEventListener('change', e => { if (e.target.id === 'n-kind') { const w = $('#n-capw'); if (w) w.hidden = e.target.value === 'solo'; } });
+document.addEventListener('change', e => { if (e.target.id === 'n-kind') { const w = $('#n-capw'); if (w) w.style.display = e.target.value === 'solo' ? 'none' : ''; } });
 document.addEventListener('input', e => {
   if (e.target.id !== 'add-q') return;
   const q = e.target.value.trim().toLowerCase(), box = $('#add-res');
