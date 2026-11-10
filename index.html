@@ -1381,7 +1381,7 @@ function ctxMenu(x, y, id) {
     ${it('cxcl', `👥 Клиенти (${n}) и таксуване`)}${it('cxdup', '⧉ Дубликат')}${it('cxcan', s.cancelled ? '↺ Върни часа' : '⊘ Отмени часа')}
     <div class="ctx-s">Треньор</div>${trs.map(t => it('cxtr', (t.id === s.trainer_id ? '✓ ' : '　') + esc(t.name), `data-v="${t.id}"`)).join('')}
     <div class="ctx-s">Локация</div>${LOCS.map(l => it('cxloc', (l === s.location ? '✓ ' : '　') + esc(l), `data-v="${esc(l)}"`)).join('')}
-    <div class="ctx-s"></div>${it('sess', '✎ Отвори часа')}`;
+    <div class="ctx-s"></div>${it('sess', '✎ Отвори часа')}${it('cxdel', '🗑 Изтрий часа', 'style="color:var(--bad)"')}`;
   document.body.appendChild(m);
   const r = m.getBoundingClientRect(); m.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px'; m.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
 }
@@ -1433,7 +1433,7 @@ async function openSession(id) {
       <label class="f">Начало<div class="row" style="flex-wrap:nowrap"><button class="sm" data-act="mv" data-dm="-30">▲30</button><input type="time" step="1800" id="s-time" value="${hm(s.start_time)}" style="flex:1"><button class="sm" data-act="mv" data-dm="30">▼30</button></div></label>
       <label class="f">Продължителност (мин)<input type="number" id="s-dur" value="${s.duration_min}" step="5" min="15"></label>
       <label class="f">Треньор<select id="s-tr">${trainers.map(t => `<option value="${t.id}" ${t.id === s.trainer_id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
-      <label class="f">Заглавие<input id="s-title" value="${esc(s.title || '')}"></label>
+      <label class="f">Заглавие<input id="s-title" list="ttl-sugg" value="${esc(s.title || '')}">${titleSugg('s-title')}</label>
       <label class="f">Места<input type="number" id="s-cap" value="${s.capacity ?? ''}" min="1"></label>
     </div>
     <label class="f" style="margin-top:8px">Бележка<textarea id="s-notes" rows="2">${esc(s.notes || '')}</textarea></label>
@@ -1447,9 +1447,25 @@ async function openSession(id) {
 }
 const sessId = () => $('#sess')?.dataset.sid;
 
-async function refreshAfter(id) { await weekView(); if (id) await openSession(id); }
+async function refreshAfter(id) { await weekView(); if (id) { if ((S.sessions || []).some(x => x.id === id)) await openSession(id); else { const { data } = await sb.from('sessions').select('id').eq('id', id).maybeSingle(); if (data) await openSession(id); else modal.close(); } } }
 
 /* ── Избор: само този час или този и всички следващи (същата серия / същия ден и час) ── */
+async function delSession(id) { const { data: s0, error: e0 } = await sb.from('sessions').select('id,date,start_time,location,kind,trainer_id,series_id,title').eq('id', id).single(); if (e0 || !s0) { fail(e0, 'Часът не се намери'); return; }
+        let fq = sb.from('sessions').select('id,date').gte('date', s0.date);
+        fq = s0.series_id ? fq.eq('series_id', s0.series_id) : fq.eq('start_time', s0.start_time).eq('location', s0.location).eq('kind', s0.kind).eq('trainer_id', s0.trainer_id);
+        const { data: fl } = await fq.order('date').range(0, 999); const dow = parse(s0.date).getDay();
+        const fids = [...new Set([id, ...(fl || []).filter(x => s0.series_id || parse(x.date).getDay() === dow).map(x => x.id)])];
+        let scope = 'one';
+        if (fids.length > 1) { scope = await askScope('Изтриване на час', `${esc(s0.title || KIND[s0.kind])} · ${fmt(s0.date)} от ${hm(s0.start_time)} · ${esc(trName(s0.trainer_id))}. Изтриват се и записванията на клиентите. Само този час или и всички следващи в същия ден и час?`, fids.length); if (!scope) { await openSession(id); return; } }
+        else if (!confirm('Да се изтрие ли часът заедно със записванията?')) return;
+        const ids = scope === 'all' ? fids : [id];
+        for (let i = 0; i < ids.length; i += 100) { const { error } = await sb.from('sessions').delete().in('id', ids.slice(i, i + 100)); if (error) { fail(error, 'Не се изтри'); return; } }
+        if (scope === 'all' && s0.series_id) { const { error } = await sb.from('series').update({ ends_on: ymd(addDays(parse(s0.date), -1)) }).eq('id', s0.series_id); if (error) fail(error, 'Серията не се спря'); }
+        logEvent('change', `Изтрит час ${s0.title || KIND[s0.kind]} ${fmt(s0.date)} ${hm(s0.start_time)}${ids.length > 1 ? ` и следващите (${ids.length})` : ''}`);
+        modal.close(); toast(ids.length > 1 ? `Изтрити ${ids.length} часа` : 'Часът е изтрит'); weekView();
+}
+const TITLE_SUGG = ['Upper Body', 'Lower Body', 'Conditioning'];
+const titleSugg = inp => `<div class="chips" style="margin-top:4px">${TITLE_SUGG.map(t => `<button type="button" class="sm" data-act="ttlpick" data-for="${inp}" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div><datalist id="ttl-sugg">${[...new Set([...TITLE_SUGG, ...(S.sessions || []).map(x => x.title).filter(Boolean)])].map(t => `<option value="${esc(t)}">`).join('')}</datalist>`;
 function askScope(title, text, nAll) {
   return new Promise(res => { D.scopeRes = res;
     modal.show(`<div id="scope"><h2>${esc(title)}</h2><p class="mute">${text}</p>
@@ -1539,6 +1555,7 @@ async function createSession(f) {
       const ids = (ss || []).map(x => x.id); modal.close();
       if (ids.length && await bookClient(ids[0], f.client, false)) {
         let n = 1; for (let i = 1; i < ids.length; i++) { if (i % 10 === 0) toast(`Записвам ${cname(f.client)}… ${i}/${ids.length}`); if (await bookClient(ids[i], f.client, true, true)) n++; }
+        await sb.from('series_members').insert({ series_id: ser.id, client_id: f.client }).then(() => { }, () => { });
         toast(n > 1 ? `Часът е създаден · ${cname(f.client)} е записан(а) за ${n} седмици` : `Часът е създаден · ${cname(f.client)} е записан(а) само за първата седмица (няма абонамент за повтарящи се часове)`);
       } else toast('Часът е създаден');
       weekView(); return;
@@ -1557,7 +1574,7 @@ function newSessionDialog(date, time) {
     <label class="f">Начало<input type="time" step="1800" id="n-time" value="${time || '08:30'}"></label>
     <label class="f">Продължителност (мин)<input type="number" id="n-dur" value="60" step="5"></label>
     <label class="f">Треньор<select id="n-tr">${S.staff.filter(t => t.active).map(t => `<option value="${t.id}" ${t.id === S.me.row.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
-    <label class="f">Заглавие<input id="n-title" placeholder="напр. Кондиция"></label>
+    <label class="f">Заглавие<input id="n-title" list="ttl-sugg" placeholder="напр. Upper Body">${titleSugg('n-title')}</label>
     <label class="f" id="n-capw">Места<input type="number" id="n-cap" value="${S.policy?.capacity || 16}" min="1"></label>
   </div>
   <label class="f" style="margin-top:8px">Клиент <span class="mute">— по избор, записва се веднага (за персонален час)</span><input id="n-cq" placeholder="Търси клиент по име…" autocomplete="off"><input type="hidden" id="n-cid"><div id="n-res" class="res hide"></div></label>
@@ -3775,6 +3792,8 @@ document.addEventListener('click', async e => {
         const cp = { kind: s.kind, trainer_id: s.trainer_id, location: s.location, title: s.title, description: s.description, notes: s.notes, workout: s.workout, category: s.category, green: s.green, capacity: s.capacity, duration_min: s.duration_min, date: d, start_time: t.length === 5 ? t + ':00' : t };
         const { error } = await sb.from('sessions').insert(cp); if (error) return fail(error, 'Копието не се създаде');
         logEvent('change', `Дубликат на час ${fmt(d)} ${t}: ${s.title || KIND[s.kind]}`); modal.close(); toast(`Създадено копие за ${fmt(d)} ${t}`); weekView(); break; }
+      case 'ttlpick': { const i = document.getElementById(el.dataset.for); if (i) { i.value = el.dataset.v; i.dispatchEvent(new Event('input', { bubbles: true })); } break; }
+      case 'cxdel': await delSession(el.dataset.id); break;
       case 'cxcan': { const s = (S.sessions || []).find(e => e.id === el.dataset.id); if (!s) break; const n = (s.bookings || []).filter(b => b.status !== 'cancelled').length;
         if (!s.cancelled && !confirm(`Да отменя ли часа ${hm(s.start_time)} на ${fmt(s.date)}?${n ? `\n\nЗаписани клиенти: ${n}.` : ''}`)) break;
         const { error } = await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', s.id); if (error) return fail(error, 'Не се промени');
@@ -3799,7 +3818,7 @@ document.addEventListener('click', async e => {
       case 'ssave': await saveSession(); break;
       case 'mv': await moveSession(+el.dataset.dm); break;
       case 'scancel': { const { data: s } = await sb.from('sessions').select('cancelled').eq('id', sessId()).single(); await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', sessId()); await refreshAfter(sessId()); break; }
-      case 'sdel': if (confirm('Да се изтрие ли часът заедно със записванията?')) { const id = sessId(); const { error } = await sb.from('sessions').delete().eq('id', id); if (error) return fail(error, 'Не се изтри'); modal.close(); weekView(); } break;
+      case 'sdel': await delSession(sessId()); break;
       case 'bst': await setBookingStatus(el.closest('.bk').dataset.bid, el.dataset.st); break;
       case 'brm': { const bid = el.closest('.bk').dataset.bid; const bb = (await sb.from('bookings').select('client_id,sessions(id,date,start_time,location,kind,series_id)').eq('id', bid).single()).data; if (!bb) break;
         const fs = await followingSessions(bb.sessions); const sids = fs.map(x => x.id).filter(x => x !== bb.sessions.id);
@@ -3809,6 +3828,8 @@ document.addEventListener('click', async e => {
         else if (!confirm('Да се премахне ли клиентът от този час?\n\nАко вече е таксуван, таксата и посещението му се връщат.')) break;
         const ids = scope === 'all' ? [bid, ...others.map(x => x.id)] : [bid]; let n = 0;
         for (const id2 of ids) { const { error } = await sb.rpc('unbook', { p_booking: id2 }); if (error) { fail(error, 'Не се премахна'); break; } n++; }
+        if (scope === 'all' && bb.sessions.series_id) await sb.from('series_members').delete().match({ series_id: bb.sessions.series_id, client_id: bb.client_id }).then(() => { }, () => { });
+        if (bb.sessions.kind === 'solo' && n) { const allS = scope === 'all' ? [bb.sessions.id, ...sids] : [bb.sessions.id]; const { data: left } = await sb.from('sessions').select('id,bookings(id)').in('id', allS.slice(0, 300)); const empty = (left || []).filter(x => !(x.bookings || []).length).map(x => x.id); if (empty.length) await sb.from('sessions').delete().in('id', empty).then(() => { }, () => { }); }
         logEvent('removed', `Премахнат${n > 1 ? ` от ${n} часа, от` : ':'} ${bkLabel(bb.client_id, bb.sessions.date, bb.sessions.start_time)}${n > 1 ? ' нататък' : ''}`);
         toast(n > 1 ? `${cname(bb.client_id)} е премахнат(а) от ${n} часа` : 'Премахнат · таксата и посещението са върнати, ако е имало'); await refreshAfter(bb.sessions.id); break; }
       case 'cltab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=cltab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; if (el.dataset.t === 'prog' && !$('#pg-staff').dataset.on) { $('#pg-staff').dataset.on = 1; pgBoot(true, $('#cl').dataset.cid, 'pg-staff', $('#cl').dataset.uid); } break; }
