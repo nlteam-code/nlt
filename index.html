@@ -1548,6 +1548,14 @@ async function createSession(f) {
     const wd = (parse(f.date).getDay() + 6) % 7;
     const { data: ser, error } = await sb.from('series').insert({ kind: f.kind, trainer_id: f.trainer, location: S.loc, weekday: wd, start_time: f.time, title: row.title, capacity: row.capacity, green: row.green, starts_on: f.date }).select('id').single();
     if (error) return fail(error, 'Не се създаде');
+    if (f.kind === 'solo' && f.client) {
+      /* Персонален повтарящ се час: клиентът е постоянно записан в серията и всеки час се създава заедно със записването — без празни часове */
+      const { error: me } = await sb.from('series_members').insert({ series_id: ser.id, client_id: f.client });
+      if (me) return fail(me, 'Клиентът не се записа в серията');
+      const r2 = await sb.rpc('extend_series', { horizon_weeks: 53 }); if (r2.error) return fail(r2.error, 'Не се разписа напред');
+      const { count } = await sb.from('sessions').select('id', { count: 'exact', head: true }).eq('series_id', ser.id);
+      modal.close(); toast(`Часът е създаден · ${cname(f.client)} е записан(а) всяка седмица (${count || 0} часа напред)`); weekView(); return;
+    }
     const r = await sb.rpc('extend_series', { horizon_weeks: 53 });
     if (r.error) return fail(r.error, 'Не се разписа напред');
     if (f.client && ser) {
