@@ -2988,7 +2988,7 @@ function nutrCard() {
 }
 function clientNutr() {
   const L = C.nutr || []; const p = L[0];
-  if (!p) return `<h2 class="c-title">Хранителен план</h2><div class="c-card"><div class="c-mute">Все още нямаш хранителен план. Треньорът ти ще го публикува тук.</div></div>`;
+  if (!p) return `<h2 class="c-title">Хранителен план</h2><div class="c-card" style="text-align:center;padding:28px 18px">${ic('leaf', 34)}<div style="font-weight:700;margin-top:10px">Към момента нямате достъп до тази услуга</div><div class="c-mute" style="margin-top:6px">За хранителен план се обърнете към вашия треньор.</div></div>`;
   const one = x => `${x.body ? `<div style="white-space:pre-wrap;line-height:1.5;margin-top:8px">${esc(x.body)}</div>` : ''}${x.file_path ? `<button class="c-btn" style="margin-top:10px" data-act="nfile" data-p="${esc(x.file_path)}">📄 Отвори ${esc(x.file_name || 'файла')}</button>` : ''}`;
   return `<h2 class="c-title">Хранителен план</h2>
     <div class="c-card"><b style="font-size:17px">${esc(p.title || 'Твоят режим')}</b><div class="c-mute">${fmt(String(p.created_at).slice(0, 10))}</div>${one(p)}</div>
@@ -2999,7 +2999,7 @@ function renderClient() {
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
   const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? `<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>` : C.tab === 'svc' ? clientServices() : C.tab === 'nutr' ? clientNutr() : clientHome(me, t, act);
   const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['svc', 'tag', 'Услуги'], ['prog', 'chart', 'Прогрес']];
-  if ((C.nutr || []).length) nav.splice(5, 0, ['nutr', 'leaf', 'Хранене']);
+  nav.splice(5, 0, ['nutr', 'leaf', 'Хранене']);
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
     <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
