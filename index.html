@@ -1427,6 +1427,31 @@ const sessId = () => $('#sess')?.dataset.sid;
 
 async function refreshAfter(id) { await weekView(); if (id) await openSession(id); }
 
+/* ── Избор: само този час или този и всички следващи (същата серия / същия ден и час) ── */
+function askScope(title, text, nAll) {
+  return new Promise(res => { D.scopeRes = res;
+    modal.show(`<div id="scope"><h2>${esc(title)}</h2><p class="mute">${text}</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        <button class="pri" data-act="scope" data-v="one">Само този час</button>
+        <button data-act="scope" data-v="all">Този и всички следващи${nAll ? ` (${nAll})` : ''}</button>
+        <button class="sm" data-act="scope" data-v="">Отказ</button></div></div>`); });
+}
+async function followingSessions(s) {
+  let q = sb.from('sessions').select('id,date,start_time,trainer_id,series_id').gte('date', s.date).eq('cancelled', false);
+  q = s.series_id ? q.eq('series_id', s.series_id) : q.eq('start_time', s.start_time).eq('location', s.location).eq('kind', s.kind);
+  const { data } = await q.order('date').range(0, 999);
+  const dow = parse(s.date).getDay();
+  return (data || []).filter(x => s.series_id || parse(x.date).getDay() === dow);
+}
+async function setTrainerScoped(s, tr) {
+  const fs = await followingSessions(s); let scope = 'one';
+  if (fs.filter(x => x.id !== s.id).length) { scope = await askScope('Смяна на треньор', `${esc(trName(tr))} да води само часа на ${fmt(s.date)} от ${hm(s.start_time)} или и всички следващи в същия ден и час?`, new Set([s.id, ...fs.map(x => x.id)]).size); if (!scope) return null; }
+  const ids = scope === 'all' ? [...new Set([s.id, ...fs.map(x => x.id)])] : [s.id];
+  const { error } = await sb.from('sessions').update({ trainer_id: tr }).in('id', ids); if (error) { fail(error, 'Треньорът не се смени'); return null; }
+  if (scope === 'all' && s.series_id) await sb.from('series').update({ trainer_id: tr }).eq('id', s.series_id);
+  logEvent('change', `Треньор ${trName(tr)} за ${ids.length > 1 ? ids.length + ' часа от ' : 'час '}${fmt(s.date)} ${hm(s.start_time)}`);
+  toast(ids.length > 1 ? `Треньор ${trName(tr)} за ${ids.length} часа` : `Треньор: ${trName(tr)}`); return ids.length;
+}
 async function saveSession() {
   const id = sessId();
   const patch = {
@@ -1434,9 +1459,12 @@ async function saveSession() {
     trainer_id: $('#s-tr').value, title: $('#s-title').value.trim() || null,
     capacity: $('#s-cap').value ? +$('#s-cap').value : null, notes: $('#s-notes').value.trim() || null
   };
+  const { data: old } = await sb.from('sessions').select('id,date,start_time,location,kind,series_id,trainer_id').eq('id', id).single();
+  const trChanged = old && old.trainer_id !== patch.trainer_id; if (trChanged) delete patch.trainer_id;
   const { error } = await sb.from('sessions').update(patch).eq('id', id);
   if (error) return fail(error, 'Не се записа');
-  toast('Записано'); await refreshAfter(id);
+  if (trChanged) { await setTrainerScoped(old, $('#s-tr') ? $('#s-tr').value : old.trainer_id); } else toast('Записано');
+  await refreshAfter(id);
 }
 async function moveSession(dm) {
   const id = sessId(); const cur = mins($('#s-time').value);
@@ -3721,8 +3749,8 @@ document.addEventListener('click', async e => {
         const { error } = await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', s.id); if (error) return fail(error, 'Не се промени');
         logEvent('change', `${s.cancelled ? 'Върнат' : 'Отменен'} час ${fmt(s.date)} ${hm(s.start_time)}`); toast(s.cancelled ? 'Часът е върнат' : 'Часът е отменен'); weekView(); break; }
       case 'cxtr': { const s = (S.sessions || []).find(e => e.id === el.dataset.id); if (!s || s.trainer_id === el.dataset.v) break;
-        const { error } = await sb.from('sessions').update({ trainer_id: el.dataset.v }).eq('id', s.id); if (error) return fail(error, 'Треньорът не се смени');
-        logEvent('change', `Треньор ${trName(el.dataset.v)} за час ${fmt(s.date)} ${hm(s.start_time)}`); toast(`Треньор: ${trName(el.dataset.v)}`); weekView(); break; }
+        await setTrainerScoped(s, el.dataset.v); weekView(); break; }
+      case 'scope': { const r = D.scopeRes; D.scopeRes = null; modal.close(); if (r) r(el.dataset.v || null); break; }
       case 'cxloc': { const s = (S.sessions || []).find(e => e.id === el.dataset.id), v = el.dataset.v; if (!s || s.location === v) break;
         if (!confirm(`Да преместя ли часа ${hm(s.start_time)} на ${fmt(s.date)} в ${v}?`)) break;
         const { error } = await sb.from('sessions').update({ location: v }).eq('id', s.id); if (error) return fail(error, 'Локацията не се смени');
@@ -3742,7 +3770,16 @@ document.addEventListener('click', async e => {
       case 'scancel': { const { data: s } = await sb.from('sessions').select('cancelled').eq('id', sessId()).single(); await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', sessId()); await refreshAfter(sessId()); break; }
       case 'sdel': if (confirm('Да се изтрие ли часът заедно със записванията?')) { const id = sessId(); const { error } = await sb.from('sessions').delete().eq('id', id); if (error) return fail(error, 'Не се изтри'); modal.close(); weekView(); } break;
       case 'bst': await setBookingStatus(el.closest('.bk').dataset.bid, el.dataset.st); break;
-      case 'brm': { const bid = el.closest('.bk').dataset.bid; if (!confirm('Да се премахне ли клиентът от този час?\n\nАко вече е таксуван, таксата и посещението му се връщат.')) break; const bb = (await sb.from('bookings').select('client_id,sessions(date,start_time)').eq('id', bid).single()).data; if (!(await unbook(bid))) break; if (bb) logEvent('removed', `Премахнат: ${bkLabel(bb.client_id, bb.sessions.date, bb.sessions.start_time)}`); await refreshAfter(sessId()); break; }
+      case 'brm': { const bid = el.closest('.bk').dataset.bid; const bb = (await sb.from('bookings').select('client_id,sessions(id,date,start_time,location,kind,series_id)').eq('id', bid).single()).data; if (!bb) break;
+        const fs = await followingSessions(bb.sessions); const sids = fs.map(x => x.id).filter(x => x !== bb.sessions.id);
+        const { data: fb } = sids.length ? await sb.from('bookings').select('id').eq('client_id', bb.client_id).in('session_id', sids).neq('status', 'cancelled') : { data: [] };
+        const others = fb || []; let scope = 'one';
+        if (others.length) { scope = await askScope(`Премахни ${cname(bb.client_id)}`, `Клиентът е записан и в още ${others.length} следващи часа в същия ден и час. Ако вече е таксуван, таксата и посещението му се връщат.`, others.length + 1); if (!scope) { await openSession(bb.sessions.id); break; } }
+        else if (!confirm('Да се премахне ли клиентът от този час?\n\nАко вече е таксуван, таксата и посещението му се връщат.')) break;
+        const ids = scope === 'all' ? [bid, ...others.map(x => x.id)] : [bid]; let n = 0;
+        for (const id2 of ids) { const { error } = await sb.rpc('unbook', { p_booking: id2 }); if (error) { fail(error, 'Не се премахна'); break; } n++; }
+        logEvent('removed', `Премахнат${n > 1 ? ` от ${n} часа, от` : ':'} ${bkLabel(bb.client_id, bb.sessions.date, bb.sessions.start_time)}${n > 1 ? ' нататък' : ''}`);
+        toast(n > 1 ? `${cname(bb.client_id)} е премахнат(а) от ${n} часа` : 'Премахнат · таксата и посещението са върнати, ако е имало'); await refreshAfter(bb.sessions.id); break; }
       case 'cltab': { document.querySelectorAll('#cl .cpane').forEach(p => p.hidden = p.dataset.p !== el.dataset.t); document.querySelectorAll('#cl [data-act=cltab]').forEach(b => b.classList.toggle('on', b === el)); S.ctab = el.dataset.t; if (el.dataset.t === 'prog' && !$('#pg-staff').dataset.on) { $('#pg-staff').dataset.on = 1; pgBoot(true, $('#cl').dataset.cid, 'pg-staff', $('#cl').dataset.uid); } break; }
       case 'client': S.ctab = 'profile'; modal.show('<div class="mute">Зареждане…</div>', true); await openClient(el.dataset.id); break;
       case 'csave': await saveClient(); break;
