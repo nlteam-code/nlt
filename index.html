@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,600;0,700;0,800;0,900;1,900&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <title>NLT Personal Training Club</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2212%22%20fill%3D%22%2311151b%22/%3E%3Ctext%20x%3D%2229%22%20y%3D%2242%22%20text-anchor%3D%22middle%22%20font-family%3D%22Arial%20Black%2CArial%2CHelvetica%2Csans-serif%22%20font-weight%3D%22900%22%20font-style%3D%22italic%22%20font-size%3D%2225%22%20fill%3D%22%23fff%22%20letter-spacing%3D%22-1%22%3ENLT%3C/text%3E%3Cpath%20d%3D%22M50%2016l8%2010H42z%22%20fill%3D%22%23e2263a%22/%3E%3C/svg%3E">
 <style>
 :root{color-scheme:dark}
 :root{--bg:#f2f3f7;--card:#fff;--ink:#1d2430;--mute:#6a7482;--line:#e8ebf0;--acc:#eb4c51;--acc-ink:#fff;--navy:#262d38;--org:#f48460;--grp:rgba(38,45,56,.07);--grp-b:#262d38;--solo:rgba(235,76,81,.11);--solo-b:#eb4c51;--warn:#b4531d;--warn-bg:#fff0e6;--bad:#d1363c;--ok:#0f8a5f;--shadow:0 1px 2px rgba(20,28,40,.05),0 12px 32px rgba(20,28,40,.10);--sh:0 1px 2px rgba(20,28,40,.04),0 8px 24px rgba(20,28,40,.06)}
@@ -638,6 +639,7 @@ async function staffApp() {
   try { const rr = await sb.rpc('auto_renew_sync'); if (!rr.error && rr.data > 0) S.pstat = null; } catch (e) { }
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
+  S.waitCfg = { add: [], hide: [], ...((q.data || []).find(x => x.key === 'waitlist')?.value || {}) };
   renderStaff();
 }
 function renderStaff() {
@@ -1520,7 +1522,8 @@ async function addClientToSession(cid2) {
     const { data: fut } = await sb.from('sessions').select('id').eq('series_id', s0.series_id).gt('date', s0.date).eq('cancelled', false);
     if ((fut || []).length && confirm(`${cname(cid2)} е записан. Да се запише ли и във всички следващи часове от тази серия (${fut.length})?\n\nOK = всички следващи (всеки същия ден и час)\nОтказ = само този час`)) {
       let n = 0; for (const f of fut) if (await bookClient(f.id, cid2, true, true)) n++;
-      toast(`Записан в ${n + 1} часа`);
+      const single = await seriesJoin(s0.series_id, cid2, (S.sessions.find(x => x.id === id0) || {}).kind || (await sb.from('sessions').select('kind').eq('id', id0).single()).data.kind);
+      toast(`Записан в ${n + 1} часа${single ? ' · еднократно по ' + money(single) + ', таксува се след всеки час' : ''}`);
       return refreshAfter(id0);
     }
   }
@@ -1543,35 +1546,25 @@ async function setBookingStatus(bid, st) {
 }
 async function createSession(f) {
   const { data: t } = { data: S.staff.find(x => x.id === f.trainer) };
-  const row = { kind: f.kind, trainer_id: f.trainer, location: S.loc, title: f.title || null, capacity: f.kind === 'solo' ? 1 : (f.cap || null), green: f.kind === 'solo', duration_min: f.dur };
+  const cl = (f.clients || []).filter(Boolean);
+  const row = { kind: f.kind, trainer_id: f.trainer, location: S.loc, title: f.title || null, capacity: f.kind === 'solo' ? Math.max(1, cl.length) : (f.cap || null), green: f.kind === 'solo', duration_min: f.dur };
   if (f.repeat) {
     const wd = (parse(f.date).getDay() + 6) % 7;
     const { data: ser, error } = await sb.from('series').insert({ kind: f.kind, trainer_id: f.trainer, location: S.loc, weekday: wd, start_time: f.time, title: row.title, capacity: row.capacity, green: row.green, starts_on: f.date }).select('id').single();
     if (error) return fail(error, 'Не се създаде');
-    if (f.kind === 'solo' && f.client) {
-      /* Персонален повтарящ се час: клиентът е постоянно записан в серията и всеки час се създава заедно със записването — без празни часове */
-      const { error: me } = await sb.from('series_members').insert({ series_id: ser.id, client_id: f.client });
-      if (me) return fail(me, 'Клиентът не се записа в серията');
+    if (cl.length) {
+      /* Повтарящ се час с клиенти: всеки е постоянно записан в серията (по абонамент или еднократно) — за година напред */
+      const singles = []; for (const c of cl) if (await seriesJoin(ser.id, c, f.kind)) singles.push(cname(c));
       const r2 = await sb.rpc('extend_series', { horizon_weeks: 53 }); if (r2.error) return fail(r2.error, 'Не се разписа напред');
       const { count } = await sb.from('sessions').select('id', { count: 'exact', head: true }).eq('series_id', ser.id);
-      modal.close(); toast(`Часът е създаден · ${cname(f.client)} е записан(а) всяка седмица (${count || 0} часа напред)`); weekView(); return;
+      modal.close(); toast(`Часът е създаден · ${cl.map(cname).join(', ')} — всяка седмица (${count || 0} часа напред)${singles.length ? ` · еднократно: ${singles.join(', ')}` : ''}`); weekView(); return;
     }
     const r = await sb.rpc('extend_series', { horizon_weeks: 53 });
     if (r.error) return fail(r.error, 'Не се разписа напред');
-    if (f.client && ser) {
-      const { data: ss } = await sb.from('sessions').select('id').eq('series_id', ser.id).gte('date', f.date).order('date');
-      const ids = (ss || []).map(x => x.id); modal.close();
-      if (ids.length && await bookClient(ids[0], f.client, false)) {
-        let n = 1; for (let i = 1; i < ids.length; i++) { if (i % 10 === 0) toast(`Записвам ${cname(f.client)}… ${i}/${ids.length}`); if (await bookClient(ids[i], f.client, true, true)) n++; }
-        await sb.from('series_members').insert({ series_id: ser.id, client_id: f.client }).then(() => { }, () => { });
-        toast(n > 1 ? `Часът е създаден · ${cname(f.client)} е записан(а) за ${n} седмици` : `Часът е създаден · ${cname(f.client)} е записан(а) само за първата седмица (няма абонамент за повтарящи се часове)`);
-      } else toast('Часът е създаден');
-      weekView(); return;
-    }
   } else {
     const { data: ns, error } = await sb.from('sessions').insert({ ...row, date: f.date, start_time: f.time }).select('id').single();
     if (error) return fail(error, 'Не се създаде');
-    if (f.client && ns) { modal.close(); const ok = await bookClient(ns.id, f.client, false); toast(ok ? `Часът е създаден · ${cname(f.client)} е записан(а)` : 'Часът е създаден (без клиент)'); weekView(); return; }
+    if (cl.length && ns) { modal.close(); const ok = []; for (const c of cl) if (await bookClient(ns.id, c, false)) ok.push(cname(c)); toast(ok.length ? `Часът е създаден · записани: ${ok.join(', ')}` : 'Часът е създаден (без клиент)'); weekView(); return; }
   }
   modal.close(); toast('Часът е създаден'); weekView();
 }
@@ -1585,7 +1578,7 @@ function newSessionDialog(date, time) {
     <label class="f">Заглавие<input id="n-title" list="ttl-sugg" placeholder="напр. Upper Body">${titleSugg('n-title')}</label>
     <label class="f" id="n-capw">Места<input type="number" id="n-cap" value="${S.policy?.capacity || 16}" min="1"></label>
   </div>
-  <label class="f" style="margin-top:8px">Клиент <span class="mute">— по избор, записва се веднага (за персонален час)</span><input id="n-cq" placeholder="Търси клиент по име…" autocomplete="off"><input type="hidden" id="n-cid"><div id="n-res" class="res hide"></div></label>
+  <label class="f" style="margin-top:8px">Клиенти <span class="mute">— по избор, записват се веднага; може повече от един</span><input id="n-cq" placeholder="Търси клиент по име…" autocomplete="off"><input type="hidden" id="n-cid"><div id="n-res" class="res hide"></div></label><div id="n-chips" class="chips" style="margin-top:4px"></div>
   <label class="row" style="margin-top:10px"><input type="checkbox" id="n-rep"> Повтаряй всяка седмица (53 седмици напред)</label>
   <div class="row" style="margin-top:12px"><button class="pri" data-act="nsave">Създай</button></div>`);
 }
@@ -2549,15 +2542,19 @@ async function saveCv() {
 }
 
 /* ── чакащи клиенти и влачене ── */
+async function waitSave() { const W = S.waitCfg; const u = await sb.from('settings').update({ value: W }).eq('key', 'waitlist').select(); const r = u.error ? u : (u.data && u.data.length ? u : await sb.from('settings').insert({ key: 'waitlist', value: W })); if (r.error) fail(r.error, 'Не се записа'); if ($('#wbtn')) $('#wbtn').innerHTML = waitHtml(); }
 function waitHtml() {
   if (!S.waitOpen) return '';
   const q = (S.wq || '').toLowerCase();
-  const all = S.clients.filter(c => cstat(c) === 'wait' && (c.location === S.loc || !c.location));
+  const W = S.waitCfg || { add: [], hide: [] }, isFb = c => /футбол|football/i.test(c.name || '');
+  const all = S.clients.filter(c => c.status !== 'Inactive' && !W.hide.includes(c.id) && (c.location === S.loc || !c.location || W.add.includes(c.id)) && (cstat(c) === 'wait' || isFb(c) || W.add.includes(c.id)));
   const list = (q ? all.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)) : all).sort((a, b) => a.name.localeCompare(b.name, 'bg'));
   const pc = S.waitPick && S.clients.find(c => c.id === S.waitPick);
   return `<div class="card wcard"><div class="row" style="margin-bottom:6px"><b>Чакащи (${all.length})</b><span class="mute" style="font-size:12px">${esc(S.loc)}</span><span class="sp"></span><button class="sm" data-act="wtoggle" title="Скрий">✕</button></div>
     <input id="wq" placeholder="Търси…" value="${esc(S.wq || '')}" style="width:100%;margin-bottom:6px">
-    <div class="wait">${list.map(c => `<div class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="true" data-act="wpick" data-id="${c.id}" title="${esc(c.name)}"><span class="wn">${esc(c.name)}</span></div>`).join('') || '<span class="mute">Няма чакащи (клиенти без абонамент) в този обект.</span>'}</div>
+    ${isAdm() ? `<div class="row" style="gap:6px;margin-bottom:6px"><button class="sm" data-act="wedit">${S.waitEdit ? '✓ Готово' : '✎ Редактирай списъка'}</button>${W.hide.length ? `<button class="sm" data-act="whidden">Скрити (${W.hide.length})</button>` : ''}</div>` : ''}
+    ${S.waitEdit ? `<input id="wadd" placeholder="+ Добави клиент в списъка…" autocomplete="off" style="width:100%;margin-bottom:6px"><div id="wadd-res" class="res hide"></div>` : ''}
+    <div class="wait">${list.map(c => `<div class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="${S.waitEdit ? 'false' : 'true'}" data-act="${S.waitEdit ? '' : 'wpick'}" data-id="${c.id}" title="${esc(c.name)}" style="${S.waitEdit ? 'flex-direction:row;align-items:center;gap:6px' : ''}"><span class="wn" style="flex:1">${esc(c.name)}</span>${S.waitEdit ? `<button class="sm danger" data-act="whide" data-id="${c.id}" title="Махни от списъка">✕</button>` : ''}</div>`).join('') || '<span class="mute">Няма чакащи (клиенти без абонамент) в този обект.</span>'}</div>
     ${pc ? `<div style="margin-top:6px;font-size:13px">Избран: <b>${esc(pc.name)}</b>. Натисни час или го завлачи върху графика. <button class="sm" data-act="wclear">Откажи</button></div>` : '<div class="mute" style="margin-top:6px;font-size:12px">Избери клиент и натисни час (записва се при Аксел), или го завлачи върху графика. Работи и за вечерните часове.</div>'}</div>`;
 }
 async function quickBook(cid, date, time) {
@@ -2592,21 +2589,24 @@ async function dropOnGrid(e) {
 }
 
 /* ── записване на клиент в час (общо) ── */
+/* има ли клиентът активен абонамент от този вид (днес или напред) */
+async function planFor(cid2, kind) { const { data } = await sb.from('package_status').select('id').eq('client_id', cid2).eq('kind', kind).gte('end_date', today()).limit(1); return !!(data && data.length); }
+/* постоянно записване в серия: и следващите автоматично създадени часове ще са с клиента (по абонамент или еднократно) */
+async function seriesJoin(seriesId, cid2, kind) { const single = (await planFor(cid2, kind)) ? null : visitPrice(kind); await sb.from('series_members').upsert({ series_id: seriesId, client_id: cid2, single_price: single }).then(() => { }, () => { }); return single; }
 async function bookClient(sid, cid2, auto, seriesMode) {
   const { data: s } = await sb.from('sessions').select('*,bookings(id,status,client_id)').eq('id', sid).single();
   const ex = s.bookings.find(b => b.client_id === cid2);
   const taken = s.bookings.filter(b => b.status !== 'cancelled').length;
   if (ex && ex.status !== 'cancelled') { toast(`${cname(cid2)} вече е записан.`); return false; }
-  if (s.capacity && taken >= s.capacity) { if (auto) { toast('Часът е пълен.'); return false; } if (!confirm(`Часът е пълен (${taken}/${s.capacity}). Да се добави ли все пак?`)) return false; }
+  if (s.capacity && s.kind !== 'solo' && taken >= s.capacity) { if (auto) { toast('Часът е пълен.'); return false; } if (!confirm(`Часът е пълен (${taken}/${s.capacity}). Да се добави ли все пак?`)) return false; }
   const { data: ps } = await sb.from('package_status').select('*').eq('client_id', cid2).eq('kind', s.kind).lte('start_date', s.date).gte('end_date', s.date);
   const valid = (ps || []).find(p => p.used < p.total);
   // Записване напред: клиент с активен абонамент от този вид се записва винаги по абонамента (изчерпан/изтичащ пакет не пречи; подновява се автоматично)
   const { data: anyPk } = await sb.from('package_status').select('id').eq('client_id', cid2).eq('kind', s.kind).gte('end_date', today()).limit(1);
   const hasPlan = !!valid || !!(anyPk && anyPk.length);
   let use_plan = true, price = null;
-  if (!hasPlan && seriesMode) return false;
   if (!hasPlan) {
-    if (!auto) {
+    if (!auto && !seriesMode) {
       const why = (ps || []).length ? 'пакетът му е изчерпан' : 'няма ' + (s.kind === 'solo' ? 'пакет с персонални тренировки' : 'пакет с групови класове') + ' за тази дата';
       if (!confirm(`${cname(cid2)}: ${why}.\n\nOK = добави като еднократно посещение (${money(visitPrice(s.kind))}).\nОтказ = не добавяй.`)) return false;
     }
@@ -2615,7 +2615,7 @@ async function bookClient(sid, cid2, auto, seriesMode) {
   let bid;
   if (ex) { const r = await sb.from('bookings').update({ status: 'booked', late: false, use_plan, price }).eq('id', ex.id).select('id').single(); if (r.error) { fail(r.error, 'Не се добави'); return false; } bid = r.data.id; }
   else { const r = await sb.from('bookings').insert({ session_id: sid, client_id: cid2, use_plan, price }).select('id').single(); if (r.error) { fail(r.error, 'Не се добави'); return false; } bid = r.data.id; }
-  if (!use_plan) await sb.from('charges').insert({ client_id: cid2, amount: price, date: s.date, booking_id: bid, note: `Еднократно посещение ${fmt(s.date)} ${hm(s.start_time)}` });
+  /* еднократното посещение се таксува автоматично след края на часа */
   logEvent('new', `Записан: ${bkLabel(cid2, s.date, s.start_time)}${s.title ? ' · ' + s.title : ''}${use_plan ? ' (абонамент)' : ' (еднократно)'}`, s.location);
   return true;
 }
@@ -3833,6 +3833,7 @@ document.addEventListener('click', async e => {
         const cp = { kind: s.kind, trainer_id: s.trainer_id, location: s.location, title: s.title, description: s.description, notes: s.notes, workout: s.workout, category: s.category, green: s.green, capacity: s.capacity, duration_min: s.duration_min, date: d, start_time: t.length === 5 ? t + ':00' : t };
         const { error } = await sb.from('sessions').insert(cp); if (error) return fail(error, 'Копието не се създаде');
         logEvent('change', `Дубликат на час ${fmt(d)} ${t}: ${s.title || KIND[s.kind]}`); modal.close(); toast(`Създадено копие за ${fmt(d)} ${t}`); weekView(); break; }
+      case 'nunpick': { const i = $('#n-cid'); if (i) { i.value = i.value.split(',').filter(x => x && x !== el.dataset.id).join(','); nChips(); } break; }
       case 'ttlpick': { const i = document.getElementById(el.dataset.for); if (i) { i.value = el.dataset.v; i.dispatchEvent(new Event('input', { bubbles: true })); } break; }
       case 'cxdel': await delSession(el.dataset.id); break;
       case 'cxcan': { const s = (S.sessions || []).find(e => e.id === el.dataset.id); if (!s) break; const n = (s.bookings || []).filter(b => b.status !== 'cancelled').length;
@@ -3855,7 +3856,7 @@ document.addEventListener('click', async e => {
         if (m !== 'plan' && b.use_plan) await sb.rpc('undo_renewal', { p_client: b.client_id, p_kind: s.kind });
         logEvent('change', `${cname(b.client_id)} · ${fmt(s.date)} ${hm(s.start_time)}: ${m === 'plan' ? 'по абонамент' : m === 'free' ? 'безплатно' : 'еднократно ' + money(upd.price)}`);
         toast(m === 'plan' ? 'По абонамент' : m === 'free' ? 'Без такса' : `Таксувано ${money(upd.price)}${started ? '' : ' (при започване на часа)'}`); await sessClients(s.id); weekView(); break; }
-      case 'nsave': { if ($('#n-cq').value.trim() && !$('#n-cid').value) return toast('Избери клиента от списъка.'); await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked, client: $('#n-cid').value || null }); break; }
+      case 'nsave': { if ($('#n-cq').value.trim()) return toast('Избери клиента от списъка (или изтрий текста).'); await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked, clients: ($('#n-cid').value || '').split(',').filter(Boolean) }); break; }
       case 'ssave': await saveSession(); break;
       case 'mv': await moveSession(+el.dataset.dm); break;
       case 'scancel': { const { data: s } = await sb.from('sessions').select('cancelled').eq('id', sessId()).single(); await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', sessId()); await refreshAfter(sessId()); break; }
@@ -3987,6 +3988,11 @@ document.addEventListener('click', async e => {
       case 'wtoggle': S.waitOpen = !S.waitOpen; $('#wbtn').innerHTML = waitHtml(); break;
       case 'wpick': S.waitPick = S.waitPick === el.dataset.id ? null : el.dataset.id; $('#wbtn').innerHTML = waitHtml(); break;
       case 'wclear': S.waitPick = null; $('#wbtn').innerHTML = waitHtml(); break;
+      case 'wedit': S.waitEdit = !S.waitEdit; $('#wbtn').innerHTML = waitHtml(); break;
+      case 'whide': { const W = S.waitCfg; W.hide = [...new Set([...W.hide, el.dataset.id])]; W.add = W.add.filter(x => x !== el.dataset.id); await waitSave(); toast(`${cname(el.dataset.id)} е махнат(а) от списъка`); break; }
+      case 'whidden': { const W = S.waitCfg; modal.show(`<h2>Скрити от „Чакащи“</h2><div id="whl">${W.hide.map(id => `<div class="bk"><div class="nm">${esc(cname(id))}</div><button class="sm" data-act="wunhide" data-id="${id}">Върни</button></div>`).join('') || '<div class="mute">Няма скрити.</div>'}</div>`); break; }
+      case 'wunhide': { const W = S.waitCfg; W.hide = W.hide.filter(x => x !== el.dataset.id); await waitSave(); el.closest('.bk').remove(); toast('Върнат(а) в списъка'); break; }
+      case 'wput': { const W = S.waitCfg; W.add = [...new Set([...W.add, el.dataset.id])]; W.hide = W.hide.filter(x => x !== el.dataset.id); await waitSave(); toast(`${cname(el.dataset.id)} е добавен(а) в „Чакащи“`); break; }
       case 'wst': S.wst = el.dataset.k; $('#wbtn').innerHTML = waitHtml(); break;
       case 'ics': downloadIcs(el.dataset.id); break;
       case 'cbook': await clientBook(el.dataset.id); break;
@@ -4023,9 +4029,10 @@ function pickClients(q, loc0) {
   const loc = loc0 || S.loc, here = L.filter(c => !LOCS.includes(loc) || !c.location || c.location === loc);
   return (here.length ? here : L.map(c => ({ ...c, _other: true }))).sort((a, b) => a.name.localeCompare(b.name, 'bg')).slice(0, 8);
 }
+function nChips() { const b = $('#n-chips'); if (!b) return; const ids = ($('#n-cid').value || '').split(',').filter(Boolean); b.innerHTML = ids.map(id => `<span class="chip">${esc(cname(id))} <a href="#" data-act="nunpick" data-id="${id}" title="Махни">✕</a></span>`).join(''); }
 document.addEventListener('input', e => {
   if (e.target.id !== 'n-cq') return;
-  $('#n-cid').value = ''; const q = e.target.value.trim().toLowerCase(), box = $('#n-res');
+  const q = e.target.value.trim().toLowerCase(), box = $('#n-res');
   if (q.length < 2) { box.classList.add('hide'); return; }
   const m = pickClients(q);
   box.innerHTML = m.map(c => `<div data-npick="${c.id}">${esc(c.name)} <span class="mute">${esc(c.phone || '')}${c._other ? ' · ' + esc(c.location) : ''}</span></div>`).join('') || '<div class="mute">Няма активен клиент с това име</div>';
@@ -4033,7 +4040,8 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('click', e => {
   const p = e.target.closest('[data-npick]'); if (!p) return;
-  $('#n-cid').value = p.dataset.npick; $('#n-cq').value = cname(p.dataset.npick); $('#n-res').classList.add('hide');
+  const ids = ($('#n-cid').value || '').split(',').filter(Boolean); if (!ids.includes(p.dataset.npick)) ids.push(p.dataset.npick);
+  $('#n-cid').value = ids.join(','); $('#n-cq').value = ''; $('#n-res').classList.add('hide'); nChips();
   if ($('#n-kind').value === 'solo' && !$('#n-title').value.trim()) $('#n-title').placeholder = cname(p.dataset.npick);
 });
 document.addEventListener('change', e => { if (e.target.id === 'n-kind') { const w = $('#n-capw'); if (w) w.style.display = e.target.value === 'solo' ? 'none' : ''; } });
@@ -4057,6 +4065,8 @@ document.addEventListener('dragstart', e => {
 });
 document.addEventListener('dragover', e => { if (e.target.closest?.('.body')) e.preventDefault(); });
 document.addEventListener('drop', e => { dropOnGrid(e); });
+document.addEventListener('input', e => { if (e.target.id !== 'wadd') return; const q = e.target.value.trim().toLowerCase(), box = $('#wadd-res'); if (q.length < 2) { box.classList.add('hide'); return; }
+  const m = pickClients(q); box.innerHTML = m.map(c => `<div data-act="wput" data-id="${c.id}">${esc(c.name)} <span class="mute">${esc(c.phone || '')}${c._other ? ' · ' + esc(c.location) : ''}</span></div>`).join('') || '<div class="mute">Няма резултат</div>'; box.classList.remove('hide'); });
 document.addEventListener('input', e => { if (e.target.id === 'wq') { S.wq = e.target.value; const pos = e.target.selectionStart; $('#wbtn').innerHTML = waitHtml(); const n = $('#wq'); n.focus(); n.setSelectionRange(pos, pos); } });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.open()) modal.close(); });
 
