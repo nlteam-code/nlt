@@ -2786,6 +2786,7 @@ function clientHome(me, t, act) {
   const se = nb?.sessions;
   return `<div class="c-hello"><span>${greet()},</span><b>${esc(first)}</b></div>
   ${payReminder()}
+  ${weighCard(t)}
   ${nutrCard()}
   ${nb ? `<section class="c-hero">
       <div class="c-hero-k">${untilText(se) ? `<i class="c-live"></i>${untilText(se)}` : 'Следваща тренировка'}</div>
@@ -3026,6 +3027,13 @@ async function nutrStaff(cid) {
       <label class="f">Файл (по избор) — PDF или снимка<input type="file" id="n-file" accept="application/pdf,image/*"></label>
       <div class="row" style="margin-top:8px"><button class="pri" data-act="nadd" data-cid="${cid}">Публикувай за ${esc(cname(cid))}</button></div>
     </div>`;
+}
+/* Напомняне за притегляне — за клиенти с хранителен план, докато не въведат тегло за деня */
+function weighCard(t) {
+  if (!(C.nutr || []).length) return '';
+  const w = (C.weights || []).find(x => x.day === t);
+  if (w) return `<div class="c-card" style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">✓</span><div><b>Тегло за днес: ${String(w.weight_kg).replace('.', ',')} кг</b><div class="c-mute">Браво! Утре сутрин пак на гладно.</div></div></div>`;
+  return `<div class="c-card" data-act="weighgo" style="cursor:pointer;border:1.5px solid var(--c-coral)"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:26px">⚖️</span><div style="flex:1"><b>Притегли се днес</b><div class="c-mute">Сутрин на гладно, след тоалетна, на същия кантар. Отнема 10 секунди.</div></div><span style="color:var(--c-coral);font-weight:700">Въведи ›</span></div></div>`;
 }
 function nutrCard() {
   const p = (C.nutr || [])[0]; if (!p) return '';
@@ -3666,6 +3674,7 @@ document.addEventListener('click', async e => {
       case 'skippw': boot(); break;
       case 'othermail': S.otpEmail = ''; loginView('', 'code'); break;
       case 'cnav': C.tab = el.dataset.t; renderClient(); window.scrollTo(0, 0); break;
+      case 'weighgo': C.tab = 'prog'; PG.tab = 'weight'; renderClient(); window.scrollTo(0, 0); break;
       case 'csvc': C.svcMode = el.dataset.m; renderClient(); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
       case 'cask': clientAsk(el.dataset.id); break;
