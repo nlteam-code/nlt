@@ -1413,7 +1413,7 @@ async function sessClients(id) {
 async function openSession(id) {
   const { data: s, error } = await sb.from('sessions').select('*,bookings(id,status,late,use_plan,client_id)').eq('id', id).single();
   if (error) return fail(error, 'Часът не се отвори');
-  const act = s.bookings.filter(b => b.status !== 'cancelled');
+  const act = s.bookings.filter(b => b.status !== 'cancelled'); D.sessLoc = s.location;
   const trainers = S.staff.filter(t => t.active);
   const rows = s.bookings.slice().sort((a, b) => cname(a.client_id).localeCompare(cname(b.client_id), 'bg')).map(b => `
     <div class="bk" data-bid="${b.id}">
@@ -3984,12 +3984,18 @@ document.addEventListener('change', async e => {
   const el = e.target.closest('[data-act=blate]');
   if (el) { const bid = el.closest('.bk').dataset.bid; await sb.from('bookings').update({ late: el.checked }).eq('id', bid); await refreshAfter(sessId()); }
 });
+/* Търсене на клиент за записване: без неактивни; само от текущия обект (другите — само ако тук няма съвпадение) */
+function pickClients(q, loc0) {
+  const L = (S.clients || []).filter(c => c.status !== 'Inactive' && String(c.name || '').toLowerCase().includes(q));
+  const loc = loc0 || S.loc, here = L.filter(c => !LOCS.includes(loc) || !c.location || c.location === loc);
+  return (here.length ? here : L.map(c => ({ ...c, _other: true }))).sort((a, b) => a.name.localeCompare(b.name, 'bg')).slice(0, 8);
+}
 document.addEventListener('input', e => {
   if (e.target.id !== 'n-cq') return;
   $('#n-cid').value = ''; const q = e.target.value.trim().toLowerCase(), box = $('#n-res');
   if (q.length < 2) { box.classList.add('hide'); return; }
-  const m = S.clients.filter(c => c.name.toLowerCase().includes(q)).sort((a, b) => (a.status === 'Inactive') - (b.status === 'Inactive')).slice(0, 8);
-  box.innerHTML = m.map(c => `<div data-npick="${c.id}">${esc(c.name)} <span class="mute">${esc(c.phone || '')}${c.status === 'Inactive' ? ' · неактивен' : ''}</span></div>`).join('') || '<div class="mute">Няма резултат</div>';
+  const m = pickClients(q);
+  box.innerHTML = m.map(c => `<div data-npick="${c.id}">${esc(c.name)} <span class="mute">${esc(c.phone || '')}${c._other ? ' · ' + esc(c.location) : ''}</span></div>`).join('') || '<div class="mute">Няма активен клиент с това име</div>';
   box.classList.remove('hide');
 });
 document.addEventListener('click', e => {
@@ -4002,8 +4008,8 @@ document.addEventListener('input', e => {
   if (e.target.id !== 'add-q') return;
   const q = e.target.value.trim().toLowerCase(), box = $('#add-res');
   if (q.length < 2) { box.classList.add('hide'); return; }
-  const m = S.clients.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8);
-  box.innerHTML = m.map(c => `<div data-pick="${c.id}">${esc(c.name)} <span class="mute">${esc(c.phone || '')}</span></div>`).join('') || '<div class="mute">Няма резултат</div>';
+  const m = pickClients(q, D.sessLoc);
+  box.innerHTML = m.map(c => `<div data-pick="${c.id}">${esc(c.name)} <span class="mute">${esc(c.phone || '')}${c._other ? ' · ' + esc(c.location) : ''}</span></div>`).join('') || '<div class="mute">Няма активен клиент с това име</div>';
   box.classList.remove('hide');
 });
 document.addEventListener('click', async e => {
