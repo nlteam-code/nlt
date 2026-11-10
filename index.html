@@ -1299,6 +1299,28 @@ async function weekView() {
   if (ymd(S.week) !== a) return;
   S.sessions = data;
   drawGrid();
+  schedPollStart();
+}
+/* Авто-обновяване на графика: всеки 15 сек. (и при връщане в прозореца) проверява за промени,
+   направени от друг служител или от клиент, и прерисува без презареждане на страницата */
+const schedSig = L => JSON.stringify((L || []).map(s => [s.id, s.date, s.start_time, s.trainer_id, s.location, s.cancelled, s.duration_min, s.capacity, s.title, s.kind, (s.bookings || []).map(b => b.id + b.status + (b.use_plan ? 1 : 0)).sort()]).sort());
+async function schedPoll() {
+  if (S.tab !== 'week' || S.massage || document.hidden || !$('#grid') || !S.week) return;
+  if (document.querySelector('.modal.on, dialog[open], .ctx')) return;
+  const a = ymd(S.week), b = ymd(addDays(S.week, calSpan() - 1)), loc = S.loc;
+  const { data, error } = await sb.from('sessions').select('*,bookings(id,status,client_id,use_plan)').eq('location', loc).gte('date', a).lte('date', b).order('start_time');
+  if (error || !data || S.tab !== 'week' || ymd(S.week) !== a || S.loc !== loc || calSpan() - 1 !== Math.round((parse(b) - parse(a)) / 864e5)) return;
+  if (document.querySelector('.modal.on, dialog[open], .ctx')) return;
+  if (schedSig(data) === schedSig(S.sessions)) return;
+  const sc = $('.wkl') ? $('.wkl').scrollTop : 0, sx = window.scrollY;
+  S.sessions = data; drawGrid();
+  try { if ($('.wkl')) $('.wkl').scrollTop = sc; window.scrollTo(0, sx); } catch (e) { }
+}
+function schedPollStart() {
+  if (window.__schedT) return;
+  window.__schedT = setInterval(() => schedPoll().catch(() => { }), 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) schedPoll().catch(() => { }); });
+  window.addEventListener('focus', () => schedPoll().catch(() => { }));
 }
 function layoutDay(evs) {
   const items = evs.map(e => ({ e, s: mins(e.start_time), f: mins(e.start_time) + (e.duration_min || 60) })).sort((x, y) => x.s - y.s || x.f - y.f);
