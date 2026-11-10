@@ -634,13 +634,17 @@ async function staffApp() {
   ]);
   if (c.error || p.error || s.error) return fail(c.error || p.error || s.error, 'Грешка при зареждане');
   S.clients = c.data; S.packages = p.data; S.staff = s.data;
-  try { await sb.rpc('charge_started'); } catch (e) { }
   if (!window.__chargeT) window.__chargeT = setInterval(async () => { try { const r = await sb.rpc('charge_started'); if (!$('#grid')) return; if (!r.error && r.data > 0 && S.tab === 'week' && !document.querySelector('.modal.on, dialog[open]')) weekView(); else drawGrid(); } catch (e) { } }, 60000);
-  try { const rr = await sb.rpc('auto_renew_sync'); if (!rr.error && rr.data > 0) S.pstat = null; } catch (e) { }
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
   S.waitCfg = { add: [], hide: [], ...((q.data || []).find(x => x.key === 'waitlist')?.value || {}) };
   renderStaff();
+  /* таксуване и авто-подновяване вървят във фона — не забавят отварянето; ако променят нещо, графикът се опреснява */
+  Promise.all([sb.rpc('charge_started').then(r => r, () => ({})), sb.rpc('auto_renew_sync').then(r => r, () => ({}))]).then(async ([a, r]) => {
+    const ren = !r.error && r.data > 0, ch = !a.error && a.data > 0;
+    if (ren) S.pstat = await loadPstat();
+    if ((ren || ch) && S.tab === 'week' && $('#grid') && !document.querySelector('.modal.on, dialog[open]')) weekView();
+  });
 }
 function renderStaff() {
   document.body.classList.remove('cm');
@@ -1283,7 +1287,7 @@ function calSpan() {
 const isAdm = () => S.owner || (S.me && S.me.row && S.me.row.role === 'admin');
 async function weekView() {
   if (S.waitOpen === undefined) S.waitOpen = true;
-  if (!S.pstat || !S.pstat.length) S.pstat = await loadPstat();
+  const pP = (!S.pstat || !S.pstat.length) ? (S.pstatP = S.pstatP || loadPstat().then(d => { S.pstat = d; S.pstatP = null; return d; })) : null;
   const sp = calSpan();
   const a = ymd(S.week), b = ymd(addDays(S.week, (S.massage ? 7 : sp) - 1));
   const main = $('#main');
@@ -1295,8 +1299,9 @@ async function weekView() {
     ${isAdm() ? `<select id="trsel" title="Покажи графика на един треньор"><option value="">Всички треньори</option>${(S.staff || []).filter(t => t.active !== false).map(t => `<option value="${t.id}"${S.trf === t.id ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}</select>` : ''}
     <span class="sp"></span>
     <button class="sm ${S.massage ? 'pri' : ''}" data-act="mtoggle" title="Масажно студио (само Лерин)">Масажно</button><button class="sm" data-act="wtoggle">Клиенти</button><button class="pri" data-act="newsess">+ Нов час</button></div><div class="wkl"><aside id="wbtn">${waitHtml()}</aside><div id="grid" class="mute">Зареждане…</div></div>`;
-  const { data, error } = await sb.from('sessions')
-    .select('*,bookings(id,status,client_id,use_plan)').eq('location', S.loc).gte('date', a).lte('date', b).order('start_time');
+  const [{ data, error }] = await Promise.all([sb.from('sessions')
+    .select('*,bookings(id,status,client_id,use_plan)').eq('location', S.loc).gte('date', a).lte('date', b).order('start_time'),
+    pP ? pP.then(() => { const w = $('#wbtn'); if (w && S.tab === 'week') w.innerHTML = waitHtml(); }) : null]);
   if (error) return fail(error, 'Графикът не се зареди');
   if (ymd(S.week) !== a) return;
   S.sessions = data;
@@ -1307,6 +1312,10 @@ async function weekView() {
    направени от друг служител или от клиент, и прерисува без презареждане на страницата */
 const schedSig = L => JSON.stringify((L || []).map(s => [s.id, s.date, s.start_time, s.trainer_id, s.location, s.cancelled, s.duration_min, s.capacity, s.title, s.kind, (s.bookings || []).map(b => b.id + b.status + (b.use_plan ? 1 : 0)).sort()]).sort());
 async function schedPoll() {
+  if (window.__schedBusy || Date.now() - (window.__schedLast || 0) < 4000) return;
+  window.__schedBusy = true; try { await schedPoll0(); } finally { window.__schedBusy = false; window.__schedLast = Date.now(); }
+}
+async function schedPoll0() {
   if (S.tab !== 'week' || S.massage || document.hidden || !$('#grid') || !S.week) return;
   if (document.querySelector('.modal.on, dialog[open], .ctx')) return;
   const a = ymd(S.week), b = ymd(addDays(S.week, calSpan() - 1)), loc = S.loc;
@@ -1442,7 +1451,7 @@ async function openSession(id) {
     <div class="row" style="margin-top:10px"><button class="pri" data-act="ssave">Запази</button>
       <button data-act="scancel">${s.cancelled ? 'Върни часа' : 'Отмени часа'}</button><span class="sp"></span>
       <button class="danger" data-act="sdel">Изтрий часа</button></div>
-    <h3>Записани (${act.length}${s.capacity ? ' от ' + s.capacity : ''})</h3>
+    <h3>Записани (${act.length}${s.capacity && s.kind !== 'solo' ? ' от ' + s.capacity : ''})</h3>
     <div id="bks">${rows || '<div class="mute">Няма записани.</div>'}</div>
     <div style="margin-top:10px"><input id="add-q" placeholder="+ Добави клиент (търси по име)…" style="width:100%" autocomplete="off"><div id="add-res" class="res hide"></div></div>
   </div>`);
@@ -2308,13 +2317,14 @@ async function dashView() {
   loadMain();
   const cur = firstOf(today()), from = shiftM(cur, -10), to = shiftM(cur, 2);
   const dayA = new Date(D.day + 'T00:00:00'), dayB = new Date(dayA.getTime() + 864e5);
-  const [m, bal, tr, act] = await Promise.all([
+  const [m, bal, tr, act, ps] = await Promise.all([
     sb.rpc('dash_months', { from_m: from, to_m: to }), sb.rpc('dash_balances'), sb.rpc('dash_trainers', { mon: D.month }),
-    sb.from('activity').select('*').gte('at', dayA.toISOString()).lt('at', dayB.toISOString()).order('at', { ascending: false }).limit(300)
+    sb.from('activity').select('*').gte('at', dayA.toISOString()).lt('at', dayB.toISOString()).order('at', { ascending: false }).limit(300),
+    loadPstat()
   ]);
   const er = m.error || bal.error || tr.error;
   if (er) return fail(er, 'Обобщението не се зареди (изпълнен ли е 04_dopalneniya.sql?)');
-  S.pstat = await loadPstat();
+  S.pstat = ps;
   const months = m.data, row = mm => months.find(x => x.m === mm) || { n: 0, n_done: 0, proj: 0, done: 0, pay: 0, chg: 0 };
   const balances = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c);
   D.bal = balances;
@@ -2545,6 +2555,7 @@ async function saveCv() {
 async function waitSave() { const W = S.waitCfg; const u = await sb.from('settings').update({ value: W }).eq('key', 'waitlist').select(); const r = u.error ? u : (u.data && u.data.length ? u : await sb.from('settings').insert({ key: 'waitlist', value: W })); if (r.error) fail(r.error, 'Не се записа'); if ($('#wbtn')) $('#wbtn').innerHTML = waitHtml(); }
 function waitHtml() {
   if (!S.waitOpen) return '';
+  if (!S.pstat) return '<div class="card wcard"><b>Чакащи</b><div class="mute" style="margin-top:6px">Зареждане…</div></div>';
   const q = (S.wq || '').toLowerCase();
   const W = S.waitCfg || { add: [], hide: [] }, isFb = c => /футбол|football/i.test(c.name || '');
   const all = S.clients.filter(c => c.status !== 'Inactive' && !W.hide.includes(c.id) && (c.location === S.loc || !c.location || W.add.includes(c.id)) && (cstat(c) === 'wait' || isFb(c) || W.add.includes(c.id)));
