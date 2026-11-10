@@ -1583,7 +1583,7 @@ async function openClient(id, tab) {
   const vpk = (d, kind) => { const c = pk.filter(q => q.start_date <= d && q.end_date >= d && (!kind || q.kind === kind)).sort((a, b) => a.start_date.localeCompare(b.start_date))[0]; return c ? `<span class="chip" title="Към кой абонамент се брои">${esc(c.package_name || 'Абонамент')} · ${fmt(c.start_date)}–${fmt(c.end_date)}${S.owner && c.price ? ' · ' + eur(c.price) : ''}</span>` : '<span class="chip warn">извън абонамент</span>'; };
   const ledger = [...pays.map(p => ({ d: p.date, plus: true, a: p.amount, t: `${esc(p.method || '')} ${esc(p.note || '')}`, id: p.id, act: 'paydel' })), ...chs.map(p => ({ d: p.date, plus: false, a: p.amount, t: esc(p.note || 'Такса'), id: p.id, act: 'chdel' }))].sort((a, b) => String(b.d).localeCompare(String(a.d)));
   D.ecl = { id: x.id, pk, pays, chs, past, arch }; const T = tab || 'profile';
-  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес']].concat([['pays', 'Плащания']]);
+  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес'], ['nutr', 'Хранене']].concat([['pays', 'Плащания']]);
   modal.show(`<div id="cl" data-cid="${x.id}" data-uid="${x.user_id || ''}">
     <h2>${esc(x.name)}</h2>
     <div class="chips" style="margin-bottom:10px">${tabs.map(([k, l]) => `<button class="sm ${T === k ? 'on' : ''}" data-act="cltab" data-t="${k}">${l}</button>`).join('')}</div>
@@ -1635,6 +1635,7 @@ async function openClient(id, tab) {
     </div>
 
     <div class="cpane staffpg" data-p="prog" ${T === 'prog' ? '' : 'hidden'}><div class="pg" id="pg-staff"></div></div>
+    <div class="cpane" data-p="nutr" ${T === 'nutr' ? '' : 'hidden'}><div id="nutr-box"><div class="mute">Зареждане…</div></div></div>
 
     ${S.owner ? `<div class="cpane" data-p="pays" ${T === 'pays' ? '' : 'hidden'}>
     <h3>История на плащанията</h3>
@@ -1651,6 +1652,7 @@ async function openClient(id, tab) {
     <div style="max-height:320px;overflow:auto">${pays.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).map(p => `<div class="bk"><div class="nm"><b style="color:var(--ok)">+ ${money(p.amount)}</b> · ${fmt(p.date)} · ${esc(p.method || '')} ${esc(p.note || '')}</div><button class="sm danger" data-act="paydel" data-id="${p.id}" title="Изтрий плащането">✕</button></div>`).join('') || '<div class="mute">Няма плащания.</div>'}</div>
     </div>`}
   </div>`, true);
+  nutrStaff(x.id);
   if (S.owner) paySubHtml(x.id, 'pay').then(h => { const e = $('#pay-sub'); if (e) e.innerHTML = h; });
   if (x.user_id) sb.from('client_consents').select('accepted_at,signed_name,version').eq('client_id', x.id).order('accepted_at', { ascending: false }).limit(1).then(r => { const el = $('#cl h2'); if (!el) return; const c0 = r.data && r.data[0]; el.insertAdjacentHTML('afterend', `<div class="mute" style="font-size:12px;margin:-4px 0 8px">${c0 ? `Подписани условия: ${fmt(String(c0.accepted_at).slice(0, 10))} · ${esc(c0.signed_name)}` : 'Още не е подписал условията'}</div>`); });
 }
@@ -2532,6 +2534,7 @@ async function clientApp() {
   } catch (e) { C.chs = []; C.pays = []; C.done = []; C.recent = []; }
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
   try { const bq = await sb.from('bonuses').select('*').eq('client_id', me.id).order('created_at', { ascending: false }); C.bons = bq.error ? null : bq.data || []; } catch (e) { C.bons = null; }
+  try { const nq = await sb.from('nutrition_plans').select('id,title,body,file_path,file_name,created_at').eq('client_id', me.id).eq('visible', true).order('created_at', { ascending: false }); C.nutr = nq.error ? [] : nq.data || []; } catch (e) { C.nutr = []; }
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
   C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.wcCfg = (set.data || []).find(s => s.key === 'challenge')?.value || null; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {}; C.bcfg = (set.data || []).find(s => s.key === 'bonus')?.value || {};
   const ids = (cl.data || []).map(s => s.id);
@@ -2625,6 +2628,7 @@ const ICO = {
   edit: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   chart: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/>',
+  leaf: '<path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z"/><path d="M5 19c3-4 6-7 10-9"/>',
   pin: '<path d="M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'
 };
 const ic = (n, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]}</svg>`;
@@ -2737,6 +2741,7 @@ function clientHome(me, t, act) {
   const se = nb?.sessions;
   return `<div class="c-hello"><span>${greet()},</span><b>${esc(first)}</b></div>
   ${payReminder()}
+  ${nutrCard()}
   ${nb ? `<section class="c-hero">
       <div class="c-hero-k">${untilText(se) ? `<i class="c-live"></i>${untilText(se)}` : 'Следваща тренировка'}</div>
       <div class="c-hero-t">${hm(se.start_time)}</div>
@@ -2949,11 +2954,52 @@ function clientServices() {
   ${(([n, s, pr]) => `<section class="c-plan c-single"><div><div class="c-plan-n">${n}</div><div class="c-plan-k">${s}</div></div><div class="c-price"><b>${pr}</b><span>€</span></div></section>`)(SVC.single[g ? 0 : 1])}
   <div class="c-note" style="text-align:center">За абонамент или въпроси — питай треньора си в залата.</div>`;
 }
+/* ── Хранителен план: екипът публикува за конкретен клиент; клиентът вижда само своите видими планове ── */
+const NUTR_BUCKET = 'nutrition';
+async function nutrOpen(path) {
+  const { data, error } = await sb.storage.from(NUTR_BUCKET).createSignedUrl(path, 3600);
+  if (error || !data) return fail(error, 'Файлът не се отвори');
+  window.open(data.signedUrl, '_blank');
+}
+async function nutrStaff(cid) {
+  const box = $('#nutr-box'); if (!box) return;
+  const { data, error } = await sb.from('nutrition_plans').select('*').eq('client_id', cid).order('created_at', { ascending: false });
+  if (error) { box.innerHTML = `<div class="mute">Разделът още не е активен (${esc(error.message)}).</div>`; return; }
+  const L = data || []; D.nutr = L;
+  box.innerHTML = `<h3>Хранителен план</h3>
+    <div class="mute" style="margin-bottom:8px">Вижда го само ${esc(cname(cid))} в приложението. Последният видим план се показва най-отгоре.</div>
+    ${L.map((p, i) => `<div class="bk" style="align-items:flex-start;flex-wrap:wrap"><div class="nm" style="flex:1;min-width:200px"><b>${esc(p.title || 'Хранителен план')}</b> <span class="mute">· ${fmt(String(p.created_at).slice(0, 10))}</span>
+        ${p.visible ? (i === L.findIndex(x => x.visible) ? ' <span class="chip ok">текущ</span>' : ' <span class="chip">видим</span>') : ' <span class="chip warn">скрит</span>'}
+        ${p.body ? `<details style="margin-top:4px"><summary class="mute">Текст</summary><div style="white-space:pre-wrap;margin-top:4px">${esc(p.body)}</div></details>` : ''}</div>
+      <div class="row" style="gap:6px">${p.file_path ? `<button class="sm" data-act="nfile" data-p="${esc(p.file_path)}">📄 ${esc(p.file_name || 'Файл')}</button>` : ''}
+        <button class="sm" data-act="ntog" data-id="${p.id}" data-on="${p.visible ? 1 : 0}">${p.visible ? 'Скрий' : 'Покажи'}</button>
+        <button class="sm danger" data-act="ndel" data-id="${p.id}">Изтрий</button></div></div>`).join('') || '<div class="mute">Няма публикуван план.</div>'}
+    <div style="margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:12px">
+      <b>Нов план</b>
+      <label class="f">Заглавие<input id="n-ttl" placeholder="напр. Режим за отслабване · ноември"></label>
+      <label class="f">Текст (по избор)<textarea id="n-body" rows="6" placeholder="Закуска: …&#10;Обяд: …&#10;Вечеря: …"></textarea></label>
+      <label class="f">Файл (по избор) — PDF или снимка<input type="file" id="n-file" accept="application/pdf,image/*"></label>
+      <div class="row" style="margin-top:8px"><button class="pri" data-act="nadd" data-cid="${cid}">Публикувай за ${esc(cname(cid))}</button></div>
+    </div>`;
+}
+function nutrCard() {
+  const p = (C.nutr || [])[0]; if (!p) return '';
+  return `<div class="c-card" data-act="cnav" data-t="nutr" style="cursor:pointer"><div class="c-k">Хранителен план</div><b>${esc(p.title || 'Твоят режим')}</b><div class="c-mute" style="margin-top:2px">Обновен ${fmt(String(p.created_at).slice(0, 10))} · Отвори ›</div></div>`;
+}
+function clientNutr() {
+  const L = C.nutr || []; const p = L[0];
+  if (!p) return `<h2 class="c-title">Хранителен план</h2><div class="c-card"><div class="c-mute">Все още нямаш хранителен план. Треньорът ти ще го публикува тук.</div></div>`;
+  const one = x => `${x.body ? `<div style="white-space:pre-wrap;line-height:1.5;margin-top:8px">${esc(x.body)}</div>` : ''}${x.file_path ? `<button class="c-btn" style="margin-top:10px" data-act="nfile" data-p="${esc(x.file_path)}">📄 Отвори ${esc(x.file_name || 'файла')}</button>` : ''}`;
+  return `<h2 class="c-title">Хранителен план</h2>
+    <div class="c-card"><b style="font-size:17px">${esc(p.title || 'Твоят режим')}</b><div class="c-mute">${fmt(String(p.created_at).slice(0, 10))}</div>${one(p)}</div>
+    ${L.length > 1 ? `<div class="c-k" style="margin:14px 4px 6px">Предишни планове</div>${L.slice(1).map(x => `<details class="c-card"><summary><b>${esc(x.title || 'План')}</b> <span class="c-mute">· ${fmt(String(x.created_at).slice(0, 10))}</span></summary>${one(x)}</details>`).join('')}` : ''}`;
+}
 function renderClient() {
   closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
-  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? `<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>` : C.tab === 'svc' ? clientServices() : clientHome(me, t, act);
+  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? `<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>` : C.tab === 'svc' ? clientServices() : C.tab === 'nutr' ? clientNutr() : clientHome(me, t, act);
   const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['svc', 'tag', 'Услуги'], ['prog', 'chart', 'Прогрес']];
+  if ((C.nutr || []).length) nav.splice(5, 0, ['nutr', 'leaf', 'Хранене']);
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
     <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
@@ -3618,6 +3664,20 @@ document.addEventListener('click', async e => {
         weekView(); break; }
       case 'sess': if (S.waitPick) { const cid3 = S.waitPick; S.waitPick = null; if (await bookClient(el.dataset.id, cid3, true)) toast('Записан'); weekView(); } else openSession(el.dataset.id); break;
       case 'newsess': newSessionDialog(); break;
+      case 'nfile': await nutrOpen(el.dataset.p); break;
+      case 'nadd': { const cid4 = el.dataset.cid, ttl = $('#n-ttl').value.trim(), body = $('#n-body').value.trim(), f = $('#n-file').files[0];
+        if (!body && !f) return toast('Добави текст или файл.');
+        if (f && f.size > 15 * 1024 * 1024) return toast('Файлът е по-голям от 15 MB.');
+        el.disabled = true; let file_path = null, file_name = null;
+        if (f) { const ext = (f.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, ''); file_path = `${cid4}/${Date.now()}.${ext}`; file_name = f.name;
+          const { error: ue } = await sb.storage.from(NUTR_BUCKET).upload(file_path, f, { contentType: f.type || undefined }); if (ue) { el.disabled = false; return fail(ue, 'Файлът не се качи'); } }
+        const { error } = await sb.from('nutrition_plans').insert({ client_id: cid4, title: ttl || 'Хранителен план', body: body || null, file_path, file_name, visible: true, created_by: S.me.row.id });
+        el.disabled = false; if (error) return fail(error, 'Планът не се публикува');
+        logEvent('change', `Хранителен план за ${cname(cid4)}: ${ttl || 'Хранителен план'}`); toast(`Планът е публикуван за ${cname(cid4)}`); await nutrStaff(cid4); break; }
+      case 'ntog': { const on = el.dataset.on === '1'; const { error } = await sb.from('nutrition_plans').update({ visible: !on }).eq('id', el.dataset.id); if (error) return fail(error, 'Не се промени'); toast(on ? 'Скрит от клиента' : 'Видим за клиента'); await nutrStaff(cid()); break; }
+      case 'ndel': { const p = (D.nutr || []).find(x => x.id === el.dataset.id); if (!p || !confirm(`Да изтрия ли плана „${p.title || 'Хранителен план'}“? Клиентът няма да го вижда повече.`)) break;
+        if (p.file_path) await sb.storage.from(NUTR_BUCKET).remove([p.file_path]);
+        const { error } = await sb.from('nutrition_plans').delete().eq('id', p.id); if (error) return fail(error, 'Не се изтри'); toast('Планът е изтрит'); await nutrStaff(cid()); break; }
       case 'cxcl': await sessClients(el.dataset.id); break;
       case 'cxdup': dupDialog(el.dataset.id); break;
       case 'dupsave': { const id = $('#dp').dataset.id, d = $('#dp-date').value, t = $('#dp-time').value; if (!d || !t) return toast('Въведи дата и час.');
