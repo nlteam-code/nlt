@@ -1675,7 +1675,7 @@ async function openClient(id, tab) {
   const vpk = (d, kind) => { const c = pk.filter(q => q.start_date <= d && q.end_date >= d && (!kind || q.kind === kind)).sort((a, b) => a.start_date.localeCompare(b.start_date))[0]; return c ? `<span class="chip" title="Към кой абонамент се брои">${esc(c.package_name || 'Абонамент')} · ${fmt(c.start_date)}–${fmt(c.end_date)}${S.owner && c.price ? ' · ' + eur(c.price) : ''}</span>` : '<span class="chip warn">извън абонамент</span>'; };
   const ledger = [...pays.map(p => ({ d: p.date, plus: true, a: p.amount, t: `${esc(p.method || '')} ${esc(p.note || '')}`, id: p.id, act: 'paydel' })), ...chs.map(p => ({ d: p.date, plus: false, a: p.amount, t: esc(p.note || 'Такса'), id: p.id, act: 'chdel' }))].sort((a, b) => String(b.d).localeCompare(String(a.d)));
   D.ecl = { id: x.id, pk, pays, chs, past, arch }; const T = tab || 'profile';
-  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес'], ['nutr', 'Хранене']].concat([['pays', 'Плащания']]);
+  const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес'], ['nutr', 'Хранене']].concat([['pays', 'Плащания']]).concat(S.owner ? [['audit', '🕓 Дневник']] : []);
   modal.show(`<div id="cl" data-cid="${x.id}" data-uid="${x.user_id || ''}">
     <h2>${esc(x.name)}</h2>
     <div class="chips" style="margin-bottom:10px">${tabs.map(([k, l]) => `<button class="sm ${T === k ? 'on' : ''}" data-act="cltab" data-t="${k}">${l}</button>`).join('')}</div>
@@ -1728,6 +1728,7 @@ async function openClient(id, tab) {
 
     <div class="cpane staffpg" data-p="prog" ${T === 'prog' ? '' : 'hidden'}><div class="pg" id="pg-staff"></div></div>
     <div class="cpane" data-p="nutr" ${T === 'nutr' ? '' : 'hidden'}><div id="nutr-box"><div class="mute">Зареждане…</div></div></div>
+    ${S.owner ? `<div class="cpane" data-p="audit" ${T === 'audit' ? '' : 'hidden'}><h3 style="margin-top:0">Дневник</h3><div id="audit-box"><div class="mute">Зареждане…</div></div></div>` : ''}
 
     ${S.owner ? `<div class="cpane" data-p="pays" ${T === 'pays' ? '' : 'hidden'}>
     <h3>История на плащанията</h3>
@@ -1745,6 +1746,7 @@ async function openClient(id, tab) {
     </div>`}
   </div>`, true);
   nutrStaff(x.id);
+  if (S.owner) loadAudit(x.id).then(L => { const b = $('#audit-box'); if (b && $('#cl')?.dataset.cid === x.id) b.innerHTML = auditHtml(L); });
   if (S.owner) paySubHtml(x.id, 'pay').then(h => { const e = $('#pay-sub'); if (e) e.innerHTML = h; });
   if (x.user_id) sb.from('client_consents').select('accepted_at,signed_name,version').eq('client_id', x.id).order('accepted_at', { ascending: false }).limit(1).then(r => { const el = $('#cl h2'); if (!el) return; const c0 = r.data && r.data[0]; el.insertAdjacentHTML('afterend', `<div class="mute" style="font-size:12px;margin:-4px 0 8px">${c0 ? `Подписани условия: ${fmt(String(c0.accepted_at).slice(0, 10))} · ${esc(c0.signed_name)}` : 'Още не е подписал условията'}</div>`); });
 }
@@ -1883,8 +1885,39 @@ async function loadPayHist() {
   const { data } = await q;
   D.phist = data || []; if (D.tab === 'hist') redrawPay();
 }
+/* ── Дневник на промените (абонаменти, плащания, такси) — само за собственика ── */
+async function loadAudit(cid) {
+  let q = sb.from('audit_log').select('*').order('at', { ascending: false }).limit(cid ? 200 : 300);
+  if (cid) q = q.eq('client_id', cid);
+  const { data, error } = await q;
+  const L = error ? { err: error.message } : (data || []);
+  if (!cid) D.audit = L; return L;
+}
+function auditLine(a) {
+  const o = a.old_row || {}, n = a.new_row || {}, r = a.action === 'delete' ? o : n;
+  const pk = id => (S.packages.find(p => p.id === id) || {}).name;
+  const what = a.tbl === 'client_packages' ? `абонамент <b>${esc(pk(r.package_id) || r.kind || '')}</b> · ${fmt(r.start_date)}–${fmt(r.end_date)} · ${r.total ?? ''} пос.${r.price != null ? ' · ' + money(Number(r.price)) : ''}`
+    : a.tbl === 'payments' ? `плащане <b>${money(Number(r.amount))}</b> · ${fmt(r.date)}${r.method ? ' · ' + esc(r.method) : ''}${r.note ? ' · ' + esc(r.note) : ''}`
+    : `такса <b>${money(Number(r.amount))}</b> · ${fmt(r.date)}${r.note ? ' · ' + esc(r.note) : ''}`;
+  const verb = { insert: '<span style="color:var(--ok)">добави</span>', update: 'промени', delete: '<span style="color:var(--bad)">изтри</span>' }[a.action] || a.action;
+  let diff = '';
+  if (a.action === 'update') {
+    const lbl = { start_date: 'начало', end_date: 'край', total: 'посещения', price: 'цена', amount: 'сума', date: 'дата', note: 'бележка', method: 'начин', auto_renew: 'авт. подновяване', frozen_at: 'замразен', frozen_days: 'дни замразяване', package_id: 'пакет', used_before: 'използвани преди', counted_from: 'брои от' };
+    diff = Object.keys(lbl).filter(k => k in n && JSON.stringify(o[k]) !== JSON.stringify(n[k])).map(k => `${lbl[k]}: ${esc(String(o[k] ?? '—'))} → <b>${esc(String(n[k] ?? '—'))}</b>`).join(' · ');
+    if (!diff) return '';
+  }
+  const t = new Date(a.at), when = `${fmt(ymd(t))} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+  return `<div class="bk" style="align-items:flex-start"><div class="nm" style="flex:1"><span class="mute">${when}</span> · <b>${esc(a.actor_name || '—')}</b> ${verb} ${what}${a._all && a.client_id ? ` · <a href="#" data-act="client" data-id="${a.client_id}">${esc(cname(a.client_id))}</a>` : ''}${diff ? `<div class="mute" style="font-size:12px;margin-top:2px">${diff}</div>` : ''}</div></div>`;
+}
+function auditHtml(L, all) {
+  if (!L) return '<div class="mute" style="padding:12px">Зареждане…</div>';
+  if (L.err) return `<div class="mute" style="padding:12px">Дневникът още не е активен (${esc(L.err)}).</div>`;
+  const rows = L.map(a => auditLine(all ? { ...a, _all: true } : a)).filter(Boolean);
+  return `<div class="mute" style="margin:4px 0 8px">Кой и кога е добавил, променил или изтрил абонамент, плащане или такса.</div><div style="max-height:420px;overflow:auto">${rows.join('') || '<div class="mute">Още няма записи.</div>'}</div>`;
+}
 function payCard() {
   if (D.tab === 'hist') return payCardHead() + payHistHtml();
+  if (D.tab === 'audit') return payCardHead() + auditHtml(D.audit, true);
   return payCardBody();
 }
 function payCardHead() {
@@ -1893,7 +1926,7 @@ function payCardHead() {
   const locs = [['all', 'Всички обекти'], ...LOCS.map(l => [l, l])];
   const cnt = l => (D.bal || []).filter(r => r.bal > 0 && (l === 'all' || r.c.location === l || !r.c.location)).length;
   return `<h2>Плащания</h2><div class="chips" style="margin-bottom:6px">${locs.map(([v, l]) => ch('ploc', v, l, payLoc(), ` <span class="mute">${cnt(v)}</span>`)).join('')}</div>
-    <div class="chips" style="margin-bottom:8px">${S.owner ? `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}` : ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length}`)}${ch('ptab', 'hist', 'История', D.tab)}</div>`;
+    <div class="chips" style="margin-bottom:8px">${S.owner ? `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}` : ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length}`)}${ch('ptab', 'hist', 'История', D.tab)}${S.owner ? ch('ptab', 'audit', '🕓 Дневник', D.tab) : ''}</div>`;
 }
 function payCardBody() {
   const { due, cred, even } = payLists(), list = D.tab === 'due' ? due : D.tab === 'credit' ? cred : even;
@@ -1902,7 +1935,7 @@ function payCardBody() {
   const cnt = l => (D.bal || []).filter(r => r.bal > 0 && (l === 'all' || r.c.location === l || !r.c.location)).length;
   return `<h2>Плащания</h2>
     <div class="chips" style="margin-bottom:6px">${locs.map(([v, l]) => ch('ploc', v, l, payLoc(), ` <span class="mute">${cnt(v)}</span>`)).join('')}</div>
-    <div class="chips">${S.owner ? `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}${ch('ptab', 'hist', 'История', D.tab)}` : `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length}`)}${ch('ptab', 'hist', 'История на плащанията', D.tab)}`}</div>
+    <div class="chips">${S.owner ? `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}${ch('ptab', 'hist', 'История', D.tab)}${ch('ptab', 'audit', '🕓 Дневник', D.tab)}` : `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length}`)}${ch('ptab', 'hist', 'История на плащанията', D.tab)}`}</div>
     <div class="tw" id="paytw" style="max-height:340px;overflow:auto"><table><thead><tr><th>Клиент</th><th>${D.tab === 'due' ? 'Дължимо' : D.tab === 'credit' ? 'В кредит' : 'Баланс'}</th><th>Обект</th><th>Пакет</th><th></th></tr></thead><tbody>
     ${list.slice(0, 150).map(r => `<tr data-cid="${r.c.id}"><td><b>${esc(r.c.name)}</b></td><td>${D.tab === 'due' ? `<span class="neg">−${eur(r.bal)}</span>` : D.tab === 'credit' ? `<span class="pos">+${eur(-r.bal)}</span>` : eur(0)}</td><td class="mute">${esc(r.c.location || '—')}</td><td>${pkgChip(curPkg(r.c.id))}</td>
     <td style="white-space:nowrap">${D.tab === 'due' ? `<button class="sm pri" data-act="quickpay" data-id="${r.c.id}" data-amt="${r.bal}">Платено</button> ` : ''}<button class="sm" data-act="client" data-id="${r.c.id}">Отвори</button>${D.tab === 'due' ? ` <button class="sm danger" data-act="debtdel" data-id="${r.c.id}" data-amt="${r.bal}" title="Отписва дължимото — клиентът става изравнен">Изтрий дълга</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="mute">Няма.</td></tr>'}</tbody></table></div>
@@ -3876,7 +3909,7 @@ document.addEventListener('click', async e => {
       case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
       case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); S.owner ? dashView() : trainerDash(); break;
       case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
-      case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; D.phm = D.phm || today().slice(0, 7); loadPayHist(); } redrawPay(); break;
+      case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; D.phm = D.phm || today().slice(0, 7); loadPayHist(); } if (D.tab === 'audit') { D.audit = null; loadAudit().then(redrawPay); } redrawPay(); break;
       case 'hcsv': { const rows = (D.phist || []).filter(p => payLoc() === 'all' || (S.clients.find(c => c.id === p.client_id) || {}).location === payLoc()); const t = ['Дата\tКлиент\tОбект\tСума\tНачин\tБележка'].concat(rows.map(p => [p.date, cname(p.client_id), (S.clients.find(c => c.id === p.client_id) || {}).location || '', String(p.amount).replace('.', ','), p.method || '', p.note || ''].join('\t'))).join('\n'); try { await navigator.clipboard.writeText(t); toast('Копирано, постави в Excel'); } catch (e) { modal.show(`<h2>Копирай ръчно</h2><textarea style="width:100%;height:200px">${esc(t)}</textarea>`); } break; }
       case 'vedit': {
         const E = D.ecl; if (!E) break; const id = el.dataset.id;
