@@ -453,6 +453,23 @@ table.fin td.fxln:hover{color:var(--acc)}
 .ctx button:hover{background:var(--grp)}
 .ctx-h{font-weight:700;padding:6px 10px 4px;font-size:13px}
 .ctx-s{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);padding:8px 10px 2px;border-top:1px solid var(--line);margin-top:4px}
+.nt{margin-top:6px}
+.nt-sec{margin:18px 0 8px;font:700 12px Montserrat,sans-serif;letter-spacing:.08em;color:var(--c-coral,var(--acc))}
+.nt-sec:first-child{margin-top:4px}
+.nt-meal{background:var(--c-bg,var(--bg));border:1px solid var(--c-line,var(--line));border-radius:14px;padding:10px 12px;margin:8px 0}
+.nt-mh{display:flex;gap:8px;align-items:center;margin-bottom:4px;font-size:15px}
+.nt-t{font:700 12px Roboto,sans-serif;background:rgba(235,76,81,.14);color:var(--c-coral,var(--acc));border-radius:999px;padding:3px 9px}
+.nt-tb{width:100%;border-collapse:collapse;font-size:14px}
+.nt-tb td{padding:7px 0;border-top:1px solid var(--c-line,var(--line))}
+.nt-tb tr:first-child td{border-top:0}
+.nt-tb td:last-child{text-align:right;color:var(--c-mute,var(--mute));white-space:nowrap;padding-left:12px;font-weight:600}
+.nt-tot{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
+.nt-tot span{font:600 12px Roboto,sans-serif;border:1px solid var(--c-line,var(--line));border-radius:999px;padding:4px 10px}
+.nt-tot span:first-child{background:var(--c-coral,var(--acc));color:#fff;border-color:transparent}
+.nt-li{position:relative;padding:8px 0 8px 18px;border-top:1px solid var(--c-line,var(--line));font-size:14px;line-height:1.4}
+.nt-sec+.nt-li{border-top:0}
+.nt-li:before{content:'';position:absolute;left:4px;top:15px;width:6px;height:6px;border-radius:50%;background:var(--c-coral,var(--acc))}
+.nt-p{font-size:14px;color:var(--c-mute,var(--mute));margin:6px 0}
 </style>
 </head>
 <body>
@@ -2970,7 +2987,7 @@ async function nutrStaff(cid) {
     <div class="mute" style="margin-bottom:8px">Вижда го само ${esc(cname(cid))} в приложението. Последният видим план се показва най-отгоре.</div>
     ${L.map((p, i) => `<div class="bk" style="align-items:flex-start;flex-wrap:wrap"><div class="nm" style="flex:1;min-width:200px"><b>${esc(p.title || 'Хранителен план')}</b> <span class="mute">· ${fmt(String(p.created_at).slice(0, 10))}</span>
         ${p.visible ? (i === L.findIndex(x => x.visible) ? ' <span class="chip ok">текущ</span>' : ' <span class="chip">видим</span>') : ' <span class="chip warn">скрит</span>'}
-        ${p.body ? `<details style="margin-top:4px"><summary class="mute">Текст</summary><div style="white-space:pre-wrap;margin-top:4px">${esc(p.body)}</div></details>` : ''}</div>
+        ${p.body ? `<details style="margin-top:4px"><summary class="mute">Преглед</summary>${nutrRender(p.body)}</details>` : ''}</div>
       <div class="row" style="gap:6px">${p.file_path ? `<button class="sm" data-act="nfile" data-p="${esc(p.file_path)}">📄 ${esc(p.file_name || 'Файл')}</button>` : ''}
         <button class="sm" data-act="ntog" data-id="${p.id}" data-on="${p.visible ? 1 : 0}">${p.visible ? 'Скрий' : 'Покажи'}</button>
         <button class="sm danger" data-act="ndel" data-id="${p.id}">Изтрий</button></div></div>`).join('') || '<div class="mute">Няма публикуван план.</div>'}
@@ -2986,10 +3003,24 @@ function nutrCard() {
   const p = (C.nutr || [])[0]; if (!p) return '';
   return `<div class="c-card" data-act="cnav" data-t="nutr" style="cursor:pointer"><div class="c-k">Хранителен план</div><b>${esc(p.title || 'Твоят режим')}</b><div class="c-mute" style="margin-top:2px">Обновен ${fmt(String(p.created_at).slice(0, 10))} · Отвори ›</div></div>`;
 }
+function nutrRender(body) {
+  const lines = String(body || '').split('\n'); let html = '', meal = null, rows = [], structured = false;
+  const flush = () => { if (meal) html += `<div class="nt-meal"><div class="nt-mh"><span class="nt-t">${esc(meal.t)}</span><b>${esc(meal.n)}</b></div><table class="nt-tb">${rows.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table></div>`; meal = null; rows = []; };
+  for (const raw of lines) {
+    const l = raw.trim(); if (!l) continue; let m;
+    if (!l.startsWith('•') && l === l.toUpperCase() && /[А-ЯA-Z]{3}/.test(l)) { flush(); html += `<div class="nt-sec">${esc(l.replace(/\s+·\s+/g, ' · '))}</div>`; structured = true; continue; }
+    if ((m = l.match(/^(\d{1,2}:\d{2})\s+(.+?):$/))) { flush(); meal = { t: m[1], n: m[2] }; structured = true; continue; }
+    if (meal && (m = l.match(/^•\s*(.+?)\s+—\s+(.+)$/))) { rows.push([m[1], m[2]]); continue; }
+    if ((m = l.match(/^Общо:\s*(.+)$/))) { flush(); html += `<div class="nt-tot">${m[1].split('·').map(x => `<span>${esc(x.trim().replace(/^Б /, 'Белтъчини ').replace(/^М /, 'Мазнини ').replace(/^В /, 'Въглехидрати '))}</span>`).join('')}</div>`; continue; }
+    flush(); html += l.startsWith('•') ? `<div class="nt-li">${esc(l.replace(/^•\s*/, ''))}</div>` : `<div class="nt-p">${esc(l)}</div>`;
+  }
+  flush();
+  return structured ? `<div class="nt">${html}</div>` : `<div style="white-space:pre-wrap;line-height:1.5;margin-top:8px">${esc(body)}</div>`;
+}
 function clientNutr() {
   const L = C.nutr || []; const p = L[0];
   if (!p) return `<h2 class="c-title">Хранителен план</h2><div class="c-card" style="text-align:center;padding:28px 18px">${ic('leaf', 34)}<div style="font-weight:700;margin-top:10px">Към момента нямате достъп до тази услуга</div><div class="c-mute" style="margin-top:6px">За хранителен план се обърнете към вашия треньор.</div></div>`;
-  const one = x => `${x.body ? `<div style="white-space:pre-wrap;line-height:1.5;margin-top:8px">${esc(x.body)}</div>` : ''}${x.file_path ? `<button class="c-btn" style="margin-top:10px" data-act="nfile" data-p="${esc(x.file_path)}">📄 Отвори ${esc(x.file_name || 'файла')}</button>` : ''}`;
+  const one = x => `${x.body ? nutrRender(x.body) : ''}${x.file_path ? `<button class="c-btn" style="margin-top:10px" data-act="nfile" data-p="${esc(x.file_path)}">📄 Отвори ${esc(x.file_name || 'файла')}</button>` : ''}`;
   return `<h2 class="c-title">Хранителен план</h2>
     <div class="c-card"><b style="font-size:17px">${esc(p.title || 'Твоят режим')}</b><div class="c-mute">${fmt(String(p.created_at).slice(0, 10))}</div>${one(p)}</div>
     ${L.length > 1 ? `<div class="c-k" style="margin:14px 4px 6px">Предишни планове</div>${L.slice(1).map(x => `<details class="c-card"><summary><b>${esc(x.title || 'План')}</b> <span class="c-mute">· ${fmt(String(x.created_at).slice(0, 10))}</span></summary>${one(x)}</details>`).join('')}` : ''}`;
