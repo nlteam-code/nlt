@@ -1297,7 +1297,7 @@ async function weekView() {
     <span class="seg" title="Колко дни да се виждат">${[3, 5, 7].map(n => `<button class="${sp === n ? 'on' : ''}" data-act="span" data-n="${n}">${n} дни</button>`).join('')}</span>
     ${isAdm() ? `<select id="trsel" title="Покажи графика на един треньор"><option value="">Всички треньори</option>${(S.staff || []).filter(t => t.active !== false).map(t => `<option value="${t.id}"${S.trf === t.id ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}</select>` : ''}
     <span class="sp"></span>
-    <button class="sm ${S.massage ? 'pri' : ''}" data-act="mtoggle" title="Масажно студио (само Лерин)">Масажно</button><button class="sm" data-act="wtoggle">Клиенти</button><button class="pri" data-act="newsess">+ Нов час</button></div><div class="wkl"><aside id="wbtn">${waitHtml()}</aside><div id="grid" class="mute">Зареждане…</div></div>`;
+    <button class="sm ${S.massage ? 'pri' : ''}" data-act="mtoggle" title="Масажно студио (само Лерин)">Масажно</button><button class="sm" data-act="wtoggle">Клиенти</button><button class="sm" data-act="gsub" title="Твоите часове автоматично в Google Календар">📅 Google</button><button class="pri" data-act="newsess">+ Нов час</button></div><div class="wkl"><aside id="wbtn">${waitHtml()}</aside><div id="grid" class="mute">Зареждане…</div></div>`;
   const [{ data, error }] = await Promise.all([sb.from('sessions')
     .select('*,bookings(id,status,client_id,use_plan)').eq('location', S.loc).gte('date', a).lte('date', b).order('start_time'),
     pP ? pP.then(() => { const w = $('#wbtn'); if (w && S.tab === 'week') w.innerHTML = waitHtml(); }) : null]);
@@ -2656,6 +2656,21 @@ function downloadIcs(bid) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([icsFor(list)], { type: 'text/calendar' })); a.download = bid ? 'nlt-chas.ics' : 'nlt-chasove.ics'; document.body.appendChild(a); a.click(); a.remove();
 }
 const C = { pkgs: [], bookings: [], classes: [], policy: {}, cv: {} };
+function gcalSub() {
+  const tok = S.me && S.me.row && S.me.row.cal_token;
+  if (!tok) return toast('Календарът още не е включен. Опитай пак след малко.');
+  const https = 'https://krshyauillsrgoqzyjgc.supabase.co/functions/v1/ical?t=' + tok, webcal = https.replace(/^https:/, 'webcal:');
+  const g = 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcal);
+  const isC = S.me.role === 'client';
+  const html = `<h2 style="margin-top:0">Автоматично в календара</h2>
+    <p class="mute" style="margin:0 0 12px">${isC ? 'Всичките ти записани тренировки' : 'Всичките ти часове с имената на клиентите'} ще се появяват сами в календара на телефона ти. Ако се запишеш, отпишеш или часът се промени, календарът се обновява автоматично (Google проверява на няколко часа).</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <a class="${isC ? 'c-btn solid wide' : 'pri'}" style="text-align:center;text-decoration:none;padding:10px" href="${g}" target="_blank" rel="noopener">Добави в Google Календар</a>
+      <a class="${isC ? 'c-btn outline wide' : ''}" style="text-align:center;padding:10px" href="${webcal}">Добави в iPhone / Apple календар</a>
+      <button class="${isC ? 'c-btn outline wide' : ''}" data-act="gcopy" data-u="${https}">Копирай линка (Outlook и др.)</button>
+    </div><p class="mute" style="font-size:12px;margin-top:10px">Линкът е личен — не го споделяй.</p>`;
+  if (isC) cSheet(html); else modal.show(`<div>${html}</div>`);
+}
 async function clientApp() {
   const me = S.me.row, t = today(), to = ymd(addDays(new Date(), 28));
   const wq = sb.from('weight_log').select('day,weight_kg').eq('client_id', me.id).order('day');
@@ -2998,6 +3013,7 @@ async function clientMassageCancel(id) {
 function clientMine(t) {
   return `<h2 class="c-title">Моите тренировки</h2>
   ${C.bookings.length ? `<section class="c-card c-list">${C.bookings.map(b => cSession(b, t)).join('')}</section>
+    <button class="c-btn solid wide" data-act="gsub" style="margin-bottom:8px">${ic('calplus', 18)}Автоматично в Google Календар</button>
     <button class="c-btn outline wide" data-act="ics" data-id="">${ic('calplus', 18)}Всички в календара (.ics)</button>`
     : `<div class="c-empty">Нямаш предстоящи тренировки.<br><button class="c-btn solid" style="margin-top:14px" data-act="cnav" data-t="book">Запиши се</button></div>`}
   ${clientMassages()}`;
@@ -4031,6 +4047,8 @@ document.addEventListener('click', async e => {
       case 'wput': { const W = S.waitCfg; W.add = [...new Set([...W.add, el.dataset.id])]; W.hide = W.hide.filter(x => x !== el.dataset.id); await waitSave(); toast(`${cname(el.dataset.id)} е добавен(а) в „Чакащи“`); break; }
       case 'wst': S.wst = el.dataset.k; $('#wbtn').innerHTML = waitHtml(); break;
       case 'ics': downloadIcs(el.dataset.id); break;
+      case 'gsub': gcalSub(); break;
+      case 'gcopy': { const u = el.dataset.u; try { await navigator.clipboard.writeText(u); toast('Линкът е копиран'); } catch (e) { prompt('Копирай линка:', u); } break; }
       case 'cbook': await clientBook(el.dataset.id); break;
       case 'ccancel': clientCancelDialog(el.dataset.bid, el.dataset.sid); break;
       case 'wcgo': C.tab = 'prog'; PG.tab = 'chal'; renderClient(); window.scrollTo(0, 0); break;
