@@ -94,7 +94,9 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get("RESEND_API_KEY") ?? "";
   if (!dryRun && !apiKey) return Response.json({ error: "RESEND_API_KEY missing" }, { status: 500 });
 
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY");
+  if (!serviceKey) return Response.json({ error: "service key missing" }, { status: 500 });
+  const db = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey, {
     auth: { persistSession: false },
   });
 
