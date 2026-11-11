@@ -1588,6 +1588,11 @@ function newSessionDialog(date, time) {
     <label class="f" id="n-capw">Места<input type="number" id="n-cap" value="${S.policy?.capacity || 16}" min="1"></label>
   </div>
   <label class="f" style="margin-top:8px">Клиенти <span class="mute">— по избор, записват се веднага; може повече от един</span><input id="n-cq" placeholder="Търси клиент по име…" autocomplete="off"><input type="hidden" id="n-cid"><div id="n-res" class="res hide"></div></label><div id="n-chips" class="chips" style="margin-top:4px"></div>
+  <div style="margin-top:6px"><a href="#" data-act="nnctoggle">+ Нов клиент</a></div>
+  <div id="n-nc" class="hide" style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:6px">
+    <div class="grid2"><label class="f">Име<input id="n-nc-name" placeholder="Име и фамилия"></label><label class="f">Имейл<input id="n-nc-email" type="email" placeholder="по избор — получава покана за приложението"></label></div>
+    <label class="f">Обект<select id="n-nc-loc">${LOCS.map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+    <button type="button" class="pri sm" data-act="nncadd" style="margin-top:6px">Създай и добави в часа</button></div>
   <label class="row" style="margin-top:10px"><input type="checkbox" id="n-rep"> Повтаряй всяка седмица (53 седмици напред)</label>
   <div class="row" style="margin-top:12px"><button class="pri" data-act="nsave">Създай</button></div>`);
 }
@@ -1809,9 +1814,10 @@ async function saveClient() {
   if (!p.name) return toast('Името е задължително.');
   const { error } = await sb.from('clients').update(p).eq('id', cid());
   if (error) return fail(error, 'Не се записа');
-  const cc = S.clients.find(c => c.id === cid()), prevEmail = (cc.email || '').trim().toLowerCase();
+  const cc = S.clients.find(c => c.id === cid()), prevEmail = (cc.email || '').trim().toLowerCase(), prevSt = cc.status;
   Object.assign(cc, p); toast('Записано'); if (S.tab === 'clients') drawClients();
-  if (p.email && p.email.trim().toLowerCase() !== prevEmail && !cc.user_id) sendInvite(p.email);
+  /* нов имейл или току-що активиран клиент без профил → веднага получава имейла за активация */
+  if (p.email && !cc.user_id && (p.email.trim().toLowerCase() !== prevEmail || (p.status === 'Active' && prevSt !== 'Active'))) sendInvite(p.email);
 }
 async function addPackage() {
   const p = S.packages.find(x => x.id === $('#np-sel').value), start = $('#np-start').value;
@@ -3844,6 +3850,18 @@ document.addEventListener('click', async e => {
         const cp = { kind: s.kind, trainer_id: s.trainer_id, location: s.location, title: s.title, description: s.description, notes: s.notes, workout: s.workout, category: s.category, green: s.green, capacity: s.capacity, duration_min: s.duration_min, date: d, start_time: t.length === 5 ? t + ':00' : t };
         const { error } = await sb.from('sessions').insert(cp); if (error) return fail(error, 'Копието не се създаде');
         logEvent('change', `Дубликат на час ${fmt(d)} ${t}: ${s.title || KIND[s.kind]}`); modal.close(); toast(`Създадено копие за ${fmt(d)} ${t}`); weekView(); break; }
+      case 'nnctoggle': $('#n-nc').classList.toggle('hide'); if (!$('#n-nc').classList.contains('hide')) $('#n-nc-name').focus(); break;
+      case 'nncadd': { const name = $('#n-nc-name').value.trim(), email = $('#n-nc-email').value.trim(), loc = $('#n-nc-loc').value;
+        if (!name) return toast('Въведи име.'); if (email && !/^\S+@\S+\.\S+$/.test(email)) return toast('Имейлът не изглежда правилен.');
+        const dup = S.clients.find(c => c.name.trim().toLowerCase() === name.toLowerCase() && c.location === loc && c.status !== 'Inactive');
+        if (dup && !confirm(`Вече има клиент „${dup.name}“ в ${loc}. Да създам ли нов?`)) break;
+        const { data, error } = await sb.from('clients').insert({ name, email: email || null, location: loc }).select().single();
+        if (error) return fail(error, 'Клиентът не се създаде');
+        S.clients.push(data); S.clients.sort((a, b) => a.name.localeCompare(b.name, 'bg'));
+        const ids = ($('#n-cid').value || '').split(',').filter(Boolean); ids.push(data.id); $('#n-cid').value = ids.join(','); nChips();
+        $('#n-nc-name').value = ''; $('#n-nc-email').value = ''; $('#n-nc').classList.add('hide');
+        if (data.email) sendInvite(data.email, true).then(ok => toast(ok ? `${data.name} е създаден(а) · поканата е изпратена` : `${data.name} е създаден(а)`)); else toast(`${data.name} е създаден(а) и добавен(а) в часа`);
+        break; }
       case 'nunpick': { const i = $('#n-cid'); if (i) { i.value = i.value.split(',').filter(x => x && x !== el.dataset.id).join(','); nChips(); } break; }
       case 'ttlpick': { const i = document.getElementById(el.dataset.for); if (i) { i.value = el.dataset.v; i.dispatchEvent(new Event('input', { bubbles: true })); } break; }
       case 'cxdel': await delSession(el.dataset.id); break;
