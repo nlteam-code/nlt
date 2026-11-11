@@ -3335,7 +3335,7 @@ const PG_ANG = [['profile', 'Профил'], ['front', 'Анфас'], ['back', '
 const PG_PR = { 'ВИСОК': 'bad', 'СРЕДЕН': 'warn', 'НИСЪК': 'ok' };
 const PG_COL = ['var(--pg-c1)', 'var(--pg-c2)', 'var(--pg-c3)', 'var(--pg-c4)'];
 
-const pgNum = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(',', '.')); return isNaN(n) ? null : n; };
+const pgNum = v => { v = v == null ? '' : String(v).replace(/\s/g, '').replace(',', '.'); if (v === '') return null; const n = Number(v); return isNaN(n) ? null : n; };
 const pgF = (n, d = 1) => n == null || isNaN(n) ? '—' : Number(n).toFixed(d).replace('.', ',');
 const pgAvg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
 const pgSgn = (n, d = 1) => n == null ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + pgF(Math.abs(n), d);
@@ -3469,7 +3469,7 @@ function pgWeightTab() {
     ${s.pace ? `<div class="pg-pace">Темпо: ${pgChip(s.pace[0], s.pace[1])} <span class="pg-mute">${s.pct > 0 ? '+' : ''}${pgF(s.pct * 100, 2)}% спрямо предходната седмица</span></div>` : ''}${s.hint ? `<div class="pg-mute pg-sm">${esc(s.hint)}</div>` : ''}` : '<div class="pg-empty">Въведи първото си тегло.</div>';
   const lst = w.slice().reverse().slice(0, 14).map(x => `<div class="pg-li"><span>${fmt(x.day)}</span><b>${pgF(x.weight_kg)} кг</b>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgwedit" data-d="${x.day}" data-v="${x.weight_kg}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgwdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>`).join('');
   return `<section class="pg-card"><h3 class="pg-h">${PG.staff ? 'Тегло' : 'Тегло днес'}</h3>
-    <div class="pg-wf"><input id="pg-wv" type="number" inputmode="decimal" step="0.1" min="30" max="300" placeholder="кг" value="${esc(e.v ?? '')}" aria-label="Тегло в кг"><input id="pg-wd" type="date" max="${today()}" value="${e.d || today()}" aria-label="Дата"><button class="pg-btn" data-act="pgwsave">Запиши</button></div>
+    <div class="pg-wf"><input id="pg-wv" type="text" inputmode="decimal" autocomplete="off" step="0.1" min="30" max="300" placeholder="кг" value="${esc(e.v ?? '')}" aria-label="Тегло в кг"><input id="pg-wd" type="date" max="${today()}" value="${e.d || today()}" aria-label="Дата"><button class="pg-btn" data-act="pgwsave">Запиши</button></div>
     <div class="pg-mute pg-sm">Сутрин, на гладно, след тоалетна, по бельо, на един и същ кантар. Един запис на ден — повторният го презаписва.</div></section>
     ${s.n ? `<section class="pg-card"><h3 class="pg-h">${PG.staff ? 'Графика' : 'Твоят резултат'}</h3>${pgChart([{ name: 'Дневно', pts: w.map(x => ({ d: x.day, v: Number(x.weight_kg) })), dotsOnly: true, r: 2.6 }, { name: '7-дневна средна', pts: s.ma, dots: false, w: 2.6 }], { goal: s.tgt, label: 'Тегло' })}</section>` : ''}
     <section class="pg-card">${stats}</section>
@@ -3488,7 +3488,7 @@ function pgMeasTab() {
   };
   const ser = keys => keys.map(([k, n]) => ({ name: n, pts: m.filter(x => x[k] != null).map(x => ({ d: x.day, v: Number(x[k]) })) })).filter(s => s.pts.length);
   const chg = (k) => last && first && last[k] != null && first[k] != null && last !== first ? pgSgn(last[k] - first[k]) : '—';
-  const f = (k, n) => `<label class="pg-f">${n}<input id="pg-m-${k}" type="number" inputmode="decimal" step="0.1" min="10" max="250" value="${esc(e[k] ?? '')}"></label>`;
+  const f = (k, n) => `<label class="pg-f">${n}<input id="pg-m-${k}" type="text" inputmode="decimal" autocomplete="off" step="0.1" min="10" max="250" value="${esc(e[k] ?? '')}"></label>`;
   const rows = m.slice().reverse().map(x => `<div class="pg-li"><span>${fmt(x.day)}</span><span class="pg-sm pg-mute">${PG_M.map(([k]) => pgF(x[k])).join(' · ')}</span>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgmedit" data-id="${x.id}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgmdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>`).join('');
   return `<section class="pg-card"><h3 class="pg-h">Нови замервания <span class="pg-mute pg-sm">на всеки 2 седмици, в см</span></h3>
     <label class="pg-f">Дата<input id="pg-m-day" type="date" max="${today()}" value="${e.day || today()}"></label>
@@ -3569,7 +3569,7 @@ function pgCheckTab() {
   const weeks = []; for (let i = 0; i < 14; i++) weeks.push(ymd(addDays(monday(new Date()), -7 * i)));
   if (!weeks.includes(wk)) weeks.push(wk);
   const sl = (id, l, v, lo, hi, step) => `<label class="pg-f">${l} <output id="o-${id}" class="pg-val">${v ?? '—'}</output><input type="range" id="${id}" min="${lo}" max="${hi}" step="${step || 1}" value="${v ?? Math.round((lo + hi) / 2)}" data-pgsl="o-${id}" data-set="${v != null ? 1 : 0}"></label>`;
-  const nf = (id, l, v, step, max) => `<label class="pg-f">${l}<input id="${id}" type="number" inputmode="decimal" step="${step}" min="0" max="${max}" value="${esc(v ?? '')}"></label>`;
+  const nf = (id, l, v, step, max) => `<label class="pg-f">${l}<input id="${id}" type="text" inputmode="decimal" autocomplete="off" step="${step}" min="0" max="${max}" value="${esc(v ?? '')}"></label>`;
   const ser = ks.length ? pgChart(PG_CK.map(([k, n]) => ({ name: n, pts: ks.filter(x => x[k] != null).map(x => ({ d: x.week_start, v: x[k] })) })).filter(s => s.pts.length), { ymin: 1, ymax: 10, label: 'Чек-ин' }) : '';
   const adh = ks.filter(x => x.adherence != null).length ? pgChart([{ name: 'Придържане към плана %', pts: ks.filter(x => x.adherence != null).map(x => ({ d: x.week_start, v: Number(x.adherence) })) }], { ymin: 0, ymax: 100, label: 'Придържане' }) : '';
   const list = ks.slice().reverse().slice(0, 12).map(x => `<div class="pg-ck"><div class="pg-row"><b>${pgDm(x.week_start)} – ${pgDm(ymd(addDays(parse(x.week_start), 6)))}</b>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgcedit" data-w="${x.week_start}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgcdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>
@@ -3619,7 +3619,7 @@ function pgResize(file, max = 1600) {
 function pgProfileTab() {
   const p = PG.D.profile || {}, oa = p.open_answers || {};
   const sel = (id, v, opts) => `<select id="${id}"><option value="">—</option>${opts.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
-  const nf = (id, l, v, mn, mx, st) => `<label class="pg-f">${l}<input id="${id}" type="number" inputmode="decimal" step="${st || 1}" min="${mn}" max="${mx}" value="${esc(v ?? '')}"></label>`;
+  const nf = (id, l, v, mn, mx, st) => `<label class="pg-f">${l}<input id="${id}" type="text" inputmode="decimal" autocomplete="off" step="${st || 1}" min="${mn}" max="${mx}" value="${esc(v ?? '')}"></label>`;
   return `<section class="pg-card"><h3 class="pg-h">Профил за прогрес</h3>
     <div class="pg-grid"><label class="pg-f">Пол${sel('pg-p-sex', p.sex, ['Жена', 'Мъж'])}</label>${nf('pg-p-age', 'Години', p.age, 10, 100)}${nf('pg-p-height_cm', 'Ръст (см)', p.height_cm, 120, 230, .5)}${nf('pg-p-start_weight', 'Начално тегло (кг)', p.start_weight, 30, 300, .1)}
       <label class="pg-f">Начална дата<input id="pg-p-start_date" type="date" value="${p.start_date || ''}"></label><label class="pg-f">Основна цел${sel('pg-p-goal', p.goal, PG_GOALS)}</label>${nf('pg-p-target_weight', 'Целево тегло (кг)', p.target_weight, 30, 300, .1)}</div>
