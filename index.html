@@ -542,6 +542,7 @@ const S = {
   q: '', cfilter: 'all'
 };
 const cname = id => S.clients.find(c => c.id === id)?.name || '—';
+const pausedC = id => S.clients.find(c => c.id === id)?.status === 'Paused';
 
 /* ───────── вход ───────── */
 function loginView(msg, mode) {
@@ -1362,7 +1363,7 @@ function drawGrid() {
     const ds = ymd(d);
     const items = layoutDay(evs.filter(e => e.date === ds));
     const html = items.map(({ e, s, col, n }) => {
-      const act = e.bookings.filter(b => b.status !== 'cancelled');
+      const act = e.bookings.filter(b => b.status !== 'cancelled' && !pausedC(b.client_id));
       const names = act.map(b => cname(b.client_id).split(' ')[0] + ' ' + (cname(b.client_id).split(' ')[1] || '')[0] + '.').join(', ');
       const full = e.kind === 'group' && e.capacity && act.length >= e.capacity;
       const top = (s - h0 * 60) / 60 * HH, hgt = Math.max(((e.duration_min || 60) / 60) * HH - 2, 18);
@@ -1423,9 +1424,10 @@ async function sessClients(id) {
 async function openSession(id) {
   const { data: s, error } = await sb.from('sessions').select('*,bookings(id,status,late,use_plan,client_id)').eq('id', id).single();
   if (error) return fail(error, 'Часът не се отвори');
-  const act = s.bookings.filter(b => b.status !== 'cancelled'); D.sessLoc = s.location;
+  const paused = s.bookings.filter(b => b.status !== 'cancelled' && pausedC(b.client_id));
+  const act = s.bookings.filter(b => b.status !== 'cancelled' && !pausedC(b.client_id)); D.sessLoc = s.location;
   const trainers = S.staff.filter(t => t.active);
-  const rows = s.bookings.slice().sort((a, b) => cname(a.client_id).localeCompare(cname(b.client_id), 'bg')).map(b => `
+  const rows = s.bookings.filter(b => !pausedC(b.client_id)).slice().sort((a, b) => cname(a.client_id).localeCompare(cname(b.client_id), 'bg')).map(b => `
     <div class="bk" data-bid="${b.id}">
       <div class="nm"><a href="#" data-act="client" data-id="${b.client_id}">${esc(cname(b.client_id))}</a>
         ${!b.use_plan ? `<span class="chip warn">еднократно</span>` : ''}${b.late ? ' <span class="chip bad">късен отказ</span>' : ''}</div>
@@ -1451,7 +1453,7 @@ async function openSession(id) {
       <button data-act="scancel">${s.cancelled ? 'Върни часа' : 'Отмени часа'}</button><span class="sp"></span>
       <button class="danger" data-act="sdel">Изтрий часа</button></div>
     <h3>Записани (${act.length}${s.capacity && s.kind !== 'solo' ? ' от ' + s.capacity : ''})</h3>
-    <div id="bks">${rows || '<div class="mute">Няма записани.</div>'}</div>
+    <div id="bks">${rows || '<div class="mute">Няма записани.</div>'}</div>${paused.length ? `<div class="mute" style="font-size:12px;margin-top:6px" title="Абонаментът им е замразен – не се показват в графика, докато не се размразят">⏸ В пауза (скрити): ${paused.map(b => esc(cname(b.client_id))).join(', ')}</div>` : ''}
     <div style="margin-top:10px"><input id="add-q" placeholder="+ Добави клиент (търси по име)…" style="width:100%" autocomplete="off"><div id="add-res" class="res hide"></div></div>
   </div>`);
 }
@@ -3942,7 +3944,13 @@ document.addEventListener('click', async e => {
         const { data, error } = await sb.rpc('freeze_package', { p_id: el.dataset.id, p_on: on }); if (error) { fail(error, 'Не се промени'); break; }
         logEvent('change', `Абонамент ${on ? 'замразен' : 'размразен'}: ${cname(cid())}`); const cc = S.clients.find(c => c.id === cid()); if (cc) cc.status = on ? 'Paused' : (cc.status === 'Paused' ? 'Active' : cc.status);
         await afterClient(); toast('Абонаментът е ' + data); break; }
-      case 'cpdel': if (confirm('Да се изтрие ли пакетът?')) { await sb.from('client_packages').delete().eq('id', el.dataset.id); await afterClient(); } break;
+      case 'cpdel': { if (!confirm('Да се изтрие ли пакетът?\n\nСистемата няма да го създава отново автоматично.')) break;
+        const { data: pk0 } = await sb.from('client_packages').select('id,client_id,kind').eq('id', el.dataset.id).maybeSingle();
+        if (pk0) await sb.from('client_packages').update({ auto_renew: false }).eq('client_id', pk0.client_id).eq('kind', pk0.kind);
+        const { data: dl, error } = await sb.from('client_packages').delete().eq('id', el.dataset.id).select('id');
+        if (error) { fail(error, 'Пакетът не се изтри'); await afterClient(); break; }
+        if (!dl || !dl.length) { toast('Пакетът не се изтри – нямаш права или вече е изтрит.'); await afterClient(); break; }
+        toast('Пакетът е изтрит · автоматичното подновяване за този вид е спряно'); await afterClient(); break; }
       case 'payadd': { const a = +$('#pay-amt').value; if (!a) return toast('Въведи сума.'); const ps = await paySubConfirm(cid(), 'pay', a); if (!ps) break; await sb.from('payments').insert({ client_id: cid(), amount: a, method: $('#pay-m').value, date: $('#pay-d').value || today(), note: $('#pay-note').value.trim() || ps.note || null }); logEvent('paid', `Плащане ${money(a)} (${$('#pay-m').value}): ${cname(cid())}`); await afterClient(); break; }
       case 'debtdel': { const id = el.dataset.id, a = +el.dataset.amt;
         if (!confirm(`Да изтрия ли дълга на ${cname(id)} (${money(a)})?\n\nКлиентът става изравнен. Таксите, абонаментите и плащанията остават в историята, а в сметката му се добавя корекция „Отписан дълг“.`)) break;
