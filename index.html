@@ -655,7 +655,7 @@ function renderStaff() {
     <div class="tabs">
       ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Задачи'], ['rewards', 'Награди']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['reports', 'Отчети'], ['fin', 'Финанси']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
-    <select id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<option ${l === S.loc ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+    <span class="seg" id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<button class="${l === S.loc ? 'on' : ''}" data-act="hloc" data-l="${esc(l)}">${esc(l)}</button>`).join('')}</span>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="mypw" title="Смени своята парола">Парола</button><button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
   <div class="wrap" id="main"></div>`;
@@ -665,7 +665,6 @@ function renderStaff() {
     S.view = t || null; S.me = t ? { role: 'staff', row: t } : S.real; S.owner = S.realOwner && !t;
     if (t && ['settings', 'fin', 'reports', 'tasks', 'rewards', 'team'].includes(S.tab)) S.tab = 'week'; D.ploc = null; renderStaff();
   };
-  $('#loc').onchange = e => { S.loc = e.target.value; S.cloc = S.loc; store.set('nlt-loc', S.loc); D.ploc = null; renderTab(); };
   renderTab();
 }
 function loadMain() { const m = $('#main'); if (!m) return; if (m.dataset.ld === '1' || !m.firstElementChild) { m.innerHTML = '<div class="mute">Зареждане…</div>'; m.dataset.ld = ''; } }
@@ -1635,21 +1634,25 @@ function drawClients() {
     if (S.cfilter === 'exp') { const p = curPkg(c.id); if (!p) return false; const left = p.total - p.used, days = (parse(p.end_date) - parse(today())) / 864e5; return left <= 1 || days <= 3; }
     return true;
   }).sort((a, b) => ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(a)] - ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
+  if (S.csort) { const { k, d } = S.csort, SO = { active: 0, wait: 1, pause: 2, inactive: 3 };
+    const pv = c => { const p = curPkg(c.id); return p ? (p.total - p.used) * 1000 + Math.max(0, (parse(p.end_date) - parse(today())) / 864e5) : -1; };
+    const key = { name: c => c.name, st: c => SO[cstat(c)], loc: c => c.location || '', ph: c => c.phone || '', pkg: pv, prof: c => c.user_id ? 0 : 1 }[k];
+    list.sort((a, b) => { const x = key(a), y = key(b); return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'bg')) * d || a.name.localeCompare(b.name, 'bg'); }); }
+  const th = (k, l, t) => `<th class="click" data-act="csort" data-k="${k}" style="cursor:pointer;user-select:none;white-space:nowrap"${t ? ` title="${t}"` : ''}>${l} ${S.csort && S.csort.k === k ? (S.csort.d > 0 ? '▲' : '▼') : '<span class="mute">↕</span>'}</th>`;
   const stCls = { active: 'ok', wait: 'warn', pause: '', inactive: '' };
   S.clist = list;
   $('#main').innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap">
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
-    <select id="cl-loc"><option value="all">Двата обекта</option>${LOCS.map(l => `<option ${S.cloc === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <span class="seg">${[['all', 'Всички обекти']].concat(LOCS.map(l => [l, l])).map(([v, l]) => `<button class="${S.cloc === v ? 'on' : ''}" data-act="clloc" data-l="${esc(v)}">${esc(l)}</button>`).join('')}</span>
     <select id="cf"><option value="all">Без друг филтър</option><option value="exp" ${S.cfilter === 'exp' ? 'selected' : ''}>Изтичащи</option><option value="mo" ${S.cfilter === 'mo' ? 'selected' : ''}>Само масажи</option></select>
     ${S.owner ? '<button data-act="cemails" title="Имейлите на показания списък, готови за скрито копие (BCC)">Имейли за писмо</button><button data-act="cnoprof" title="Клиенти без профил в приложението · повторна покана">Без профил</button>' : ''}<button class="pri" data-act="newclient">+ Нов клиент</button></div>
     <div class="chips" style="margin-bottom:8px"><button class="${S.csts.length ? '' : 'on'}" data-act="cstat" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${S.csts.includes(k) ? 'on' : ''}" data-act="cstat" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
     <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.csts.length ? ' · ' + S.csts.map(k => CST[k]).join(', ') : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
-    <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Телефон</th><th>Пакет</th><th title="Активирал профила си в приложението">Профил</th></tr></thead><tbody>
+    <div class="tw"><table><thead><tr>${th('name', 'Име')}${th('st', 'Статус')}${th('loc', 'Обект')}${th('ph', 'Телефон')}${th('pkg', 'Пакет')}${th('prof', 'Профил', 'Активирал профила си в приложението')}</tr></thead><tbody>
     ${list.slice(0, 400).map(c => { const k = cstat(c); return `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}</td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td><td>${c.user_id ? '<span class="chip ok" title="Активирал профила си">✓</span>' : ''}</td></tr>`; }).join('')}
     </tbody></table></div>`;
   const qi = $('#cq'); qi.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; drawClients(); const n = $('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
   $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
-  $('#cl-loc').onchange = e => { S.cloc = e.target.value; drawClients(); };
 }
 async function openClient(id, tab) {
   const [c, cp, pay, chg, bk, hist, hv, hm2, arq] = await Promise.all([
@@ -2445,7 +2448,7 @@ async function teamExtras() {
   const P = [['perm_visits_loc', 'Вижда броя посещения по обект'], ['perm_revenue', 'Вижда приходите']];
   const html = `<h3 style="margin:22px 0 8px">Права</h3><div class="card" style="overflow:auto"><div class="mute" style="margin-bottom:8px">Всеки служител вижда своите часове и клиентите си. Тук добавяш допълнителни права. Администраторите и собственикът винаги виждат всичко останало.</div>
     <table><thead><tr><th>Служител</th>${P.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>
-    ${S.staff.filter(t => t.active).map(t => `<tr><td><b>${esc(t.name)}</b></td>${P.map(([k]) => `<td><input type="checkbox" style="width:20px;height:20px" data-act="perm" data-s="${t.id}" data-p="${k}" ${t[k] ? 'checked' : ''}></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    ${S.staff.filter(t => t.active).map(t => `<tr><td><b><span class="click" style="cursor:pointer;text-decoration:underline" data-act="trsched" data-id="${t.id}">${esc(t.name)}</span></b></td>${P.map(([k]) => `<td><input type="checkbox" style="width:20px;height:20px" data-act="perm" data-s="${t.id}" data-p="${k}" ${t[k] ? 'checked' : ''}></td>`).join('')}</tr>`).join('')}</tbody></table></div>
     <h3 style="margin:22px 0 8px">Заплати</h3>${ratesCardHtml(rates || [])}`;
   const m = $('#main'); m.querySelector('#team-x')?.remove();
   const w = document.createElement('div'); w.id = 'team-x'; w.innerHTML = html; m.append(w);
@@ -2453,7 +2456,7 @@ async function teamExtras() {
 function teamView() {
   const admin = S.me.row.role === 'admin', today2 = today();
   $('#main').innerHTML = `<div class="row" style="margin-bottom:10px"><h2 style="margin:0">Служители</h2><span class="sp"></span>${admin ? '<button class="pri" data-act="trnew">+ Нов служител</button>' : ''}</div>` +
-    S.staff.map(t => `<div class="card" style="margin-bottom:8px"><div class="row"><div style="flex:1;min-width:200px"><b>${esc(t.name)}</b> <span class="chip">${esc(t.position || (t.role === 'admin' ? 'Администратор' : 'Треньор'))}</span>${t.role === 'admin' ? ' <span class="chip ok">админ</span>' : ''}${t.active ? '' : ' <span class="chip">неактивен</span>'}
+    S.staff.map(t => `<div class="card" style="margin-bottom:8px"><div class="row"><div style="flex:1;min-width:200px"><b><span class="click" style="cursor:pointer;text-decoration:underline" data-act="trsched" data-id="${t.id}" title="Виж графика на ${esc(t.name)}">${esc(t.name)}</span></b> <span class="chip">${esc(t.position || (t.role === 'admin' ? 'Администратор' : 'Треньор'))}</span>${t.role === 'admin' ? ' <span class="chip ok">админ</span>' : ''}${t.active ? '' : ' <span class="chip">неактивен</span>'}
       <br><span class="mute">${[t.phone, t.email].filter(Boolean).map(esc).join(' · ') || 'без контакти'} · ${t.user_id ? 'има акаунт ✓' : 'още без акаунт'}</span><br>${(t.locations || []).map(l => `<span class="chip">${esc(l)}</span>`).join(' ')}${t.notes ? `<br><span class="mute">${esc(t.notes)}</span>` : ''}</div>
       ${admin ? `<button class="sm" data-act="tredit" data-id="${t.id}">Редактирай</button>` : ''}</div></div>`).join('') +
     (admin ? '<p class="mute">Нов служител получава достъп, когато в Supabase → Authentication → Users → Add user се създаде акаунт със същия имейл.</p>' : '');
@@ -3783,6 +3786,10 @@ document.addEventListener('click', async e => {
       case 'exitpreview': exitPreview(); break;
       case 'logout': if (S.previewClient) { closeSheet(); exitPreview(); break; } closeSheet(); await sb.auth.signOut(); S.me = null; S.view = null; loginView(); break;
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
+      case 'hloc': { S.loc = el.dataset.l; S.cloc = S.loc; store.set('nlt-loc', S.loc); D.ploc = null; document.querySelectorAll('#loc button').forEach(b => b.classList.toggle('on', b.dataset.l === S.loc)); renderTab(); break; }
+      case 'clloc': S.cloc = el.dataset.l; drawClients(); break;
+      case 'csort': { const k = el.dataset.k; S.csort = S.csort && S.csort.k === k ? { k, d: -S.csort.d } : { k, d: 1 }; drawClients(); break; }
+      case 'trsched': S.trf = el.dataset.id; S.tab = 'week'; renderStaff(); break;
       case 'kper': D.kper = el.dataset.p; kpiView(); break;
       case 'ktr': D.ktr = el.dataset.u; kpiView(); break;
       case 'cstat': { const k = el.dataset.k; if (k === 'all') S.csts = []; else S.csts = S.csts.includes(k) ? S.csts.filter(x => x !== k) : [...S.csts, k]; drawClients(); break; }
