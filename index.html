@@ -425,23 +425,37 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .dwrap>.dtxt{position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:inherit;font:inherit;white-space:nowrap}
 .dwrap>.dtxt.ph{opacity:.5}
 .fin-wrap{overflow:auto;padding:0!important}
-table.fin{font-size:12.5px;min-width:1100px}
-table.fin th,table.fin td{padding:6px 8px;white-space:nowrap}
-table.fin .fxn{text-align:right;font-variant-numeric:tabular-nums}
-table.fin .fxl{position:sticky;left:0;background:var(--card);z-index:1;max-width:280px;overflow:hidden;text-overflow:ellipsis}
-table.fin .fxt{font-weight:700;border-left:1px solid var(--line)}
-table.fin tr.fxh td{font-weight:700;background:rgba(255,255,255,.03);padding-top:12px}
-table.fin tr.fxh td.fxl{background:var(--card)}
-table.fin tr.fxs td{font-weight:700;border-top:1px solid var(--line)}
-table.fin tr.fxp td{font-size:13.5px}
+table.fin{font-size:13px;min-width:1100px;border-collapse:separate;border-spacing:0}
+table.fin th,table.fin td{padding:7px 10px;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.045)}
+table.fin thead th{position:sticky;top:0;z-index:2;background:#151a21;color:var(--mute);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line);padding-top:10px;padding-bottom:10px}
+table.fin thead th.fxl{z-index:3}
+table.fin .fxn{text-align:right;font-variant-numeric:tabular-nums;color:#c9d0da}
+table.fin .fxl{position:sticky;left:0;background:var(--card);z-index:1;max-width:280px;overflow:hidden;text-overflow:ellipsis;color:var(--ink);border-right:1px solid var(--line)}
+table.fin tbody tr:hover td{background:rgba(255,255,255,.035)}
+table.fin tbody tr:hover td.fxl{background:#20262f}
+table.fin .fxt{font-weight:700;color:var(--ink);background:rgba(255,255,255,.035);border-left:1px solid var(--line)}
+table.fin .fxcur{background:rgba(240,87,92,.06)}
+table.fin thead th.fxcur{color:var(--acc);background:#1d1a20}
+table.fin td.fxneg,table.fin td.fxneg .fin-in{color:#ff7b7f}
+table.fin tr.fxp td.fxpos{color:#4cc38a}
+table.fin tr.fxh td{font-weight:700;color:var(--ink);background:#20262f;padding-top:11px;padding-bottom:11px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+table.fin tr.fxh td.fxl{background:#20262f;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--acc)}
+table.fin tr.fxh td.fxn{color:var(--ink)}
+table.fin tbody tr.fxh:hover td{background:#20262f}
+table.fin tr.fxs td{font-weight:700;color:var(--ink);border-top:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.025)}
+table.fin tr.fxs td.fxl{background:#1d232b}
+table.fin tr.fxp td{font-size:14px;padding-top:11px;padding-bottom:11px}
 table.fin tr.fxmut td{color:var(--mute)}
+table.fin tr.fxmut td.fxl{color:var(--mute)}
+table.fin tbody td.fxl:not(.fxln){font-weight:500}
+table.fin td.fxln{padding-left:22px;color:#d5dbe3}
 table.fin td.fxauto{color:var(--mute);font-style:italic}
 table.fin td.fxc{padding:0!important}
-table.fin .fin-in{width:100%;min-width:64px;box-sizing:border-box;background:transparent;border:1px solid transparent;border-radius:0;color:inherit;font:inherit;text-align:right;padding:6px 8px;outline:none;font-variant-numeric:tabular-nums}
+table.fin .fin-in{width:100%;min-width:64px;box-sizing:border-box;background:transparent;border:1px solid transparent;border-radius:6px;color:inherit;font:inherit;text-align:right;padding:7px 10px;outline:none;font-variant-numeric:tabular-nums}
 table.fin .fin-in:hover{background:rgba(255,255,255,.04)}
 table.fin .fin-in:focus{border-color:var(--acc);background:rgba(235,76,81,.10)}
 table.fin .fin-in::placeholder{color:var(--mute);font-style:italic;opacity:.8}
-table.fin td.fxln{cursor:pointer}
+table.fin td.fxln{cursor:pointer;padding-left:22px}
 table.fin td.fxln:hover{color:var(--acc)}
 .fxhint{font-size:11px;font-weight:400;margin-left:4px}
 .fxadd{margin-left:6px;padding:0 6px!important;line-height:16px}
@@ -682,7 +696,7 @@ const FIN_SHEET_LBL = { 'Общо': 'Общо', 'Боян Петров': 'Боя
 const FIN_CATS = ['Сметки', 'Заплати', 'Осигуровки', 'Услуги', 'Консумативи', 'Маркетинг', 'Оборудване', 'Интериор и ремонт', 'Бар', 'Обучение', 'Други', 'Данъци и такси'];
 const FIN_MON = ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'];
 const FIN_MAS_SHARE = 0.4; // заплата масажист: 40% от остатъка
-const fnum = v => v == null || v === '' || isNaN(v) ? '' : (Math.round(v) || 0).toLocaleString('bg-BG');
+const fnum = v => v == null || v === '' || isNaN(v) ? '' : String(Math.round(v) || 0).replace('-', '−').replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f');
 const fsum = a => a.reduce((s, v) => s + (+v || 0), 0);
 const fhas = a => a.some(v => v != null && v !== '');
 async function finView() {
@@ -760,7 +774,7 @@ function finChart(rev, exp, profit) {
 }
 const fcells = (a, cls = '') => a.map(v => `<td class="fxn ${cls}">${fnum(v)}</td>`).join('') + `<td class="fxn fxt ${cls}">${fhas(a) ? fnum(fsum(a)) : ''}</td>`;
 const fraw = v => v == null ? '' : String(Math.round(v * 100) / 100).replace('.', ',');
-const finInp = (lid, m, v, ph = '') => `<td class="fxn fxc"><input class="fin-in" data-l="${lid}" data-m="${m}" value="${fraw(v)}" placeholder="${ph}" autocomplete="off" spellcheck="false"></td>`;
+const finInp = (lid, m, v, ph = '') => `<td class="fxn fxc"><input class="fin-in" data-l="${lid}" data-m="${m}" value="${fnum(v)}"${v != null && Math.round(v) !== +v ? ` title="точно: ${fraw(v)} €"` : ''} placeholder="${ph}" autocomplete="off" spellcheck="false"></td>`;
 const fedit = (l, a) => a.map((v, i) => finInp(l.id, i + 1, v)).join('') + `<td class="fxn fxt">${fhas(a) ? fnum(fsum(a)) : ''}</td>`;
 function finRender() {
   const main = $('#main'); if (!main) return;
@@ -819,6 +833,7 @@ function finRender() {
     <div class="card fin-wrap"><table class="fin"><thead>${hdr}</thead><tbody>${body}</tbody></table></div>
     <div class="mute" style="margin-top:8px;font-size:12px">Работи като Excel: пиши направо в клетките, стрелките и Enter местят, Tab — надясно. Можеш да копираш цял блок от Excel и да го поставиш (Ctrl/⌘+V) — попълва се надолу и надясно. Записва се автоматично. Сивите числа идват от приложението. Цъкни върху име на перо, за да го преименуваш или изтриеш.</div>`;
   $('#fin-y').onchange = e => { FIN.y = +e.target.value; finView(); };
+  finDecorate();
   finBindGrid();
   if (FIN.focus) { const t = document.querySelector(`.fin-in[data-l="${FIN.focus.l}"][data-m="${FIN.focus.m}"]`); if (t) { t.focus(); t.select(); } }
 }
@@ -838,9 +853,19 @@ async function finSaveMany(list) {
 function finGrid() { const rows = []; document.querySelectorAll('table.fin tbody tr').forEach(tr => { const ins = [...tr.querySelectorAll('.fin-in')]; if (ins.length) rows.push(ins); }); return rows; }
 function finCellAt(rows, r, m) { if (r < 0 || r >= rows.length) return null; return rows[r].find(x => +x.dataset.m === m) || null; }
 function finPos(inp, rows) { const r = rows.findIndex(a => a.includes(inp)); return { r, m: +inp.dataset.m }; }
+function finDecorate() {
+  const t = document.querySelector('table.fin'); if (!t) return;
+  const now = new Date(), cm = FIN.y === now.getFullYear() ? now.getMonth() + 1 : 0;
+  [...t.rows].forEach(tr => {
+    const c = tr.cells; if (c.length < 14) return;
+    if (cm) c[cm].classList.add('fxcur');
+    for (let k = 1; k < c.length; k++) { const inp = c[k].querySelector('input'), txt = inp ? inp.value : c[k].textContent; if (/^\s*[−-]\d/.test(txt)) c[k].classList.add('fxneg'); else if (tr.classList.contains('fxp') && /\d/.test(txt)) c[k].classList.add('fxpos'); }
+  });
+}
 function finBindGrid() {
   const t = document.querySelector('table.fin'); if (!t || t.dataset.b) return; t.dataset.b = '1';
-  t.addEventListener('focusin', e => { const i = e.target.closest('.fin-in'); if (!i) return; FIN.focus = { l: i.dataset.l, m: i.dataset.m }; i.select(); });
+  t.addEventListener('focusin', e => { const i = e.target.closest('.fin-in'); if (!i) return; FIN.focus = { l: i.dataset.l, m: i.dataset.m }; i.value = fraw((FIN.vals[i.dataset.l] || {})[i.dataset.m]); i.select(); });
+  t.addEventListener('focusout', e => { const i = e.target.closest('.fin-in'); if (!i) return; const v = (FIN.vals[i.dataset.l] || {})[i.dataset.m]; if (i.value === fraw(v)) i.value = fnum(v); });
   t.addEventListener('change', async e => {
     const i = e.target.closest('.fin-in'); if (!i) return;
     const v = finParse(i.value); if (Number.isNaN(v)) { toast('Невалидно число'); i.value = fraw((FIN.vals[i.dataset.l] || {})[i.dataset.m]); return; }
