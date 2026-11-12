@@ -2044,7 +2044,7 @@ async function trainerDash() {
   loadMain();
   D.tab = 'due'; D.ploc = D.ploc || 'all';
   D.day = D.day || today(); D.filter = D.filter || 'all';
-  const dA = new Date(D.day + 'T00:00:00'), dB = new Date(dA.getTime() + 864e5), myLocs = S.me.row.locations || [];
+  const dA = new Date(D.day + 'T00:00:00'), dB = new Date(dA.getTime() + 864e5), myLocs = actLocs(S.me.row);
   const [bal, soon, actq] = await Promise.all([sb.rpc('my_debtors'), nextClients(), sb.from('activity').select('*').gte('at', dA.toISOString()).lt('at', dB.toISOString()).order('at', { ascending: false }).limit(300)]);
   const acts = (actq.data || []).filter(e => e.type !== 'paid' && e.location && myLocs.includes(e.location));
   if (bal.error) return fail(bal.error, 'Обобщението не се зареди (изпълнен ли е 06_finansi_samo_sobstvenik.sql?)');
@@ -2075,11 +2075,12 @@ async function loadCancelCard() {
     <div class="mute" style="margin:8px 0 4px">Най-често отказват</div>
     ${top.map(([id, n]) => `<div class="fe"><span>${esc(cname(id))}</span><span class="chip">${n}</span></div>`).join('') || '<div class="mute">Няма отказани часове.</div>'}`;
 }
+function actLocs(r) { const a = r && r.act_locations; return (Array.isArray(a) && a.length ? a : (r && r.locations) || []); }
 function actCardHtml(acts) {
   const FEEDS = { cancel: 'Отказан', change: 'Сменен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' }, dd = parse(D.day);
   const cnt = t => acts.filter(e => e.type === t).length, shown = acts.filter(e => D.filter === 'all' || e.type === D.filter);
   const chip = (v, l, extra = '') => `<button class="sm ${D.filter === v ? 'on' : ''}" data-act="afilter" data-v="${v}">${l}${extra}</button>`;
-  return `<div class="card" style="margin-bottom:12px"><h2>Дневна активност <span class="mute" style="font-weight:400">· ${esc((S.me.row.locations || []).join(', '))}</span></h2>
+  return `<div class="card" style="margin-bottom:12px"><h2>Дневна активност <span class="mute" style="font-weight:400">· ${esc(actLocs(S.me.row).join(', '))}</span></h2>
     <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
     <div class="chips">${chip('all', 'Всички', S.owner ? ` ${acts.length}` : '')}${chip('cancel', 'Отказани', S.owner ? ` ${cnt('cancel')}` : '')}${chip('change', 'Сменени', S.owner ? ` ${cnt('change')}` : '')}${chip('attended', 'Проведени', S.owner ? ` ${cnt('attended')}` : '')}${chip('new', 'Записани', S.owner ? ` ${cnt('new')}` : '')}${chip('activated', 'Нови профили', ` ${cnt('activated')}`)}</div>
     <div style="max-height:340px;overflow:auto">${shown.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден.</div>'}</div></div>`;
@@ -2385,7 +2386,9 @@ async function dashView() {
   svg += '</svg>';
   // дневна активност
   const FEEDS = { cancel: 'Отказан', change: 'Сменен', paid: 'Платен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' };
-  const acts = act.data || [], cnt = t => acts.filter(e => e.type === t).length;
+  D.aloc = D.aloc || 'all';
+  const acts = (act.data || []).filter(e => D.aloc === 'all' || e.location === D.aloc), cnt = t => acts.filter(e => e.type === t).length;
+  const alocBtns = `<div class="seg" style="margin-bottom:8px;flex-wrap:wrap">${['all', ...LOCS].map(l => { const who = l === 'all' ? '' : S.staff.filter(t => t.active !== false && t.role !== 'admin' && actLocs(t).includes(l)).map(t => t.name.split(' ')[0]).join(', '); return `<button class="${D.aloc === l ? 'on' : ''}" data-act="aloc" data-v="${esc(l)}">${l === 'all' ? 'Всички' : esc(l)}${who ? ` <span class="mute" style="font-weight:400">· ${esc(who)}</span>` : ''}</button>`; }).join('')}</div>`;
   const shownActs = acts.filter(e => D.filter === 'all' || e.type === D.filter);
   const dd = parse(D.day);
   // КПД
@@ -2394,6 +2397,7 @@ async function dashView() {
     <div class="kpis">${kpi('Приход', eur(cr.pay), 'този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
     <div class="cols">
       <div class="card"><h2>Дневна активност</h2>
+        ${alocBtns}
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
         <div class="chips">${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}${chip('afilter', 'activated', 'Нови профили', D.filter, ` ${cnt('activated')}`)}</div>
         <div style="max-height:340px;overflow:auto">${shownActs.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
@@ -3995,6 +3999,7 @@ document.addEventListener('click', async e => {
       case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
       case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); S.owner ? dashView() : trainerDash(); break;
       case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
+      case 'aloc': D.aloc = el.dataset.v; dashView(); break;
       case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; D.phm = D.phm || today().slice(0, 7); loadPayHist(); } if (D.tab === 'audit') { D.audit = null; loadAudit().then(redrawPay); } redrawPay(); break;
       case 'hcsv': { const rows = (D.phist || []).filter(p => payLoc() === 'all' || (S.clients.find(c => c.id === p.client_id) || {}).location === payLoc()); const t = ['Дата\tКлиент\tОбект\tСума\tНачин\tБележка'].concat(rows.map(p => [p.date, cname(p.client_id), (S.clients.find(c => c.id === p.client_id) || {}).location || '', String(p.amount).replace('.', ','), p.method || '', p.note || ''].join('\t'))).join('\n'); try { await navigator.clipboard.writeText(t); toast('Копирано, постави в Excel'); } catch (e) { modal.show(`<h2>Копирай ръчно</h2><textarea style="width:100%;height:200px">${esc(t)}</textarea>`); } break; }
       case 'vedit': {
