@@ -1744,8 +1744,14 @@ async function openClient(id, tab) {
 
     <div class="cpane" data-p="pkgs" ${T === 'pkgs' ? '' : 'hidden'}>
     <h3 style="margin-top:0">Назначи услуга</h3>
-    <div class="row"><select id="np-sel" style="flex:1;min-width:200px">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select>
+    <div class="row"><select id="np-sel" style="flex:1;min-width:200px" onchange="document.getElementById('np-combo').hidden=this.value!=='__combo'">${chosen.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}<option value="__combo">➕ Комбиниран: групови + персонални…</option></select>
       <input type="date" id="np-start" value="${today()}"><button data-act="cpadd">+ Добави пакет</button></div>
+    <div id="np-combo" ${chosen.length ? 'hidden' : ''} class="row" style="margin-top:8px;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <label class="f" style="width:110px">Групови<input id="npc-g" type="number" min="0" value="4"></label>
+      <label class="f" style="width:110px">Персонални<input id="npc-s" type="number" min="0" value="4"></label>
+      <label class="f" style="width:130px">Обща цена €<input id="npc-p" type="number" min="0" step="1" placeholder="напр. 300"></label>
+      <label class="f" style="width:130px">Валидност<select id="npc-m"><option value="1">1 месец</option><option value="2">2 месеца</option><option value="3">3 месеца</option></select></label>
+      <span class="mute" style="font-size:12px;flex-basis:100%">Създава два абонамента с еднакви дати: групов и персонален. Цената се разделя пропорционално на броя посещения.</span></div>
     ${disc ? `<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="np-bon" value="${disc.id}" checked> Приложи бонус <b>−10%</b> (${esc(BON_K[disc.kind])})</label>` : ''}
     <h3>Бонуси</h3>
     ${bons.map(b => `<div class="bk"><div class="nm"><b>${esc(BON_K[b.kind])}</b>${b.friend_id ? ' · ' + esc(cname(b.friend_id)) : ''} — ${b.reward ? esc(BON_R[b.reward]) : '<i>чака избор: 10% или масаж</i>'} <span class="chip ${BON_S[b.status][0]}">${BON_S[b.status][1]}</span> <span class="mute">${fmt(String(b.created_at).slice(0, 10))}</span></div>
@@ -1859,7 +1865,21 @@ async function saveClient() {
   /* нов имейл или току-що активиран клиент без профил → веднага получава имейла за активация */
   if (p.email && !cc.user_id && (p.email.trim().toLowerCase() !== prevEmail || (p.status === 'Active' && prevSt !== 'Active'))) sendInvite(p.email);
 }
+async function addCombo(start) {
+  const g = Math.max(0, +$('#npc-g').value || 0), so = Math.max(0, +$('#npc-s').value || 0), price = Math.max(0, +$('#npc-p').value || 0), m = +$('#npc-m').value || 1;
+  if (!g && !so) return toast('Въведи брой групови и/или персонални посещения.');
+  if (!$('#npc-p').value) return toast('Въведи обща цена.');
+  const end = ymd(addDays(addMonths(parse(start), m), -1)), pg = so ? Math.round(price * g / (g + so) * 100) / 100 : price;
+  const rows = [];
+  if (g) rows.push({ client_id: cid(), package_id: null, kind: 'group', start_date: start, end_date: end, total: g, price: pg, source: 'combo', auto_renew: false });
+  if (so) rows.push({ client_id: cid(), package_id: null, kind: 'solo', start_date: start, end_date: end, total: so, price: Math.round((price - (g ? pg : 0)) * 100) / 100, source: 'combo', auto_renew: false });
+  const { error } = await sb.from('client_packages').insert(rows);
+  if (error) return fail(error, 'Не се добави');
+  logEvent('change', `Комбиниран абонамент: ${cname(cid())} · ${g} групови + ${so} персонални · ${money(price)}`);
+  toast(`Добавен: ${g} групови + ${so} персонални · ${money(price)}`); afterClient();
+}
 async function addPackage() {
+  if ($('#np-sel').value === '__combo') { if ($('#np-start').value) await addCombo($('#np-start').value); return; }
   const p = S.packages.find(x => x.id === $('#np-sel').value), start = $('#np-start').value;
   if (!p || !start) return;
   const bon = $('#np-bon')?.checked ? +$('#np-bon').value : null, price = bon ? Math.round(p.price * 90) / 100 : p.price;
