@@ -1,0 +1,82 @@
+// One-off announcement email about the new NLT app.
+// POST body: { "mode": "test" }  -> only to the owner
+//            { "mode": "all" }   -> Active + Lead clients with a valid email, skipping anyone already in announce_log
+// Auth: x-cron-secret header must equal CRON_SECRET (same secret as activation-reminders).
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const CAMPAIGN = "app-intro-2026-11";
+const FROM = "New Level Training <gym@newleveltraining.bg>";
+const REPLY_TO = "gym@newleveltraining.bg";
+const SUBJECT = "Новото приложение на NLT – какво можеш да правиш в него";
+const OWNER = "axlrustem@gmail.com";
+const MAX_ALL = 200;
+
+const TEXT = `Здравей,
+
+Вече имаш достъп до новото приложение на New Level Training на app.newleveltraining.bg. Влизаш с имейла си и паролата си. Ако влизаш за първи път, натисни „Първо влизане или забравена парола“ и си задай парола.
+
+Какво можеш да правиш още сега:
+• Твоите тренировки – на началния екран виждаш предстоящите си часове и колко посещения са ти останали от абонамента.
+• Седмичен график – виждаш всички часове в твоя обект и колко свободни места има във всеки.
+• Записване и отписване – записваш се за час или се отписваш сам, без да пишеш на треньора. Можеш да добавиш тренировките си и в Google Calendar.
+• Абонамент и плащания – виждаш кога ти е бил начислен абонаментът и кога си платил.
+• Масаж – можеш да запазиш час в масажното ни студио в Лерин директно от приложението. Там ще прочетеш и как масажът помага за възстановяването, и отзиви от наши клиенти.
+• Прогрес – въвеждаш теглото си и следиш резултата на графика.
+
+Какво предстои:
+• По-добро проследяване при хранителните планове – ако имаш хранителен план, треньорът ти ще следи напредъка ти по-отблизо и ще може да коригира плана навреме.
+• Мобилно приложение NLTEAM – за iPhone и Android, с което ще имаш всичко на един клик.
+• Фитнес предизвикателства – ще можеш да се включваш в предизвикателства на клуба и да следиш резултатите си.
+
+Все още изпробваме новите функции. Ако забележиш проблем или нещо не излиза както трябва, например часове, посещения или плащания, пиши ни във Viber на 0895748765 и ще го оправим веднага.
+
+Със сила и здраве,
+NLTEAM`;
+
+function esc(s: string) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function html(t: string) {
+  const b = esc(t)
+    .replace("app.newleveltraining.bg", '<a href="https://app.newleveltraining.bg" style="color:#e30613;font-weight:bold">app.newleveltraining.bg</a>')
+    .replace(/^(Какво можеш да правиш още сега:|Какво предстои:)$/gm, "<b>$1</b>")
+    .replace(/^• ([^–]+) –/gm, "• <b>$1</b> –")
+    .replace(/\n/g, "<br>");
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#111;max-width:600px">${b}</div>`;
+}
+const okEmail = (e: string | null) => { const s = (e || "").trim(); return s.indexOf("@") > 0 && s.includes(".") && !/\s/.test(s); };
+
+Deno.serve(async (req) => {
+  if (req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET")) return new Response("forbidden", { status: 403 });
+  const { mode } = await req.json().catch(() => ({}));
+  const key = Deno.env.get("RESEND_API_KEY")!;
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const msg = (to: string) => ({ from: FROM, to: [to], reply_to: REPLY_TO, subject: SUBJECT, text: TEXT, html: html(TEXT) });
+
+  if (mode === "test") {
+    const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify(msg(OWNER)) });
+    return new Response(JSON.stringify({ test: r.status, body: await r.text() }), { headers: { "Content-Type": "application/json" } });
+  }
+  if (mode !== "all") return new Response("mode?", { status: 400 });
+
+  const { data: cl, error } = await sb.from("clients").select("id,email,status").in("status", ["Active", "Lead"]);
+  if (error) return new Response(error.message, { status: 500 });
+  const { data: done } = await sb.from("announce_log").select("client_id").eq("campaign", CAMPAIGN);
+  const sent = new Set((done || []).map((d: any) => d.client_id));
+  const seen = new Set<string>();
+  const list = (cl || []).filter((c: any) => {
+    if (!okEmail(c.email) || sent.has(c.id)) return false;
+    const e = c.email.trim().toLowerCase(); if (seen.has(e)) return false; seen.add(e); return true;
+  });
+  if (list.length > MAX_ALL) return new Response(`too many: ${list.length}`, { status: 400 });
+
+  let ok = 0; const errs: string[] = [];
+  for (let i = 0; i < list.length; i += 50) {
+    const chunk = list.slice(i, i + 50);
+    const r = await fetch("https://api.resend.com/emails/batch", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify(chunk.map((c: any) => msg(c.email.trim()))) });
+    if (!r.ok) { errs.push(`${r.status} ${await r.text()}`); continue; }
+    const j = await r.json(); const ids = (j.data || []).map((d: any) => d.id);
+    await sb.from("announce_log").insert(chunk.map((c: any, k: number) => ({ client_id: c.id, campaign: CAMPAIGN, resend_id: ids[k] || null })));
+    ok += chunk.length;
+    await new Promise((s) => setTimeout(s, 1200));
+  }
+  return new Response(JSON.stringify({ candidates: list.length, sent: ok, errors: errs }), { headers: { "Content-Type": "application/json" } });
+});
