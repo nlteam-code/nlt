@@ -3108,20 +3108,28 @@ function clientMassages() {
     ${massageOk(x) ? `<button class="c-btn outline sm" data-act="mcancelme" data-id="${x.id}">Откажи</button>` : `<span class="c-mute" style="font-size:12px">под 4 ч.</span>`}</div>`).join('')}</section>
     <div class="c-note">Отказ през приложението е възможен до 4 часа преди масажа.</div>`;
 }
-const MAS_BEN = [
-  ['Възстановяване', 'По-бързо възстановяване на мускулите след тренировка и по-малко мускулна треска.'],
-  ['Напрежение и болка', 'Отпуска схванати места: врат, рамене, кръст. Помага при заседнала работа.'],
-  ['Подвижност и стойка', 'По-свободни движения и по-добра стойка, което личи и на тренировка.'],
-  ['Сън и стрес', 'Успокоява нервната система: по-лесно заспиване и по-добро настроение.']
+const MAS_TH = [
+  ['💪', 'Дълбокотъканен масаж', 'Интензивна терапия за дълбоките мускулни слоеве. Подходящ за спортисти, активно трениращи и хора с хронично мускулно напрежение. Подобрява подвижността, намалява болката и ускорява възстановяването след натоварване.'],
+  ['🌿', 'Класически масаж', 'Нежна и отпускаща техника, която подобрява кръвообращението, освобождава ума от стреса и възстановява тонуса на тялото. Перфектен след натоварен ден или седмица.'],
+  ['🔥', 'Терапия с вендузи', 'Стимулира кръвообращението и лимфния поток, отпуска мускулите и облекчава болки в гърба, врата и раменете.']
+];
+const MAS_REV = [
+  ['Илиян Стефанов', 'професионален футболист, Левски', 'От 2018 година насам тренирам тук и това ми позволява да разгръщам целия си физически потенциал като атлет. Откакто тренирам тук, не съм имал никакви сериозни травми.'],
+  ['Мартин Луков', 'професионален футболист, Локомотив Пловдив', 'Започнах тренировките си тук след счупване на глезен. Екипът работи всекидневно с мен, помагайки ми да се възстановя и да се върна отново на терена здрав.'],
+  ['Таня Панева', 'клиент', 'Дойдох с намерението да отслабна 2-3 килограма. Отслабнах 15. Работя на компютър, но с помощта на екипа спечелих два сребърни медала на националното състезание по биатлон за ветерани.']
 ];
 function clientMassageTab() {
   return `<h2 class="c-title">Масаж</h2>
   <section class="c-card" style="padding:0;overflow:hidden"><img src="massage.jpg" alt="Масажното студио" style="display:block;width:100%;height:210px;object-fit:cover">
-    <div style="padding:16px 18px"><div class="c-k">Масажно студио · Лерин</div><div class="c-st" style="font-size:17px;margin-top:4px">Масаж за трениращи и не само</div>
-    <div class="c-note" style="margin-top:6px">Плащане на място. Отказ през приложението до 4 часа преди часа.</div></div></section>
-  <h3 class="c-h">Защо масаж</h3>
-  <section class="c-card c-list">${MAS_BEN.map(([h, d]) => `<div style="display:flex;gap:12px;align-items:flex-start;padding:4px 0"><span style="color:var(--c-coral);flex:none;margin-top:2px">${ic('check', 18)}</span><div><div class="c-st" style="font-size:15px">${h}</div><div class="c-ss" style="margin-top:2px">${d}</div></div></div>`).join('')}</section>
-  ${clientMassages()}`;
+    <div style="padding:16px 18px"><div class="c-k">Масажно студио · Лерин</div><div class="c-st" style="font-size:17px;margin-top:4px">Възстановяване. Релакс. Ново ниво на усещане.</div>
+    <div class="c-note" style="margin-top:6px">Всеки масаж се изпълнява с внимание, прецизност и индивидуален подход според нуждите ти. Плащане на място.</div>
+    <a href="https://www.google.com/maps/place/?q=place_id:${GPLACE['Лерин']}" target="_blank" rel="noopener" style="display:inline-flex;gap:6px;align-items:center;margin-top:10px;font:600 13px Roboto,sans-serif;color:var(--c-ink);text-decoration:none"><span style="color:#f5b301">★★★★★</span> 5.0 в Google · виж отзивите ›</a></div></section>
+  ${clientMassages()}
+  <h3 class="c-h">Нашите терапии</h3>
+  <section class="c-card c-list">${MAS_TH.map(([e, h, d]) => `<div style="display:flex;gap:12px;align-items:flex-start;padding:6px 0"><span style="font-size:20px;flex:none">${e}</span><div><div class="c-st" style="font-size:15px">${h}</div><div class="c-ss" style="margin-top:3px;line-height:1.45">${d}</div></div></div>`).join('')}
+  <div class="c-note" style="padding-top:6px">Терапиите могат да се комбинират за по-добър ефект.</div></section>
+  <h3 class="c-h">Какво казват клиентите ни</h3>
+  ${MAS_REV.map(([n, r, t]) => `<section class="c-card" style="margin-bottom:8px"><div style="font:400 14px/1.5 Roboto,sans-serif">„${t}“</div><div style="margin-top:8px;font:600 13px Roboto,sans-serif">${n} <span class="c-mute" style="font-weight:400">· ${r}</span></div></section>`).join('')}`;
 }
 async function clientMassageCancel(id) {
   if (S.previewClient) return toast('Само преглед — промените са изключени.');
