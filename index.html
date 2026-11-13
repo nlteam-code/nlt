@@ -290,16 +290,16 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-meter{flex:1;height:5px;border-radius:9px;background:var(--c-ringbg);overflow:hidden;max-width:90px}
 .c-meter i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--c-orange),var(--c-coral))}
 .c-done{display:inline-flex;align-items:center;gap:4px;color:#2ea064;font-weight:700;font-size:14px;white-space:nowrap}
-.c-wk{width:100%;border-collapse:separate;border-spacing:4px;table-layout:fixed;margin:0 -4px}
-.c-wk th{font:700 12px Roboto,sans-serif;color:var(--c-mute);padding:4px 0}
-.c-wk th.today{color:var(--c-coral)}
-.c-wk td.t{font:700 12px Roboto,sans-serif;color:var(--c-mute);width:42px;vertical-align:top;padding-top:8px}
-.c-wk td.cl{vertical-align:top;padding:0}
-.c-wk .wc{display:block;width:100%;text-align:left;border:1px solid var(--c-line);background:var(--c-card);border-radius:12px;padding:6px 6px;margin-bottom:4px;font:600 11px/1.25 Roboto,sans-serif;color:var(--c-ink);cursor:pointer;word-break:break-word}
-.c-wk .wc small{display:block;font-weight:500;color:var(--c-mute);margin-top:2px}
-.c-wk .wc.mine{border-color:var(--c-coral);background:rgba(235,76,81,.10)}
-.c-wk .wc.past{opacity:.45;cursor:default}
-.c-wk .wc.full small{color:var(--c-coral)}
+.c-wd{font:700 12px Roboto,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--c-coral);margin:16px 4px 6px}
+.c-wd.past{color:var(--c-mute)}
+.c-wr{display:flex;align-items:center;gap:12px;background:var(--c-card);border:1px solid var(--c-line);border-radius:16px;padding:10px 12px;margin-bottom:6px}
+.c-wr.mine{border-color:var(--c-coral);background:rgba(235,76,81,.08)}
+.c-wr.past{opacity:.45}
+.c-wr .t{font:800 16px Montserrat,sans-serif;width:52px;flex:none}
+.c-wr .n{flex:1;min-width:0;font:600 14px Roboto,sans-serif}
+.c-wr .n small{display:block;font-weight:500;font-size:12px;color:var(--c-mute);margin-top:2px}
+.c-wr .n small.bad{color:var(--c-coral)}
+.c-wr .ok{color:#3ba776;font:700 13px Roboto,sans-serif;display:flex;align-items:center;gap:4px}
 .c-empty{text-align:center;color:var(--c-mute);padding:40px 16px;background:var(--c-card);border:1px dashed var(--c-line);border-radius:26px}
 .c-pk-h{display:flex;justify-content:space-between;gap:10px;align-items:center}
 .c-pk-h b{font:700 16px Montserrat,sans-serif}
@@ -3034,19 +3034,18 @@ function cWeekHtml(me, t, hasGroup) {
   const sat = ymd(addDays(mon, 5));
   if (loc === 'Лерин' && L.some(x => x.date === sat && isPilates(x))) days.push(sat);
   const shown = L.filter(x => days.includes(x.date) && (x.date !== sat || isPilates(x)));
-  const times = [...new Set(shown.map(x => hm(x.start_time)))].sort();
-  const now = new Date();
-  const cell = x => {
+  const now = new Date(), wk = `${fmt(from)} – ${fmt(days[days.length - 1])}`;
+  const row = x => {
     const past = new Date(`${x.date}T${hm(x.start_time)}:00`) <= now, m = mine.has(x.id), full = x.free === 0, can = C.classes.some(c => c.id === x.id);
-    const sub = m ? '✓ записан' : past ? '' : full ? 'пълен' : x.free != null ? `${x.free} св.` : '';
-    return `<button class="wc ${m ? 'mine' : ''} ${past ? 'past' : ''} ${full && !m ? 'full' : ''}" ${past || m || full || !hasGroup || !can ? 'disabled' : `data-act="cask" data-id="${x.id}"`}>${esc(x.title || 'Група')}${sub ? `<small>${sub}</small>` : ''}</button>`;
+    const sub = m ? 'записан си' : past ? 'минал' : full ? 'пълен' : x.free != null ? `${x.free} свободни` : '';
+    const right = m ? `<span class="ok">${ic('check', 16)}Записан</span>` : past ? '' : `<button class="c-btn solid sm" ${full || !hasGroup || !can ? 'disabled' : `data-act="cask" data-id="${x.id}"`}>${full ? 'Пълен' : 'Запиши'}</button>`;
+    return `<div class="c-wr ${m ? 'mine' : ''} ${past ? 'past' : ''}"><span class="t">${hm(x.start_time)}</span><span class="n">${esc(x.title || 'Групова тренировка')}${sub ? `<small class="${full && !m && !past ? 'bad' : ''}">${sub}</small>` : ''}</span>${right}</div>`;
   };
-  const wk = `${fmt(from)} – ${fmt(days[days.length - 1])}`;
-  return head + `<div style="display:flex;align-items:center;gap:8px;margin:0 0 6px"><button class="c-btn outline sm" data-act="cwk" data-d="-1" ${C.wkOff > 0 ? '' : 'disabled'}>‹</button><b style="flex:1;text-align:center;font:700 14px Roboto,sans-serif">${esc(loc)} · ${wk}</b><button class="c-btn outline sm" data-act="cwk" data-d="1" ${(C.wkOff || 0) < 3 ? '' : 'disabled'}>›</button></div>
-  ${hasGroup ? '' : '<div class="c-note" style="margin-bottom:6px">За записване е нужен активен групов абонамент.</div>'}
-  ${times.length ? `<table class="c-wk"><thead><tr><th style="width:42px"></th>${days.map(d => { const dt = parse(d); return `<th class="${d === t ? 'today' : ''}">${WD[dt.getDay()]} ${dt.getDate()}</th>`; }).join('')}</tr></thead><tbody>
-  ${times.map(tm => `<tr><td class="t">${tm}</td>${days.map(d => `<td class="cl">${shown.filter(x => x.date === d && hm(x.start_time) === tm).map(cell).join('')}</td>`).join('')}</tr>`).join('')}</tbody></table>
-  <div class="c-note" style="margin-top:8px">Натисни час, за да се запишеш.</div>` : '<div class="c-empty">Няма групови часове тази седмица.</div>'}`;
+  const DN = ['Неделя', 'Понеделник', 'Вторник', 'Сряда', 'Четвъртък', 'Петък', 'Събота'];
+  const body = days.map(d => { const L2 = shown.filter(x => x.date === d).sort((a, b) => a.start_time.localeCompare(b.start_time)); if (!L2.length) return ''; const dt = parse(d); return `<div class="c-wd ${d < t ? 'past' : ''}">${DN[dt.getDay()]} ${dt.getDate()}${d === t ? ' · днес' : ''}</div>${L2.map(row).join('')}`; }).join('');
+  return head + `<div style="display:flex;align-items:center;gap:8px;margin:0 0 4px"><button class="c-btn outline sm" data-act="cwk" data-d="-1" ${C.wkOff > 0 ? '' : 'disabled'}>‹</button><b style="flex:1;text-align:center;font:700 14px Roboto,sans-serif">${esc(loc)} · ${wk}</b><button class="c-btn outline sm" data-act="cwk" data-d="1" ${(C.wkOff || 0) < 3 ? '' : 'disabled'}>›</button></div>
+  ${hasGroup ? '' : '<div class="c-note" style="margin:6px 0">За записване е нужен активен групов абонамент.</div>'}
+  ${body || '<div class="c-empty">Няма групови часове тази седмица.</div>'}`;
 }
 
 /* запис на масаж от приложението (Edge Function → SimplyBook) */
