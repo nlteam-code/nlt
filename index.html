@@ -75,6 +75,31 @@ tr.click:hover{background:var(--bg)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
 label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mute)}
 label.f input,label.f select{color:var(--ink)}
+.vx-ks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.vx-k{background:var(--card2,rgba(127,127,127,.08));border-radius:12px;padding:10px 12px}
+.vx-k b{display:block;font-size:18px;line-height:1.2}
+.vx-k span{font-size:12px;color:var(--mute)}
+.vx-l{border:1px solid var(--line);border-radius:14px;padding:2px 10px}
+.vx-r{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.vx-r:last-child{border-bottom:0}
+.vx-r.dim{opacity:.62}
+.vx-d{width:42px;flex:none;text-align:center;border-radius:10px;padding:4px 0;background:rgba(127,127,127,.1)}
+.vx-d.hot{background:rgba(235,76,81,.15);color:#eb4c51}
+.vx-d b{display:block;font-size:16px;line-height:1.1}
+.vx-d span{font-size:11px;text-transform:uppercase;color:var(--mute)}
+.vx-m{flex:1;min-width:0}
+.vx-t{font-weight:600}
+.vx-s{font-size:12px;color:var(--mute);margin-top:2px}
+.vx-s .chip{font-size:11px;padding:1px 6px}
+.vx-a{display:flex;gap:4px;flex:none}
+.vx-a .sm{padding:3px 8px}
+.vx-b{display:inline-block;font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px;margin-left:4px;vertical-align:1px;background:rgba(127,127,127,.14)}
+.vx-b.ok{background:rgba(59,167,118,.16);color:#2f9a68}
+.vx-b.bad{background:rgba(235,76,81,.16);color:#d8434a}
+.vx-b.warn{background:rgba(240,160,40,.18);color:#b8770e}
+.vx-mh{display:flex;justify-content:space-between;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);padding:10px 0 4px;border-bottom:1px solid var(--line)}
+.vx-mh span{text-transform:none;letter-spacing:0;font-weight:500}
+@media(max-width:640px){.vx-ks{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .bk{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .bk .nm{flex:1;min-width:140px}
 .seg button{border-radius:0;padding:3px 8px;font-size:12px}
@@ -1703,7 +1728,7 @@ async function openClient(id, tab) {
     sb.from('package_status').select('*').eq('client_id', id).order('end_date', { ascending: false }),
     S.owner ? sb.from('payments').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     S.owner ? sb.from('charges').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
-    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').order('date', { foreignTable: 'sessions' }).limit(30),
+    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').limit(400),
     sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).lt('sessions.date', today()).order('date', { foreignTable: 'sessions', ascending: false }).limit(500),
     sb.from('hist_visits').select('id,date,time,title,location,status').eq('client_id', id).order('date', { ascending: false }).limit(1000),
     S.owner ? sb.from('hist_money').select('date,amount,method,category,note').eq('client_id', id).order('date', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
@@ -1727,7 +1752,7 @@ async function openClient(id, tab) {
   const pstate = p => p.end_date < t0 || p.used >= p.total ? '<span class="chip">Изтекъл</span>' : p.start_date > t0 ? '<span class="chip warn">Предстоящ</span>' : '<span class="chip" style="color:var(--ok)">Активен</span>';
   const vpk = (d, kind) => { const c = pk.filter(q => q.start_date <= d && q.end_date >= d && (!kind || q.kind === kind)).sort((a, b) => a.start_date.localeCompare(b.start_date))[0]; return c ? `<span class="chip" title="Към кой абонамент се брои">${esc(c.package_name || 'Абонамент')} · ${fmt(c.start_date)}–${fmt(c.end_date)}${S.owner && c.price ? ' · ' + eur(c.price) : ''}</span>` : '<span class="chip warn">извън абонамент</span>'; };
   const ledger = [...pays.map(p => ({ d: p.date, plus: true, a: p.amount, t: `${esc(p.method || '')} ${esc(p.note || '')}`, id: p.id, act: 'paydel' })), ...chs.map(p => ({ d: p.date, plus: false, a: p.amount, t: esc(p.note || 'Такса'), id: p.id, act: 'chdel' }))].sort((a, b) => String(b.d).localeCompare(String(a.d)));
-  D.ecl = { id: x.id, pk, pays, chs, past, arch }; const T = tab || 'profile';
+  D.ecl = { id: x.id, pk, pays, chs, past: past.concat(upcoming), arch }; const T = tab || 'profile';
   const tabs = [['profile', 'Профил'], ['pkgs', `Абонаменти · ${pk.length}`], ['visits', `Посещения · ${nDone}`], ['prog', 'Прогрес'], ['nutr', 'Хранене']].concat([['pays', 'Плащания']]).concat(S.owner ? [['audit', '🕓 Дневник']] : []);
   modal.show(`<div id="cl" data-cid="${x.id}" data-uid="${x.user_id || ''}">
     <h2>${esc(x.name)}</h2>
@@ -1777,12 +1802,31 @@ async function openClient(id, tab) {
     ${subHistory(pk, [...past.filter(b => b.status === 'done').map(b => ({ date: b.sessions.date, kind: b.sessions.kind })), ...arch.filter(h => !h.bad).map(h => ({ date: h.date }))], S.owner ? { pays, chs } : null, true)}
     </div>
 
-    <div class="cpane" data-p="visits" ${T === 'visits' ? '' : 'hidden'}>
-    <div class="mute" style="margin-bottom:6px">Проведени ${nDone} · Отказани ${nCan + arch.filter(h => h.bad).length}${nLate ? ` (късни ${nLate})` : ''}${arch.length ? ` · включени ${arch.length} от PT Minder (от май 2026)` : ''}</div>
-    <h3>Предстоящи</h3>
-    ${upcoming.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])}${b.sessions.location !== S.loc ? ' · ' + esc(b.sessions.location) : ''}</div></div>`).join('') || '<div class="mute">Няма.</div>'}
-    <h3>История</h3>
-    <div style="max-height:320px;overflow:auto">${arch.map(h => `<div class="bk"><div class="nm">${fmt(h.date)} ${esc(h.t)} · ${esc(h.title || '')} <span class="mute">${esc(h.location || '')}</span> ${h.bad ? '<span class="chip">Отказан</span>' : '<span class="chip" style="color:var(--ok)">Проведен</span>'} <span class="chip">PT Minder</span> ${h.bad ? '' : vpk(h.date)}</div><button class="sm" data-act="vedit" data-k="h" data-id="${h.id}">Коригирай</button> <button class="sm danger" data-act="vdel" data-k="h" data-id="${h.id}" title="Изтрий посещението">✕</button></div>`).join('')}${past.map(b => `<div class="bk"><div class="nm">${fmt(b.sessions.date)} ${hm(b.sessions.start_time)} · ${esc(b.sessions.title || KIND[b.sessions.kind])} <span class="mute">${esc(b.sessions.location)}${tn(b.sessions.trainer_id) ? ' · ' + esc(tn(b.sessions.trainer_id)) : ''}</span> ${st(b)}${b.use_plan ? (b.status === 'cancelled' && !b.late ? '' : vpk(b.sessions.date, b.sessions.kind)) : ' <span class="chip warn">еднократно</span>'}</div><button class="sm" data-act="vedit" data-k="b" data-id="${b.id}">Коригирай</button> <button class="sm danger" data-act="vdel" data-k="b" data-id="${b.id}" title="Изтрий посещението">✕</button></div>`).join('') || '<div class="mute">Още няма записани посещения.</div>'}</div>
+    <div class="cpane" data-p="visits" ${T === 'visits' ? '' : 'hidden'}>${(() => {
+      const MON = ['януари', 'февруари', 'март', 'април', 'май', 'юни', 'юли', 'август', 'септември', 'октомври', 'ноември', 'декември'];
+      const WDS = ['нд', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+      const now = new Date();
+      const up = upcoming.filter(b => new Date(b.sessions.date + 'T' + hm(b.sessions.start_time) + ':00') > now || b.status === 'booked' && b.sessions.date === t0);
+      const todayDone = upcoming.filter(b => !up.includes(b));
+      const rows = [
+        ...arch.map(h => ({ d: h.date, t: (h.t || '').slice(0, 5), title: h.title || '', loc: h.location || '', tr: '', s: h.bad ? 'can' : 'done', src: 'PT Minder', k: 'h', id: h.id, plan: true })),
+        ...past.concat(todayDone).map(b => ({ d: b.sessions.date, t: hm(b.sessions.start_time), title: b.sessions.title || KIND[b.sessions.kind], loc: b.sessions.location, tr: tn(b.sessions.trainer_id), s: b.status === 'done' ? 'done' : b.status === 'cancelled' ? (b.late ? 'late' : 'can') : 'open', k: 'b', id: b.id, plan: b.use_plan, kind: b.sessions.kind }))
+      ].sort((x1, x2) => (x2.d + x2.t).localeCompare(x1.d + x1.t));
+      const last = rows.find(r => r.s === 'done'), next = up[0];
+      const SB = { done: ['Проведено', 'ok'], can: ['Отказано', 'mu'], late: ['Късен отказ', 'bad'], open: ['Не е отбелязано', 'warn'] };
+      const dateBox = (d, hot) => { const dt = parse(d); return `<div class="vx-d${hot ? ' hot' : ''}"><b>${dt.getDate()}</b><span>${WDS[dt.getDay()]}</span></div>`; };
+      const rel = d => d === t0 ? 'днес' : d === ymd(addDays(parse(t0), 1)) ? 'утре' : '';
+      const upHtml = up.length ? up.slice(0, 12).map(b => { const s2 = b.sessions, r2 = rel(s2.date); return `<div class="vx-r">${dateBox(s2.date, !!r2)}<div class="vx-m"><div class="vx-t">${hm(s2.start_time)} · ${esc(s2.title || KIND[s2.kind])}${r2 ? ` <span class="vx-b ok">${r2}</span>` : ''}</div><div class="vx-s">${esc(MON[parse(s2.date).getMonth()])} · ${esc(s2.location || '')}${tn(s2.trainer_id) ? ' · ' + esc(tn(s2.trainer_id)) : ''}</div></div></div>`; }).join('') + (up.length > 12 ? `<div class="mute" style="padding:6px 2px">+ още ${up.length - 12} записани часа</div>` : '') : '<div class="mute" style="padding:8px 2px">Няма записани предстоящи часове.</div>';
+      let curM = '', hist = '';
+      rows.forEach(r => { const m = r.d.slice(0, 7); if (m !== curM) { curM = m; const n = rows.filter(z => z.d.slice(0, 7) === m && z.s === 'done').length; const dt = parse(r.d); hist += `<div class="vx-mh">${MON[dt.getMonth()]} ${dt.getFullYear()} <span>${n} ${n === 1 ? 'посещение' : 'посещения'}</span></div>`; }
+        const [lb, cl] = SB[r.s];
+        hist += `<div class="vx-r ${r.s !== 'done' ? 'dim' : ''}">${dateBox(r.d)}<div class="vx-m"><div class="vx-t">${esc(r.t)} · ${esc(r.title)} <span class="vx-b ${cl}">${lb}</span>${r.src ? ` <span class="vx-b mu">${r.src}</span>` : ''}${r.plan ? '' : ' <span class="vx-b warn">еднократно</span>'}</div><div class="vx-s">${esc(r.loc)}${r.tr ? ' · ' + esc(r.tr) : ''}${r.s === 'done' || r.s === 'late' ? ' · ' + vpk(r.d, r.kind) : ''}</div></div><div class="vx-a"><button class="sm" data-act="vedit" data-k="${r.k}" data-id="${r.id}" title="Коригирай">✎</button><button class="sm danger" data-act="vdel" data-k="${r.k}" data-id="${r.id}" title="Изтрий посещението">✕</button></div></div>`; });
+      const kp = (v, l) => `<div class="vx-k"><b>${v}</b><span>${l}</span></div>`;
+      return `<div class="vx-ks">${kp(nDone, 'проведени')}${kp(nCan + arch.filter(h => h.bad).length, 'отказани' + (nLate ? ` · ${nLate} късни` : ''))}${kp(up.length, 'предстоящи')}${kp(last ? fmt(last.d).slice(0, 5) : '–', 'последно')}${kp(next ? fmt(next.sessions.date).slice(0, 5) + ' ' + hm(next.sessions.start_time) : '–', 'следващо')}</div>
+      <h3 style="margin:14px 0 6px">Предстоящи</h3><div class="vx-l">${upHtml}</div>
+      <h3 style="margin:16px 0 6px">История</h3><div class="vx-l" style="max-height:420px;overflow:auto">${hist || '<div class="mute" style="padding:8px 2px">Още няма посещения.</div>'}</div>
+      ${arch.length ? `<div class="mute" style="font-size:12px;margin-top:6px">Включени ${arch.length} посещения от PT Minder (от май 2026).</div>` : ''}`;
+    })()}
     </div>
 
     <div class="cpane staffpg" data-p="prog" ${T === 'prog' ? '' : 'hidden'}><div class="pg" id="pg-staff"></div></div>
@@ -4138,7 +4182,7 @@ document.addEventListener('click', async e => {
         modal.close(); logEvent('change', `Коригирано посещение: ${cname(E.id)}`);
         S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(E.id, 'visits'); toast('Запазено — абонаментът е преизчислен.'); break; }
       case 'vdel': {
-        const E = D.ecl; if (!E) break; const isH = el.dataset.k === 'h', id = el.dataset.id, row = el.closest('.bk'), label = row ? row.querySelector('.nm').innerText.replace(/\s+/g, ' ').slice(0, 90) : '';
+        const E = D.ecl; if (!E) break; const isH = el.dataset.k === 'h', id = el.dataset.id, row = el.closest('.vx-r') || el.closest('.bk'), label = row ? (row.querySelector('.vx-m') || row.querySelector('.nm')).innerText.replace(/\s+/g, ' ').slice(0, 90) : '';
         if (!confirm(`Изтриване на посещението?\n${label}\n\nТекущият абонамент ще се върне с 1 посещение назад.`)) break;
         let r;
         if (isH) r = await sb.from('hist_visits').delete().eq('id', id);
