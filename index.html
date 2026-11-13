@@ -303,6 +303,7 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-rv{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 20px 12px;margin:0 -20px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .c-rv::-webkit-scrollbar{display:none}
 .c-rvc{flex:0 0 82%;scroll-snap-align:center;background:var(--c-card);border:1px solid var(--c-line);border-radius:22px;padding:16px;box-shadow:var(--c-shadow)}
+.c-rvp{height:200px;margin:-16px -16px 14px;border-radius:22px 22px 0 0;background-size:cover;background-position:center 25%}
 .c-rvi{width:52px;height:52px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(235,76,81,.14);color:var(--c-coral);font:800 17px Montserrat,sans-serif}
 .c-rvc img{width:52px;height:52px;border-radius:50%;object-fit:cover;flex:none;background:var(--c-line)}
 .c-empty{text-align:center;color:var(--c-mute);padding:40px 16px;background:var(--c-card);border:1px dashed var(--c-line);border-radius:26px}
@@ -3120,16 +3121,16 @@ const MAS_TH = [
 ];
 const MAS_IMG = 'https://newleveltraining.bg/wp-content/uploads/';
 const MAS_REV = [
-  ['Joel Zwarts', 'спортист', '', 'Болката в адукторите ми изчезна.'],
-  ['Александър Стефанов', 'спортист', '', 'Масажът след състезание ускори възстановяването ми значително.'],
-  ['Боян Начев', 'клиент', '', 'Напрежението в рамото намаля значително и мускулите се отпуснаха.'],
-  ['Diallo Mamadou', 'спортист', '', 'Вратът ми е много по-подвижен и без напрежение.'],
+  ['Joel Zwarts', 'спортист', 'rv/zwarts.jpg', 'Болката в адукторите ми изчезна.'],
+  ['Александър Стефанов', 'спортист', 'rv/stefanov.jpg', 'Масажът след състезание ускори възстановяването ми значително.'],
+  ['Боян Начев', 'клиент', 'rv/nachev.jpg', 'Напрежението в рамото намаля значително и мускулите се отпуснаха.'],
+  ['Diallo Mamadou', 'спортист', 'rv/diallo.jpg', 'Вратът ми е много по-подвижен и без напрежение.'],
   ['Виктор К.', 'клиент', '', 'След масажа усещам гърба си значително по-лек и раздвижен.'],
-  ['Борис Патарински', 'клиент', '', 'След масажа сънят ми се подобри осезаемо. Отдавна не бях спал толкова добре.'],
-  ['Петър Андреев', 'клиент', '', 'Напрежението в цялото тяло изчезна. Тръгнах си с напълно различно усещане за движение.'],
-  ['Mohammed Brahimi', 'спортист', '', 'Чувствам се значително по-добре след терапията.'],
-  ['Станислав Иванов', 'клиент', '', 'Посетихме студиото двамата и останахме изключително доволни от резултата.'],
-  ['Йорданка Папалезова', 'клиент', '', 'След масажа се чувствам отлично. Тялото ми е отпуснато и леко.']
+  ['Борис Патарински', 'клиент', 'rv/patarinski.jpg', 'След масажа сънят ми се подобри осезаемо. Отдавна не бях спал толкова добре.'],
+  ['Петър Андреев', 'клиент', 'rv/andreev.jpg', 'Напрежението в цялото тяло изчезна. Тръгнах си с напълно различно усещане за движение.'],
+  ['Mohammed Brahimi', 'спортист', 'rv/brahimi.jpg', 'Чувствам се значително по-добре след терапията.'],
+  ['Станислав Иванов', 'клиент', 'rv/ivanov.jpg', 'Посетихме студиото двамата и останахме изключително доволни от резултата.'],
+  ['Йорданка Папалезова', 'клиент', 'rv/papalezova.jpg', 'След масажа се чувствам отлично. Тялото ми е отпуснато и леко.']
 ];
 function clientMassageTab() {
   return `<h2 class="c-title">Масаж</h2>
@@ -3142,7 +3143,7 @@ function clientMassageTab() {
   <section class="c-card c-list">${MAS_TH.map(([e, h, d]) => `<div style="display:flex;gap:12px;align-items:flex-start;padding:6px 0"><span style="font-size:20px;flex:none">${e}</span><div><div class="c-st" style="font-size:15px">${h}</div><div class="c-ss" style="margin-top:3px;line-height:1.45">${d}</div></div></div>`).join('')}
   <div class="c-note" style="padding-top:6px">Терапиите могат да се комбинират за по-добър ефект.</div></section>
   <h3 class="c-h">Какво казват клиентите ни <span class="c-mute" style="font-weight:500;text-transform:none;letter-spacing:0">· плъзни ›</span></h3>
-  <div class="c-rv">${MAS_REV.map(([n, r, img, t]) => `<section class="c-rvc"><div style="display:flex;gap:12px;align-items:center">${img ? `<img src="${img.startsWith('http') || img.startsWith('rv/') ? img : MAS_IMG + encodeURIComponent(img)}" alt="" loading="lazy">` : `<span class="c-rvi">${esc(n.split(' ').map(w => w[0]).slice(0, 2).join(''))}</span>`}<div><div style="font:700 14px Roboto,sans-serif">${n}</div><div class="c-mute" style="font-size:12px">${r}</div></div></div><div style="font:400 14px/1.45 Roboto,sans-serif;margin-top:10px">„${t}“</div><div style="color:#f5b301;font-size:13px;margin-top:6px">★★★★★</div></section>`).join('')}</div>`;
+  <div class="c-rv">${MAS_REV.map(([n, r, img, t]) => `<section class="c-rvc">${img ? `<div class="c-rvp" style="background-image:url('${img}')"></div>` : ''}<div style="display:flex;gap:12px;align-items:center">${img ? '' : `<span class="c-rvi">${esc(n.split(' ').map(w => w[0]).slice(0, 2).join(''))}</span>`}<div><div style="font:700 14px Roboto,sans-serif">${n}</div><div class="c-mute" style="font-size:12px">${r}</div></div></div><div style="font:400 14px/1.45 Roboto,sans-serif;margin-top:10px">„${t}“</div><div style="color:#f5b301;font-size:13px;margin-top:6px">★★★★★</div></section>`).join('')}</div>`;
 }
 async function clientMassageCancel(id) {
   if (S.previewClient) return toast('Само преглед — промените са изключени.');
