@@ -703,6 +703,7 @@ async function staffApp() {
     if ((ren || ch) && S.tab === 'week' && $('#grid') && !document.querySelector('.modal.on, dialog[open]')) weekView();
   });
 }
+const DEMO_CLIENT = '79e3ca5f-7d33-4859-afef-74671ebd389c'; // ПРОБЕН ПРОБЕН — служителите могат да видят приложението през него
 function renderStaff() {
   document.body.classList.remove('cm');
   const admin = S.me.row.role === 'admin';
@@ -713,9 +714,13 @@ function renderStaff() {
       ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Задачи'], ['rewards', 'Награди']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['reports', 'Отчети'], ['fin', 'Финанси']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <span class="seg" id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<button class="${l === S.loc ? 'on' : ''}" data-act="hloc" data-l="${esc(l)}">${esc(l)}</button>`).join('')}</span>
-    ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<span class="mute">${esc(S.me.row.name)}</span>`}<button class="sm" data-act="mypw" title="Смени своята парола">Парола</button><button class="sm" data-act="logout">Изход</button></div>
+    ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<select id="tsel" title="Виж приложението като клиент"><option value="">${esc(S.me.row.name)}</option><option value="${DEMO_CLIENT}">Като клиент: Пробен Пробен</option></select>`}<button class="sm" data-act="mypw" title="Смени своята парола">Парола</button><button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
   <div class="wrap" id="main"></div>`;
+  const ts = $('#tsel'); if (ts) ts.onchange = async e => {
+    const id = e.target.value; e.target.value = ''; if (!id) return; let c = S.clients.find(x => x.id === id); if (!c) { const r = await sb.from('clients').select('*').eq('id', id).maybeSingle(); c = r.data; } if (!c) return toast('Пробният клиент не е достъпен.');
+    S.previewClient = c; S.me = { role: 'client', row: c }; C.tab = 'home'; await clientApp();
+  };
   const as = $('#asel'); if (as) as.onchange = e => {
     if (e.target.value === '__client') { e.target.value = S.view?.id || ''; return pickClientPreview(); }
     const t = S.staff.find(x => x.id === e.target.value);
