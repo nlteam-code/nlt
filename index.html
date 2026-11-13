@@ -2841,6 +2841,7 @@ async function consentSign() {
 const LOGO_URL = 'https://newleveltraining.bg/wp-content/uploads/nltlogo-new.png';
 const logoHtml = h => `<img class="c-logoimg" src="${LOGO_URL}" alt="NLT Personal Training Club" style="height:${h}px" onerror="this.outerHTML='<span class=&quot;c-logo&quot;>NLT</span>'">`;
 const ICO = {
+  spa: '<path d="M12 20c-4.5 0-8-3-8-7 2.5 0 5 1 6.5 3"/><path d="M12 20c4.5 0 8-3 8-7-2.5 0-5 1-6.5 3"/><path d="M12 20c-2-2.5-3-5-3-8 0-2.5 1.2-5 3-7 1.8 2 3 4.5 3 7 0 3-1 5.5-3 8z"/>',
   home: '<path d="M3.5 11 12 3.8 20.5 11"/><path d="M5.5 9.6V20h13V9.6"/><path d="M10 20v-5.5h4V20"/>',
   tag: '<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.3 6.3a1.4 1.4 0 0 1-2 0z"/><circle cx="8" cy="8" r="1.6"/>',
   plus: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
@@ -2942,7 +2943,7 @@ async function bonusReviewClaim() {
 function massageCard(t) {
   const m = (C.massages || []).filter(x => x.status === 'booked' && x.date >= t)[0];
   if (!m) return '';
-  return `<section class="c-card" data-act="cnav" data-t="mine" style="cursor:pointer"><div class="c-k">Масаж · Лерин</div>
+  return `<section class="c-card" data-act="cnav" data-t="mas" style="cursor:pointer"><div class="c-k">Масаж · Лерин</div>
     <div style="display:flex;gap:14px;align-items:center"><div class="c-ct" style="font-size:24px;font-weight:700">${hm(m.start_time)}</div><div><div class="c-st">${esc(m.service)}</div><div class="c-ss">${esc(dayWord(m.date, t))} · плащане на място</div></div></div></section>`;
 }
 function cBalance() {
@@ -2984,7 +2985,8 @@ function clientHome(me, t, act) {
   ${rewardCard()}
   ${massageCard(t)}
   ${weightCard()}
-  ${C.bookings.length > 1 ? `<h3 class="c-h">Предстоящи</h3><section class="c-card c-list">${C.bookings.slice(1, 4).map(b => cSession(b, t)).join('')}${C.bookings.length > 4 ? `<button class="c-more" data-act="cnav" data-t="mine">Всички (${C.bookings.length})</button>` : ''}</section>` : ''}`;
+  ${C.bookings.length > 1 ? `<h3 class="c-h">Предстоящи тренировки</h3><section class="c-card c-list">${C.bookings.slice(1).map(b => cSession(b, t)).join('')}</section>` : ''}
+  ${C.bookings.length ? `<button class="c-btn outline wide" data-act="gsub" style="margin-top:4px">${ic('calplus', 18)}Тренировките ми в Google Календар</button>` : ''}`;
 }
 function clientBookTab(me, t, act) {
   const days = []; for (let i = 0; i < 14; i++) days.push(ymd(addDays(parse(t), i)));
@@ -3105,6 +3107,21 @@ function clientMassages() {
   return `<h3 class="c-h">Масажи · само обект Лерин</h3>${book}<section class="c-card c-list">${m.map(x => `<div class="c-class"><div class="c-ct">${hm(x.start_time)}</div><div class="c-cinfo"><div class="c-st">${esc(x.service)}</div><div class="c-ss">${fmt(x.date)} · Лерин · плащане на място</div></div>
     ${massageOk(x) ? `<button class="c-btn outline sm" data-act="mcancelme" data-id="${x.id}">Откажи</button>` : `<span class="c-mute" style="font-size:12px">под 4 ч.</span>`}</div>`).join('')}</section>
     <div class="c-note">Отказ през приложението е възможен до 4 часа преди масажа.</div>`;
+}
+const MAS_BEN = [
+  ['Възстановяване', 'По-бързо възстановяване на мускулите след тренировка и по-малко мускулна треска.'],
+  ['Напрежение и болка', 'Отпуска схванати места: врат, рамене, кръст. Помага при заседнала работа.'],
+  ['Подвижност и стойка', 'По-свободни движения и по-добра стойка, което личи и на тренировка.'],
+  ['Сън и стрес', 'Успокоява нервната система: по-лесно заспиване и по-добро настроение.']
+];
+function clientMassageTab() {
+  return `<h2 class="c-title">Масаж</h2>
+  <section class="c-card" style="padding:0;overflow:hidden"><img src="massage.jpg" alt="Масажното студио" style="display:block;width:100%;height:210px;object-fit:cover">
+    <div style="padding:16px 18px"><div class="c-k">Масажно студио · Лерин</div><div class="c-st" style="font-size:17px;margin-top:4px">Масаж за трениращи и не само</div>
+    <div class="c-note" style="margin-top:6px">Плащане на място. Отказ през приложението до 4 часа преди часа.</div></div></section>
+  <h3 class="c-h">Защо масаж</h3>
+  <section class="c-card c-list">${MAS_BEN.map(([h, d]) => `<div style="display:flex;gap:12px;align-items:flex-start;padding:4px 0"><span style="color:var(--c-coral);flex:none;margin-top:2px">${ic('check', 18)}</span><div><div class="c-st" style="font-size:15px">${h}</div><div class="c-ss" style="margin-top:2px">${d}</div></div></div>`).join('')}</section>
+  ${clientMassages()}`;
 }
 async function clientMassageCancel(id) {
   if (S.previewClient) return toast('Само преглед — промените са изключени.');
@@ -3290,8 +3307,8 @@ function clientNutr() {
 function renderClient() {
   closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
-  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? `<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>` : C.tab === 'svc' ? clientServices() : C.tab === 'nutr' ? clientNutr() : clientHome(me, t, act);
-  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mine', 'cal', 'Часове'], ['pkg', 'ring', 'Абонамент'], ['svc', 'tag', 'Услуги'], ['prog', 'chart', 'Прогрес']];
+  const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'mas' ? clientMassageTab() : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? `<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>` : C.tab === 'svc' ? clientServices() : C.tab === 'nutr' ? clientNutr() : clientHome(me, t, act);
+  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mas', 'spa', 'Масаж'], ['pkg', 'ring', 'Абонамент'], ['svc', 'tag', 'Услуги'], ['prog', 'chart', 'Прогрес']];
   nav.splice(5, 0, ['nutr', 'leaf', 'Хранене']);
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
