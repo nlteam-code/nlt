@@ -300,6 +300,10 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-wr .n small{display:block;font-weight:500;font-size:12px;color:var(--c-mute);margin-top:2px}
 .c-wr .n small.bad{color:var(--c-coral)}
 .c-wr .ok{color:#3ba776;font:700 13px Roboto,sans-serif;display:flex;align-items:center;gap:4px}
+.c-rv{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 20px 12px;margin:0 -20px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.c-rv::-webkit-scrollbar{display:none}
+.c-rvc{flex:0 0 82%;scroll-snap-align:center;background:var(--c-card);border:1px solid var(--c-line);border-radius:22px;padding:16px;box-shadow:var(--c-shadow)}
+.c-rvc img{width:52px;height:52px;border-radius:50%;object-fit:cover;flex:none;background:var(--c-line)}
 .c-empty{text-align:center;color:var(--c-mute);padding:40px 16px;background:var(--c-card);border:1px dashed var(--c-line);border-radius:26px}
 .c-pk-h{display:flex;justify-content:space-between;gap:10px;align-items:center}
 .c-pk-h b{font:700 16px Montserrat,sans-serif}
@@ -3113,10 +3117,18 @@ const MAS_TH = [
   ['🌿', 'Класически масаж', 'Нежна и отпускаща техника, която подобрява кръвообращението, освобождава ума от стреса и възстановява тонуса на тялото. Перфектен след натоварен ден или седмица.'],
   ['🔥', 'Терапия с вендузи', 'Стимулира кръвообращението и лимфния поток, отпуска мускулите и облекчава болки в гърба, врата и раменете.']
 ];
+const MAS_IMG = 'https://newleveltraining.bg/wp-content/uploads/';
 const MAS_REV = [
-  ['Илиян Стефанов', 'професионален футболист, Левски', 'От 2018 година насам тренирам тук и това ми позволява да разгръщам целия си физически потенциал като атлет. Откакто тренирам тук, не съм имал никакви сериозни травми.'],
-  ['Мартин Луков', 'професионален футболист, Локомотив Пловдив', 'Започнах тренировките си тук след счупване на глезен. Екипът работи всекидневно с мен, помагайки ми да се възстановя и да се върна отново на терена здрав.'],
-  ['Таня Панева', 'клиент', 'Дойдох с намерението да отслабна 2-3 килограма. Отслабнах 15. Работя на компютър, но с помощта на екипа спечелих два сребърни медала на националното състезание по биатлон за ветерани.']
+  ['Илиян Стефанов', 'футболист, Левски', 'iliyan-stefanov-1-500x500.jpg', 'Тренирам тук от 2018 г. и оттогава нямам сериозни травми.'],
+  ['Мартин Луков', 'футболист, Локомотив Пловдив', 'martin-lukov-500x500.jpg', 'Дойдох след счупен глезен. Екипът ме върна здрав на терена.'],
+  ['Таня Панева', 'клиент', '0.-Ревю-Таня-Панева-1-e1663312495384-500x500.jpg', 'Исках 2-3 кг, свалих 15 и спечелих два медала по биатлон.'],
+  ['Даниела Димитрова', 'тенисистка', '-Димитрова-e1729159130514-500x500.jpg', 'След тежка травма на тазобедрената става си върнах атлетизма.'],
+  ['Кристиян Стоянов', 'футболист, ПФК Славия', 'hristo-petrov-1-500x500.jpg', 'Вече нямам проблеми с адукторите и кръста.'],
+  ['Десислава Димитрова', 'клиент', 'Деси-Димитрова-1-500x500.png', 'Започнах с движение без болка. За 6 месеца свалих 10 кг.'],
+  ['Елена Костова', 'клиент', 'elena-kostova-500x500.jpg', 'Сила, енергия и спокойствие. Връщам се всяка седмица.'],
+  ['Мира Кушлева', 'клиент', 'transformatsiya-500x500.jpg', 'С хранителния режим свалих 6 кг за 12 седмици.'],
+  ['Изабела Шиникова', 'тенисистка', 'izabela-shinikova-500x500.jpeg', 'Тук най-накрая намерих екип, който се съобразява с графика ми.'],
+  ['Матео Стаматов', 'футболист, Оренбург', 'mateo.jpg', 'Всяко лято и зима се връщам, за да тренирам точно тук.']
 ];
 function clientMassageTab() {
   return `<h2 class="c-title">Масаж</h2>
@@ -3128,8 +3140,8 @@ function clientMassageTab() {
   <h3 class="c-h">Нашите терапии</h3>
   <section class="c-card c-list">${MAS_TH.map(([e, h, d]) => `<div style="display:flex;gap:12px;align-items:flex-start;padding:6px 0"><span style="font-size:20px;flex:none">${e}</span><div><div class="c-st" style="font-size:15px">${h}</div><div class="c-ss" style="margin-top:3px;line-height:1.45">${d}</div></div></div>`).join('')}
   <div class="c-note" style="padding-top:6px">Терапиите могат да се комбинират за по-добър ефект.</div></section>
-  <h3 class="c-h">Какво казват клиентите ни</h3>
-  ${MAS_REV.map(([n, r, t]) => `<section class="c-card" style="margin-bottom:8px"><div style="font:400 14px/1.5 Roboto,sans-serif">„${t}“</div><div style="margin-top:8px;font:600 13px Roboto,sans-serif">${n} <span class="c-mute" style="font-weight:400">· ${r}</span></div></section>`).join('')}`;
+  <h3 class="c-h">Какво казват клиентите ни <span class="c-mute" style="font-weight:500;text-transform:none;letter-spacing:0">· плъзни ›</span></h3>
+  <div class="c-rv">${MAS_REV.map(([n, r, img, t]) => `<section class="c-rvc"><div style="display:flex;gap:12px;align-items:center"><img src="${MAS_IMG + encodeURIComponent(img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div><div style="font:700 14px Roboto,sans-serif">${n}</div><div class="c-mute" style="font-size:12px">${r}</div></div></div><div style="font:400 14px/1.45 Roboto,sans-serif;margin-top:10px">„${t}“</div><div style="color:#f5b301;font-size:13px;margin-top:6px">★★★★★</div></section>`).join('')}</div>`;
 }
 async function clientMassageCancel(id) {
   if (S.previewClient) return toast('Само преглед — промените са изключени.');
