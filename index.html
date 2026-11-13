@@ -290,6 +290,16 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-meter{flex:1;height:5px;border-radius:9px;background:var(--c-ringbg);overflow:hidden;max-width:90px}
 .c-meter i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--c-orange),var(--c-coral))}
 .c-done{display:inline-flex;align-items:center;gap:4px;color:#2ea064;font-weight:700;font-size:14px;white-space:nowrap}
+.c-wk{width:100%;border-collapse:separate;border-spacing:4px;table-layout:fixed;margin:0 -4px}
+.c-wk th{font:700 12px Roboto,sans-serif;color:var(--c-mute);padding:4px 0}
+.c-wk th.today{color:var(--c-coral)}
+.c-wk td.t{font:700 12px Roboto,sans-serif;color:var(--c-mute);width:42px;vertical-align:top;padding-top:8px}
+.c-wk td.cl{vertical-align:top;padding:0}
+.c-wk .wc{display:block;width:100%;text-align:left;border:1px solid var(--c-line);background:var(--c-card);border-radius:12px;padding:6px 6px;margin-bottom:4px;font:600 11px/1.25 Roboto,sans-serif;color:var(--c-ink);cursor:pointer;word-break:break-word}
+.c-wk .wc small{display:block;font-weight:500;color:var(--c-mute);margin-top:2px}
+.c-wk .wc.mine{border-color:var(--c-coral);background:rgba(235,76,81,.10)}
+.c-wk .wc.past{opacity:.45;cursor:default}
+.c-wk .wc.full small{color:var(--c-coral)}
 .c-empty{text-align:center;color:var(--c-mute);padding:40px 16px;background:var(--c-card);border:1px dashed var(--c-line);border-radius:26px}
 .c-pk-h{display:flex;justify-content:space-between;gap:10px;align-items:center}
 .c-pk-h b{font:700 16px Montserrat,sans-serif}
@@ -2703,6 +2713,7 @@ function gcalSub() {
   if (isC) cSheet(html); else modal.show(`<div>${html}</div>`);
 }
 async function clientApp() {
+  C.wk = null;
   const me = S.me.row, t = today(), to = ymd(addDays(new Date(), 28));
   const wq = sb.from('weight_log').select('day,weight_kg').eq('client_id', me.id).order('day');
   const mq = sb.from('massage_bookings').select('*').eq('client_id', me.id).gte('date', t).order('date').order('start_time');
@@ -2961,7 +2972,9 @@ function clientBookTab(me, t, act) {
   if (!C.day || !days.includes(C.day) || !byDay[C.day]) C.day = days.find(d => byDay[d]) || days[0];
   const hasGroup = act.some(p => p.kind === 'group');
   const list = byDay[C.day] || [];
+  if (C.bmode === 'week') return cWeekHtml(me, t, hasGroup);
   return `<h2 class="c-title">Запиши се</h2>
+  ${cModeSeg()}
   ${hasGroup ? '' : '<div class="c-warn"><i></i><div>За групов час е нужен активен групов абонамент.<br><span>Свържи се с клуба.</span></div></div>'}
   <div class="c-days">${days.map(d => { const dt = parse(d), n = (byDay[d] || []).length; return `<button class="c-day ${d === C.day ? 'on' : ''}" data-act="cday" data-d="${d}" ${n ? '' : 'disabled'}><span>${d === t ? 'Днес' : WD[dt.getDay()]}</span><b>${dt.getDate()}</b><u class="${n ? 'dot' : ''}"></u></button>`; }).join('')}</div>
   <div class="c-dayh">${esc(dayWord(C.day, t))}</div>
@@ -2974,6 +2987,47 @@ function clientBookTab(me, t, act) {
   }).join('') : '<div class="c-empty">Няма часове за този ден.</div>'}`;
 }
 
+function cModeSeg() {
+  const w = C.bmode === 'week';
+  return `<div class="c-seg" role="tablist" style="margin:12px 0 10px"><button class="${w ? '' : 'on'}" data-act="cbmode" data-m="day">По дни</button><button class="${w ? 'on' : ''}" data-act="cbmode" data-m="week">График за седмицата</button><i style="transform:translateX(${w ? 100 : 0}%)"></i></div>`;
+}
+const isPilates = s => /пилат|pilat/i.test(s.title || '');
+function cWeekLoc(me) { return me.location && LOCS.includes(me.location) ? me.location : (C.wkLoc || LOCS[0]); }
+async function cWeekLoad(me) {
+  const loc = cWeekLoc(me), mon = addDays(parse(today()), -((parse(today()).getDay() + 6) % 7) + 7 * (C.wkOff || 0)), from = ymd(mon), to = ymd(addDays(mon, 5));
+  const key = loc + from; if (C.wk && C.wk.key === key) return;
+  C.wk = { key, loading: true, mon: from };
+  const r = await sb.from('sessions').select('id,date,start_time,title,location,capacity,kind,cancelled').eq('kind', 'group').eq('cancelled', false).eq('location', loc).gte('date', from).lte('date', to).order('start_time');
+  const L = r.data || [], ids = L.map(x => x.id);
+  const sp = ids.length ? await sb.from('session_spaces').select('*').in('session_id', ids) : { data: [] };
+  const free = Object.fromEntries((sp.data || []).map(x => [x.session_id, x]));
+  C.wk = { key, mon: from, list: L.map(x => ({ ...x, free: free[x.id]?.free })) };
+  if (C.tab === 'book' && C.bmode === 'week') renderClient();
+}
+function cWeekHtml(me, t, hasGroup) {
+  const loc = cWeekLoc(me), head = `<h2 class="c-title">Запиши се</h2>${cModeSeg()}
+    ${me.location && LOCS.includes(me.location) ? '' : `<div class="c-seg" style="margin:0 0 10px">${LOCS.map((l, i) => `<button class="${l === loc ? 'on' : ''}" data-act="cwkloc" data-l="${esc(l)}">${esc(l)}</button>`).join('')}<i style="transform:translateX(${LOCS.indexOf(loc) * 100}%)"></i></div>`}`;
+  const mon = addDays(parse(t), -((parse(t).getDay() + 6) % 7) + 7 * (C.wkOff || 0)), from = ymd(mon);
+  if (!C.wk || C.wk.key !== loc + from || C.wk.loading) { cWeekLoad(me); return head + '<div class="c-empty">Зареждане…</div>'; }
+  const L = C.wk.list, mine = new Set(C.bookings.map(b => b.session_id));
+  const days = [0, 1, 2, 3, 4].map(i => ymd(addDays(mon, i)));
+  const sat = ymd(addDays(mon, 5));
+  if (loc === 'Лерин' && L.some(x => x.date === sat && isPilates(x))) days.push(sat);
+  const shown = L.filter(x => days.includes(x.date) && (x.date !== sat || isPilates(x)));
+  const times = [...new Set(shown.map(x => hm(x.start_time)))].sort();
+  const now = new Date();
+  const cell = x => {
+    const past = new Date(`${x.date}T${hm(x.start_time)}:00`) <= now, m = mine.has(x.id), full = x.free === 0, can = C.classes.some(c => c.id === x.id);
+    const sub = m ? '✓ записан' : past ? '' : full ? 'пълен' : x.free != null ? `${x.free} св.` : '';
+    return `<button class="wc ${m ? 'mine' : ''} ${past ? 'past' : ''} ${full && !m ? 'full' : ''}" ${past || m || full || !hasGroup || !can ? 'disabled' : `data-act="cask" data-id="${x.id}"`}>${esc(x.title || 'Група')}${sub ? `<small>${sub}</small>` : ''}</button>`;
+  };
+  const wk = `${fmt(from)} – ${fmt(days[days.length - 1])}`;
+  return head + `<div style="display:flex;align-items:center;gap:8px;margin:0 0 6px"><button class="c-btn outline sm" data-act="cwk" data-d="-1" ${C.wkOff > 0 ? '' : 'disabled'}>‹</button><b style="flex:1;text-align:center;font:700 14px Roboto,sans-serif">${esc(loc)} · ${wk}</b><button class="c-btn outline sm" data-act="cwk" data-d="1" ${(C.wkOff || 0) < 3 ? '' : 'disabled'}>›</button></div>
+  ${hasGroup ? '' : '<div class="c-note" style="margin-bottom:6px">За записване е нужен активен групов абонамент.</div>'}
+  ${times.length ? `<table class="c-wk"><thead><tr><th style="width:42px"></th>${days.map(d => { const dt = parse(d); return `<th class="${d === t ? 'today' : ''}">${WD[dt.getDay()]} ${dt.getDate()}</th>`; }).join('')}</tr></thead><tbody>
+  ${times.map(tm => `<tr><td class="t">${tm}</td>${days.map(d => `<td class="cl">${shown.filter(x => x.date === d && hm(x.start_time) === tm).map(cell).join('')}</td>`).join('')}</tr>`).join('')}</tbody></table>
+  <div class="c-note" style="margin-top:8px">Натисни час, за да се запишеш.</div>` : '<div class="c-empty">Няма групови часове тази седмица.</div>'}`;
+}
 
 /* запис на масаж от приложението (Edge Function → SimplyBook) */
 const MB = { svc: null, date: null };
@@ -3830,6 +3884,9 @@ document.addEventListener('click', async e => {
       case 'weighgo': C.tab = 'prog'; PG.tab = 'weight'; renderClient(); window.scrollTo(0, 0); break;
       case 'csvc': C.svcMode = el.dataset.m; renderClient(); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
+      case 'cbmode': C.bmode = el.dataset.m; renderClient(); break;
+      case 'cwk': C.wkOff = Math.max(0, Math.min(3, (C.wkOff || 0) + +el.dataset.d)); renderClient(); break;
+      case 'cwkloc': C.wkLoc = el.dataset.l; renderClient(); break;
       case 'cask': clientAsk(el.dataset.id); break;
       case 'csheetx': closeSheet(); break;
       case 'cprofile': clientProfile(); break;
