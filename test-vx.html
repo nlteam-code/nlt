@@ -1728,7 +1728,7 @@ async function openClient(id, tab) {
     sb.from('package_status').select('*').eq('client_id', id).order('end_date', { ascending: false }),
     S.owner ? sb.from('payments').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     S.owner ? sb.from('charges').select('*').eq('client_id', id).order('date', { ascending: false }) : Promise.resolve({ data: [] }),
-    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').order('date', { foreignTable: 'sessions' }).limit(30),
+    sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).gte('sessions.date', today()).neq('status', 'cancelled').limit(400),
     sb.from('bookings').select('id,status,late,use_plan,sessions!inner(id,date,start_time,kind,title,location,trainer_id)').eq('client_id', id).lt('sessions.date', today()).order('date', { foreignTable: 'sessions', ascending: false }).limit(500),
     sb.from('hist_visits').select('id,date,time,title,location,status').eq('client_id', id).order('date', { ascending: false }).limit(1000),
     S.owner ? sb.from('hist_money').select('date,amount,method,category,note').eq('client_id', id).order('date', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
