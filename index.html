@@ -1542,10 +1542,10 @@ async function delSession(id) { const { data: s0, error: e0 } = await sb.from('s
         let scope = 'one';
         if (fids.length > 1) { scope = await askScope('Изтриване на час', `${esc(s0.title || KIND[s0.kind])} · ${fmt(s0.date)} от ${hm(s0.start_time)} · ${esc(trName(s0.trainer_id))}. Изтриват се и записванията на клиентите. Само този час или и всички следващи в същия ден и час?`, fids.length); if (!scope) { await openSession(id); return; } }
         else if (!confirm('Да се изтрие ли часът заедно със записванията?')) return;
-        const ids = scope === 'all' ? fids : [id];
+        const ids = scope === 'all' ? fids : [id], who = await sesWho(id);
         for (let i = 0; i < ids.length; i += 100) { const { error } = await sb.from('sessions').delete().in('id', ids.slice(i, i + 100)); if (error) { fail(error, 'Не се изтри'); return; } }
         if (scope === 'all' && s0.series_id) { const { error } = await sb.from('series').update({ ends_on: ymd(addDays(parse(s0.date), -1)) }).eq('id', s0.series_id); if (error) fail(error, 'Серията не се спря'); }
-        logEvent('change', `Изтрит час ${s0.title || KIND[s0.kind]} ${fmt(s0.date)} ${hm(s0.start_time)}${ids.length > 1 ? ` и следващите (${ids.length})` : ''}`);
+        logEvent('change', `Изтрит час ${s0.title || KIND[s0.kind]} ${fmt(s0.date)} ${hm(s0.start_time)}${ids.length > 1 ? ` и следващите (${ids.length})` : ''}${who}`, s0.location);
         modal.close(); toast(ids.length > 1 ? `Изтрити ${ids.length} часа` : 'Часът е изтрит'); weekView();
 }
 const TITLE_SUGG = ['Upper Body', 'Lower Body', 'Conditioning'];
@@ -1593,7 +1593,7 @@ async function moveSession(dm) {
   const nt = Math.min(Math.max(cur + dm, 0), 23 * 60 + 30);
   const { error } = await sb.from('sessions').update({ start_time: fromMins(nt) }).eq('id', id);
   if (error) return fail(error, 'Не се премести');
-  logEvent('change', `Преместен час: ${dmm($('#s-date').value)} ${fromMins(cur)} → ${fromMins(nt)}`);
+  logEvent('change', `Преместен час: ${dmm($('#s-date').value)} ${fromMins(cur)} → ${fromMins(nt)}${await sesWho(id)}`);
   await refreshAfter(id);
 }
 async function addClientToSession(cid2) {
@@ -1975,6 +1975,18 @@ const dmm = d => `${d.slice(8)}.${d.slice(5, 7)}`;
 const D = { month: firstOf(today()), tab: 'due', chart: 'pay', day: today(), filter: 'all' };
 
 function logEvent(type, text, loc) { sb.from('activity').insert({ type, text, location: loc || (LOCS.includes(S.loc) ? S.loc : null), actor: S.me?.row?.user_id || null }).then(() => {}, () => {}); }
+/* имената на записаните клиенти в час(ове) — за дневника */
+async function sesWho(ids) { ids = [].concat(ids).filter(Boolean).slice(0, 100); if (!ids.length) return ''; const { data } = await sb.from('bookings').select('client_id,status').in('session_id', ids).neq('status', 'cancelled'); const n = [...new Set((data || []).map(b => cname(b.client_id)).filter(x => x !== '—'))]; return n.length ? ` · клиент: ${n.join(', ')}` : ' · без записани клиенти'; }
+const actorName = uid => uid ? (((S.staff || []).find(t => t.user_id === uid) || (S.clients || []).find(c => c.user_id === uid) || {}).name || '') : '';
+const feRow = (e, FEEDS) => { const t = new Date(e.at), who = actorName(e.actor); return `<div class="fe" data-aid="${e.id}"${e.location ? ` data-loc="${esc(e.location)}"` : ''}><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span><span class="ftx">${esc(e.text)}</span>${who ? ` <span class="mute">— ${esc(who.split(' ')[0])}</span>` : ''}</span></div>`; };
+/* стари записи „Преместен час“ без имена: търсим кой е в часа на новото място */
+async function enrichMoves() {
+  const els = [...document.querySelectorAll('.fe .ftx')].filter(x => /^Преместен час: \d\d\.\d\d \d\d:\d\d → \d\d\.\d\d \d\d:\d\d/.test(x.textContent) && !/клиент/.test(x.textContent));
+  const y = (D.day || today()).slice(0, 4);
+  await Promise.all(els.map(async x => { const m = x.textContent.match(/→ (\d\d)\.(\d\d) (\d\d:\d\d)/); const loc = x.closest('.fe').dataset.loc;
+    let q = sb.from('sessions').select('id').eq('date', `${y}-${m[2]}-${m[1]}`).eq('start_time', m[3]); if (loc) q = q.eq('location', loc);
+    const { data } = await q; const w = await sesWho((data || []).map(r => r.id)); if (w && x.isConnected) x.insertAdjacentHTML('afterend', `<span class="mute">${esc(w)}</span>`); }));
+}
 const bkLabel = (cid, date, time) => `${cname(cid)} · ${dmm(date)} ${hm(time)}`;
 
 function spark(v) {
@@ -2142,6 +2154,7 @@ async function trainerDash() {
     <div class="card" style="margin-bottom:12px">${soon}</div>
     ${actCardHtml(acts)}
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>`;
+  enrichMoves();
 }
 async function loadCancelCard() {
   const el = document.getElementById('cancelcard'); if (!el) return;
@@ -2171,7 +2184,7 @@ function actCardHtml(acts) {
   return `<div class="card" style="margin-bottom:12px"><h2>Дневна активност <span class="mute" style="font-weight:400">· ${esc(actLocs(S.me.row).join(', '))}</span></h2>
     <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
     <div class="chips">${chip('all', 'Всички', S.owner ? ` ${acts.length}` : '')}${chip('cancel', 'Отказани', S.owner ? ` ${cnt('cancel')}` : '')}${chip('change', 'Сменени', S.owner ? ` ${cnt('change')}` : '')}${chip('attended', 'Проведени', S.owner ? ` ${cnt('attended')}` : '')}${chip('new', 'Записани', S.owner ? ` ${cnt('new')}` : '')}${chip('activated', 'Нови профили', ` ${cnt('activated')}`)}</div>
-    <div style="max-height:340px;overflow:auto">${shown.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден.</div>'}</div></div>`;
+    <div style="max-height:340px;overflow:auto">${shown.map(e => feRow(e, FEEDS)).join('') || '<div class="mute">Няма събития за този ден.</div>'}</div></div>`;
 }
 async function nextClients() {
   const nowT = new Date().toTimeString().slice(0, 5);
@@ -2482,13 +2495,13 @@ async function dashView() {
   // КПД
   const trows = tr.data.map(r => ({ ...r, t: S.staff.find(x => x.id === r.trainer_id) })).filter(r => r.t).sort((a, z) => a.t.name.localeCompare(z.t.name, 'bg'));
   $('#main').innerHTML = `
-    <div class="kpis">${kpi('Приход', eur(cr.pay), 'този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
+    <div class="kpis">${kpi('Приход', eur(cr.pay), 'получени плащания този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
     <div class="cols">
       <div class="card"><h2>Дневна активност</h2>
         ${alocBtns}
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
         <div class="chips">${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}${chip('afilter', 'activated', 'Нови профили', D.filter, ` ${cnt('activated')}`)}</div>
-        <div style="max-height:340px;overflow:auto">${shownActs.map(e => { const t = new Date(e.at); return `<div class="fe"><span class="ft">${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="chip">${FEEDS[e.type] || ''}</span><span>${esc(e.text)}</span></div>`; }).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
+        <div style="max-height:340px;overflow:auto">${shownActs.map(e => feRow(e, FEEDS)).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
       <div class="card"><h2>Прогноза за месеца</h2>
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="dmonth" data-d="-1">‹</button><b>${mLabel(D.month)}</b><button class="sm" data-act="dmonth" data-d="1">›</button></div>
         <div class="stat2"><div><b>${eur(st.proj)}</b><span>Прогнозен приход</span></div><div><b>${eur(st.done)}</b><span>Реализиран до момента</span></div><div><b>${st.n_done} / ${st.n}</b><span>Проведени / всички посещения</span></div><div><b>${eur(st.n ? st.proj / st.n : 0)}</b><span>Средна цена на посещение</span></div></div>
@@ -2501,7 +2514,7 @@ async function dashView() {
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>`;
-  loadCancelCard();
+  loadCancelCard(); enrichMoves();
 }
 
 /* ── Пакети ── */
@@ -2722,7 +2735,7 @@ async function dropOnGrid(e) {
     if (ev.date === body.dataset.date && hm(ev.start_time) === nt) return;
     const { error } = await sb.from('sessions').update({ date: body.dataset.date, start_time: nt }).eq('id', ev.id);
     if (error) return fail(error, 'Не се премести');
-    logEvent('change', `Преместен час: ${dmm(ev.date)} ${hm(ev.start_time)} → ${dmm(body.dataset.date)} ${nt}${ev.title ? ' · ' + ev.title : ''}`, ev.location);
+    logEvent('change', `Преместен час: ${dmm(ev.date)} ${hm(ev.start_time)} → ${dmm(body.dataset.date)} ${nt}${ev.title ? ' · ' + ev.title : ''}${await sesWho(ev.id)}`, ev.location);
     weekView();
   }
 }
@@ -4098,14 +4111,14 @@ document.addEventListener('click', async e => {
       case 'cxcan': { const s = (S.sessions || []).find(e => e.id === el.dataset.id); if (!s) break; const n = (s.bookings || []).filter(b => b.status !== 'cancelled').length;
         if (!s.cancelled && !confirm(`Да отменя ли часа ${hm(s.start_time)} на ${fmt(s.date)}?${n ? `\n\nЗаписани клиенти: ${n}.` : ''}`)) break;
         const { error } = await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', s.id); if (error) return fail(error, 'Не се промени');
-        logEvent('change', `${s.cancelled ? 'Върнат' : 'Отменен'} час ${fmt(s.date)} ${hm(s.start_time)}`); toast(s.cancelled ? 'Часът е върнат' : 'Часът е отменен'); weekView(); break; }
+        logEvent('change', `${s.cancelled ? 'Върнат' : 'Отменен'} час ${fmt(s.date)} ${hm(s.start_time)}${await sesWho(s.id)}`, s.location); toast(s.cancelled ? 'Часът е върнат' : 'Часът е отменен'); weekView(); break; }
       case 'cxtr': { const s = (S.sessions || []).find(e => e.id === el.dataset.id); if (!s || s.trainer_id === el.dataset.v) break;
         await setTrainerScoped(s, el.dataset.v); weekView(); break; }
       case 'scope': { const r = D.scopeRes; D.scopeRes = null; modal.close(); if (r) r(el.dataset.v || null); break; }
       case 'cxloc': { const s = (S.sessions || []).find(e => e.id === el.dataset.id), v = el.dataset.v; if (!s || s.location === v) break;
         if (!confirm(`Да преместя ли часа ${hm(s.start_time)} на ${fmt(s.date)} в ${v}?`)) break;
         const { error } = await sb.from('sessions').update({ location: v }).eq('id', s.id); if (error) return fail(error, 'Локацията не се смени');
-        logEvent('change', `Час ${fmt(s.date)} ${hm(s.start_time)} преместен в ${v}`); toast(`Часът е преместен в ${v}`); weekView(); break; }
+        logEvent('change', `Час ${fmt(s.date)} ${hm(s.start_time)} преместен в ${v}${await sesWho(s.id)}`, v); toast(`Часът е преместен в ${v}`); weekView(); break; }
       case 'bpay': { const s = D.scs, bid = el.dataset.bid, m = el.dataset.m, b = s && s.bookings.find(x => x.id === bid); if (!b) break;
         const upd = m === 'plan' ? { use_plan: true, price: null } : m === 'free' ? { use_plan: false, price: 0 } : { use_plan: false, price: visitPrice(s.kind) };
         await sb.rpc('remove_visit_charge', { p_booking: bid });
