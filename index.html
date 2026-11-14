@@ -190,6 +190,11 @@ td b{font-weight:600}
 .ev{border:0;border-left:4px solid var(--grp-b);border-radius:10px;padding:4px 7px;box-shadow:0 1px 2px rgba(20,28,40,.06);transition:transform .12s,box-shadow .12s}
 .ev:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(20,28,40,.14);z-index:3}
 .ev.solo{border-left-color:var(--solo-b)}
+/* цвят по треньор: Петя — червен, Аксел — лилав (групови и персонални) */
+.ev.tr-red{background:rgba(235,76,81,.16);border-left-color:#eb4c51}
+.ev.tr-violet{background:rgba(139,92,246,.16);border-left-color:#8b5cf6}
+:root:not([data-theme=light]) .ev.tr-red{background:rgba(240,87,92,.24)}
+:root:not([data-theme=light]) .ev.tr-violet{background:rgba(167,139,250,.24);border-left-color:#a78bfa}
 .ev b{font-weight:700}
 .times div{font-variant-numeric:tabular-nums}
 /* диаграми */
@@ -1441,7 +1446,8 @@ function drawGrid() {
       const top = (s - h0 * 60) / 60 * HH, hgt = Math.max(((e.duration_min || 60) / 60) * HH - 2, 18);
       const charged = !e.cancelled && act.length && new Date(`${e.date}T${hm(e.start_time)}:00`) <= new Date();
       const label = e.kind === 'solo' ? (act.length ? esc(act.map(b => cname(b.client_id)).join(', ')) : '<span class="n">свободен</span>') : `${esc(e.title || 'Групов час')}`;
-      return `<div class="ev ${e.kind === 'solo' ? 'solo' : ''} ${e.cancelled ? 'evcx' : ''} ${full ? 'full' : ''}" draggable="true" data-act="sess" data-id="${e.id}"
+      const tn0 = trName(e.trainer_id), trc = /^Петя/.test(tn0) ? 'tr-red' : /^Аксел/.test(tn0) ? 'tr-violet' : '';
+      return `<div class="ev ${e.kind === 'solo' ? 'solo' : ''} ${trc} ${e.cancelled ? 'evcx' : ''} ${full ? 'full' : ''}" draggable="true" data-act="sess" data-id="${e.id}"
         style="top:${top}px;height:${hgt}px;left:calc(${col / n * 100}% + 1px);width:calc(${100 / n}% - 3px)" title="${esc(names)}">
         ${charged ? '<span class="tick" title="Проведена и таксувана">✓</span>' : ''}<b>${hm(e.start_time)}</b>${e.cancelled ? ' <span class="cx">отменен</span>' : ''} ${label}${e.kind === 'group' ? ` <span class="n">${act.length}${e.capacity ? '/' + e.capacity : ''}</span>` : ''}</div>`;
     }).join('');
