@@ -710,6 +710,19 @@ async function staffApp() {
     if ((ren || ch) && S.tab === 'week' && $('#grid') && !document.querySelector('.modal.on, dialog[open]')) weekView();
   });
 }
+/* ── Напомняне: Христо качва 5 сторита от работа с клиенти — вторник, четвъртък, събота ── */
+const STORY = { who: /^Христо/, days: [2, 4, 6], tag: 'Сторита: ' };
+async function storyNudge() {
+  const box = $('#nudge'); if (!box || !STORY.days.includes(new Date().getDay())) return;
+  const hr = (S.staff || []).find(t => STORY.who.test(t.name || '') && t.active !== false); if (!hr) return;
+  const isHim = STORY.who.test(S.me?.row?.name || ''); if (!isHim && !S.owner) return;
+  const d0 = new Date(today() + 'T00:00:00');
+  const { data } = await sb.from('activity').select('at').like('text', STORY.tag + '%').gte('at', d0.toISOString()).limit(1);
+  const done = !!(data && data.length), first = hr.name.split(' ')[0];
+  box.innerHTML = isHim
+    ? (done ? '' : `<div class="wrap" style="padding-bottom:0"><div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-left:4px solid var(--acc);margin:0">📸 <b>Днес: качи 5 сторита от работа с клиенти</b><span class="mute">вторник, четвъртък и събота</span><span class="sp"></span><button class="pri sm" data-act="storydone">Качих ги ✓</button></div></div>`)
+    : `<div class="wrap" style="padding-bottom:0"><div class="mute" style="font-size:13px">📸 Сторита от ${esc(first)} днес: ${done ? '<b style="color:var(--ok,#0f8a5f)">качени ✓</b>' : 'още не са отбелязани'}</div></div>`;
+}
 const DEMO_CLIENT = '79e3ca5f-7d33-4859-afef-74671ebd389c'; // ПРОБЕН ПРОБЕН — служителите могат да видят приложението през него
 function renderStaff() {
   document.body.classList.remove('cm');
@@ -723,7 +736,8 @@ function renderStaff() {
     <span class="seg" id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<button class="${l === S.loc ? 'on' : ''}" data-act="hloc" data-l="${esc(l)}">${esc(l)}</button>`).join('')}</span>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<select id="tsel" title="Виж приложението като клиент"><option value="">${esc(S.me.row.name)}</option><option value="${DEMO_CLIENT}">Като клиент: Пробен Пробен</option></select>`}<button class="sm" data-act="mypw" title="Смени своята парола">Парола</button><button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
-  <div class="wrap" id="main"></div>`;
+  <div id="nudge"></div><div class="wrap" id="main"></div>`;
+  storyNudge();
   const ts = $('#tsel'); if (ts) ts.onchange = async e => {
     const id = e.target.value; e.target.value = ''; if (!id) return; let c = S.clients.find(x => x.id === id); if (!c) { const r = await sb.from('clients').select('*').eq('id', id).maybeSingle(); c = r.data; } if (!c) return toast('Пробният клиент не е достъпен.');
     S.previewClient = c; S.me = { role: 'client', row: c }; C.tab = 'home'; await clientApp();
@@ -3423,22 +3437,21 @@ function clientCancelDialog(bid, sid) {
   const b = C.bookings.find(x => x.id === bid); if (!b) return;
   const start = new Date(`${b.sessions.date}T${hm(b.sessions.start_time)}:00`);
   const until = b.created_at ? new Date(Math.min(new Date(b.created_at).getTime() + 24 * 3600e3, start.getTime())) : null;
-  const grace = !!until && until > new Date();
-  const must = !grace && C.policy.mustResched !== false;
+  const grace = false, must = true; // клиентите не отказват — само сменят деня (виж until по-горе, ако се върне гратисният период)
   const pk = C.pkgs.find(p => p.kind === 'group' && p.start_date <= b.sessions.date && p.end_date >= b.sessions.date);
   const opts = C.classes.filter(s => !s.mine && s.free !== 0 && s.date !== b.sessions.date && pk && s.date >= pk.start_date && s.date <= pk.end_date);
   const hrs = C.cv.cancelMinHours ?? 12;
   const untilTxt = grace ? `${fmt(ymd(until))} ${pad(until.getHours())}:${pad(until.getMinutes())}` : '';
-  modal.show(`<h2>Отказ от час</h2><div class="mute">${fmtLong(b.sessions.date)} · ${hm(b.sessions.start_time)}</div>
-    <p>${grace ? `Записал си се наскоро — можеш да откажеш часа без последствия до <b>${untilTxt}</b> (24 ч. след записването). Посещението се връща в абонамента ти.` : must ? `Часът трябва да се презапише за друг ден в рамките на абонамента. Отказ по-късно от ${hrs} ч. преди началото се брои като проведен.` : 'Можеш да се откажеш или да преместиш часа.'}</p>
+  modal.show(`<h2>Смяна на час</h2><div class="mute">${fmtLong(b.sessions.date)} · ${hm(b.sessions.start_time)}</div>
+    <p>${grace ? `Записал си се наскоро — можеш да откажеш часа без последствия до <b>${untilTxt}</b> (24 ч. след записването). Посещението се връща в абонамента ти.` : must ? `Часът не може да се откаже — може само да се премести в друг ден в рамките на абонамента ти. Смяна по-късно от ${hrs} ч. преди началото се брои като проведено посещение.` : 'Можеш да се откажеш или да преместиш часа.'}</p>
     <label class="f">${grace ? 'Премести в друг час (по желание)' : 'Нов час'}<select id="re-sel">${must ? '' : '<option value="">— само отказ —</option>'}${opts.map(s => `<option value="${s.id}">${fmtLong(s.date)} · ${hm(s.start_time)} (${s.free ?? '?'} места)</option>`).join('')}</select></label>
-    ${must && !opts.length ? '<div class="err">Няма свободни часове за друг ден в рамките на абонамента ти.</div>' : ''}
+    ${must && !opts.length ? '<div class="err">Няма свободни часове за друг ден в рамките на абонамента ти. Пиши на треньора си.</div>' : ''}
     <div class="row" style="margin-top:12px"><button class="pri" data-act="cdo" data-bid="${bid}" ${must && !opts.length ? 'disabled' : ''}>Потвърди</button></div>`);
 }
 async function clientCancel(bid) {
-  const ns = $('#re-sel').value || null;
+  const ns = $('#re-sel').value || null; if (!ns) return toast('Избери нов час.');
   const { error } = await sb.rpc('cancel_booking', { p_booking: bid, p_new_session: ns });
-  if (error) return fail(error, 'Отказът не успя'); modal.close(); toast('Готово'); clientApp();
+  if (error) return fail(error, 'Смяната не успя'); modal.close(); toast('Часът е сменен'); clientApp();
 }
 
 /* ═════════════════ ПРЕДИЗВИКАТЕЛСТВО (NLT Winter Challenge) ═════════════════ */
@@ -4298,6 +4311,7 @@ document.addEventListener('click', async e => {
       case 'gsub': gcalSub(); break;
       case 'gcopy': { const u = el.dataset.u; try { await navigator.clipboard.writeText(u); toast('Линкът е копиран'); } catch (e) { prompt('Копирай линка:', u); } break; }
       case 'cbook': await clientBook(el.dataset.id); break;
+      case 'storydone': logEvent('change', `${STORY.tag}${S.me.row.name} качи 5 сторита от работа с клиенти`); toast('Супер, отбелязано!'); $('#nudge').innerHTML = ''; break;
       case 'ccancel': clientCancelDialog(el.dataset.bid, el.dataset.sid); break;
       case 'wcgo': C.tab = 'prog'; PG.tab = 'chal'; renderClient(); window.scrollTo(0, 0); break;
       case 'wcday': WC.day = +el.dataset.d; WC.exSel = null; pgRender(); break;
