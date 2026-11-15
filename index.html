@@ -602,7 +602,7 @@ const modal = {
 const addMonths = (d, n) => { const x = new Date(d); const day = x.getDate(); x.setDate(1); x.setMonth(x.getMonth() + n); x.setDate(Math.min(day, new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate())); return x; };
 function pkgEnd(start, p) {
   const s = parse(start);
-  return ymd(addDays(p.unit === 'weeks' ? addDays(s, 7 * p.duration) : addMonths(s, p.duration), -1));
+  return ymd(addDays(p.unit === 'weeks' ? addDays(s, 7 * p.duration) : addDays(s, 30 * p.duration), -1)); // 1 месец = 30 дни
 }
 
 /* ───────── състояние ───────── */
@@ -1959,7 +1959,7 @@ async function addCombo(start) {
   const g = Math.max(0, +$('#npc-g').value || 0), so = Math.max(0, +$('#npc-s').value || 0), price = Math.max(0, +$('#npc-p').value || 0), m = +$('#npc-m').value || 1;
   if (!g && !so) return toast('Въведи брой групови и/или персонални посещения.');
   if (!$('#npc-p').value) return toast('Въведи обща цена.');
-  const end = ymd(addDays(addMonths(parse(start), m), -1)), pg = so ? Math.round(price * g / (g + so) * 100) / 100 : price;
+  const end = ymd(addDays(parse(start), 30 * m - 1)), pg = so ? Math.round(price * g / (g + so) * 100) / 100 : price;
   const rows = [];
   if (g) rows.push({ client_id: cid(), package_id: null, kind: 'group', start_date: start, end_date: end, total: g, price: pg, source: 'combo', auto_renew: false });
   if (so) rows.push({ client_id: cid(), package_id: null, kind: 'solo', start_date: start, end_date: end, total: so, price: Math.round((price - (g ? pg : 0)) * 100) / 100, source: 'combo', auto_renew: false });
