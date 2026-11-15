@@ -3496,44 +3496,54 @@ function wcClientTab() {
   if (WC.err) return `<div class="pg-empty">Предизвикателството още не е готово.<br><small>${esc(WC.err)}</small></div>`;
   const cfg = WC.cfg; if (!cfg || cfg.active === false) return '<div class="pg-empty">В момента няма активно предизвикателство.</div>';
   const loc = me.location && LOCS.includes(me.location) ? me.location : 'Боян Петров';
-  const ex = WC.ex.filter(e => e.location === loc), byId = Object.fromEntries(WC.ex.map(e => [e.id, e]));
+  const ex = WC.ex.filter(e => e.location === loc && e.active !== false), byId = Object.fromEntries(WC.ex.map(e => [e.id, e]));
   const t = today(), wk = Math.min(Math.max(wcWeek(t), 1), cfg.weeks || 4), started = t >= cfg.start, ended = t > wcEnd();
   const wd = (parse(t).getDay() + 6) % 7 + 1, dSel = WC.day || (wd <= 5 ? wd : 1);
-  const opts = ex.filter(e => e.weekday === dSel), eSel = opts.find(e => e.id === WC.exSel) || opts[0];
-  const tot = wcTotals(WC.res, byId), pend = WC.res.filter(r => r.status === 'pending');
-  const weekRow = w => `<div class="wc-wk"><span>Седм. ${w}</span>${[1, 2, 3, 4, 5].map(d => { const p = tot.best[w + '|' + d]; return `<i class="${p ? 'on' : ''}" title="${WC_DAYS[d]}">${p ? p : '·'}</i>`; }).join('')}</div>`;
-  const st = { pending: ['чака одобрение', 'warn'], approved: ['одобрен', 'ok'], rejected: ['отхвърлен', 'bad'] };
+  const eSel = ex.find(e => e.weekday === dSel);
+  const res = WC.res.filter(r => byId[r.ex_id]?.active !== false && r.day >= cfg.start);
+  /* прогрес по упражнение (по име — 1000 м Ски е в понеделник и четвъртък) */
+  const names = [...new Set(ex.map(e => e.name))];
+  const prog = names.map(n => {
+    const rows = res.filter(r => byId[r.ex_id]?.name === n).sort((a, b) => (a.day + a.created_at).localeCompare(b.day + b.created_at));
+    if (!rows.length) return `<div class="wc-pr"><div class="wc-prh"><b>${esc(n)}</b><span class="pg-mute pg-sm">още няма опит</span></div></div>`;
+    const vals = rows.map(r => +r.value), best = Math.min(...vals), first = vals[0], last = vals[vals.length - 1], gain = first - best, mx = Math.max(...vals);
+    const bars = rows.slice(-12).map(r => { const v = +r.value, h = Math.max(18, Math.round(100 * (mx - v + (mx - best) * 0.25 + 1) / ((mx - best) * 1.25 + 1))); return `<i class="${v === best ? 'best' : ''}" style="height:${h}%" title="${fmt(r.day)} · ${wcMmss(v)}"></i>`; }).join('');
+    return `<div class="wc-pr"><div class="wc-prh"><b>${esc(n)}</b><span class="pg-sm pg-mute">${rows.length} ${rows.length === 1 ? 'опит' : 'опита'}</span></div>
+      <div class="wc-prs"><div><small>Най-добро</small><b>${wcMmss(best)}</b></div><div><small>Последно</small><b>${wcMmss(last)}</b></div><div><small>Подобрение</small><b style="color:${gain > 0 ? '#1f9d62' : 'inherit'}">${gain > 0 ? '−' + wcMmss(gain) : '—'}</b></div></div>
+      ${rows.length > 1 ? `<div class="wc-bars">${bars}</div><div class="pg-sm pg-mute">По-високият стълб е по-бързо време. Зеленият е личният ти рекорд.</div>` : ''}</div>`;
+  }).join('');
   const form = !started ? `<div class="pg-empty">Започва на ${fmt(cfg.start)}.</div>` : ended ? '<div class="pg-empty">Предизвикателството приключи. Благодарим, че участва!</div>' : `
-    <div class="pg-sm pg-mute" style="margin-bottom:8px">Всеки ден избираш едно от двете упражнения. Резултатът се брои, след като треньорът го одобри.</div>
     <div class="wc-days">${[1, 2, 3, 4, 5].map(d => `<button class="pg-tb ${d === dSel ? 'on' : ''}" data-act="wcday" data-d="${d}">${WC_DAYS[d].slice(0, 3)}</button>`).join('')}</div>
-    <div class="wc-opts">${opts.map(e => `<button class="wc-opt ${e.id === eSel?.id ? 'on' : ''}" data-act="wcex" data-id="${e.id}"><b>${esc(e.name)}</b><span>${esc(wcRule(e))}</span></button>`).join('<div class="wc-or">или</div>')}</div>
-    ${eSel ? `<div class="wc-form">${Array.isArray(eSel.variants) && eSel.variants.length ? `<select id="wc-var">${eSel.variants.map(v => `<option>${esc(v.k)}</option>`).join('')}</select>` : ''}
-      <input id="wc-v" ${eSel.kind === 'time' ? 'inputmode="numeric" placeholder="мм:сс (напр. 4:31)"' : `type="number" inputmode="numeric" min="1" placeholder="${esc(eSel.unit || '')}"`}>
+    ${eSel ? `<div class="wc-opt on" style="cursor:default"><b>${esc(eSel.name)}</b><span>${WC_DAYS[dSel]} · за време</span></div>
+    <div class="wc-form"><input id="wc-v" inputmode="numeric" placeholder="Време мм:сс (напр. 4:31)">
       <input id="wc-d" type="date" min="${cfg.start}" max="${t}" value="${t}">
-      <button class="pg-btn" data-act="wcsave" data-id="${eSel.id}">Изпрати резултата</button></div>` : ''}`;
-  const list = WC.res.length ? WC.res.slice(0, 30).map(r => { const e = byId[r.ex_id], s = st[r.status] || ['', '']; return `<div class="pg-li"><span>${fmt(r.day)}</span><div style="flex:1;min-width:0"><b>${esc(e?.name || '')}</b><div class="pg-sm pg-mute">${esc(wcVal(e, r.value))}${r.variant ? ' · ' + esc(r.variant) : ''}${r.pr ? ' · 🏆 личен рекорд +3' : ''}</div></div><b>${+r.points} т.</b>${pgChip(s[0], s[1])}${r.status === 'pending' ? `<button class="pg-ico bad" data-act="wcdel" data-id="${r.id}" aria-label="Изтрий">✕</button>` : ''}</div>`; }).join('') : '<div class="pg-empty">Още нямаш резултати.</div>';
+      <button class="pg-btn" data-act="wcsave" data-id="${eSel.id}">Запиши времето</button></div>` : ''}`;
+  const plan = [1, 2, 3, 4, 5].map(d => { const e = ex.find(x => x.weekday === d); return `<div class="pg-li"><span style="min-width:90px">${WC_DAYS[d]}</span><b style="flex:1">${esc(e?.name || '—')}</b>${d === wd && started && !ended ? pgChip('днес', 'ok') : ''}</div>`; }).join('');
+  const list = res.length ? res.slice(0, 40).map(r => { const e = byId[r.ex_id]; return `<div class="pg-li"><span>${fmt(r.day)}</span><div style="flex:1;min-width:0"><b>${esc(e?.name || '')}</b></div><b>${wcMmss(+r.value)}</b>${r.pr ? pgChip('рекорд', 'ok') : ''}<button class="pg-ico bad" data-act="wcdel" data-id="${r.id}" aria-label="Изтрий">✕</button></div>`; }).join('') : '<div class="pg-empty">Още нямаш записани времена.</div>';
   return `<section class="pg-card wc-head"><div><div class="pg-sm pg-mute">${esc(cfg.name || 'Предизвикателство')} · ${fmt(cfg.start)} – ${fmt(wcEnd())}</div>
-      <div class="wc-pts"><b>${tot.total}</b><span>точки${pend.length ? ` · ${pend.length} чакат одобрение` : ''}</span></div>
-      <div class="pg-sm pg-mute">${[started && !ended ? `Седмица ${wk} от ${cfg.weeks || 4}` : '', esc(loc), 'Личен рекорд: +3 т.'].filter(Boolean).join(' · ')}</div></div></section>
+      <div class="wc-pts"><b>${res.length}</b><span>записани ${res.length === 1 ? 'време' : 'времена'}</span></div>
+      <div class="pg-sm pg-mute">${[started && !ended ? `Седмица ${wk} от ${cfg.weeks || 4}` : '', 'Всичко е за време — колкото по-бързо, толкова по-добре'].filter(Boolean).join(' · ')}</div></div></section>
     <section class="pg-card"><h3 class="pg-h">Запиши резултат</h3>${form}</section>
-    <section class="pg-card"><h3 class="pg-h">Точки по дни</h3>${Array.from({ length: cfg.weeks || 4 }, (_, i) => weekRow(i + 1)).join('')}<div class="pg-sm pg-mute" style="margin-top:6px">Брои се най-добрият одобрен резултат за всеки ден.</div></section>
-    <section class="pg-card"><h3 class="pg-h">Моите резултати</h3>${list}</section>`;
+    <section class="pg-card"><h3 class="pg-h">Моят прогрес</h3>${prog}</section>
+    <section class="pg-card"><h3 class="pg-h">Програма за седмицата</h3>${plan}</section>
+    <section class="pg-card"><h3 class="pg-h">Всички мои времена</h3>${list}</section>
+    <style>.wc-pr{padding:10px 0;border-bottom:1px solid var(--c-line,rgba(255,255,255,.08))}.wc-pr:last-child{border:0}.wc-prh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.wc-prs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}.wc-prs small{display:block;font-size:11px;opacity:.6}.wc-prs b{font-size:18px}.wc-bars{display:flex;align-items:flex-end;gap:4px;height:56px;margin:6px 0 4px}.wc-bars i{flex:1;max-width:22px;background:rgba(235,76,81,.55);border-radius:4px 4px 0 0}.wc-bars i.best{background:#1f9d62}</style>`;
 }
 async function wcClientSave(exId) {
   if (S.previewClient) return toast('Само преглед — промените са изключени.');
   const e = WC.ex.find(x => x.id === +exId); if (!e) return;
   const raw = $('#wc-v').value, val = e.kind === 'time' ? wcSec(raw) : +raw, day = $('#wc-d').value;
-  if (!val || val <= 0) return toast(e.kind === 'time' ? 'Въведи време като мм:сс, напр. 4:31' : 'Въведи резултат');
+  if (!val || val <= 0) return toast('Въведи време като мм:сс, напр. 4:31');
   if (!day || day > today() || day < WC.cfg.start) return toast('Избери дата в рамките на предизвикателството');
   const { error } = await sb.from('challenge_results').insert({ client_id: S.me.row.id, ex_id: e.id, day, value: val, variant: $('#wc-var')?.value || null });
   if (error) return fail(error, 'Не се записа');
-  toast('Изпратено — треньорът ще го одобри'); await wcLoad(S.me.row.id); pgRender();
+  toast('Записано ✓'); await wcLoad(S.me.row.id); pgRender();
 }
 function wcHomeCard() {
   const cfg = (C.wcCfg || null); if (!cfg || cfg.active === false) return '';
   const t = today(); if (t < ymd(addDays(parse(cfg.start), -7)) || t > ymd(addDays(parse(cfg.start), (cfg.weeks || 4) * 7))) return '';
   return `<section class="c-card" data-act="wcgo" style="cursor:pointer"><div class="c-k">${esc(cfg.name || 'Предизвикателство')}</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b style="font-size:20px">${t < cfg.start ? 'Започва ' + fmt(cfg.start) : '4 седмици · ' + (cfg.weeks || 4) * 5 + ' предизвикателства'}</b><div class="c-mute" style="font-size:13px;margin-top:2px">Запиши резултата си и събирай точки</div></div>${ic('chart', 24)}</div></section>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b style="font-size:20px">${t < cfg.start ? 'Започва ' + fmt(cfg.start) : '4 седмици · ' + (cfg.weeks || 4) * 5 + ' предизвикателства'}</b><div class="c-mute" style="font-size:13px;margin-top:2px">Запиши времето си и следи прогреса</div></div>${ic('chart', 24)}</div></section>`;
 }
 /* ── служители: одобряване и въвеждане ── */
 async function wcStaff() {
@@ -3547,7 +3557,7 @@ async function wcStaff() {
   const inLoc = x => { const c = S.clients.find(c => c.id === x.client_id); return !loc || c?.location === loc; };
   const pend = WC.sres.filter(x => x.status === 'pending' && inLoc(x));
   const clients = S.clients.filter(c => c.status !== 'Inactive' && !c.massage_only && (!loc || c.location === loc)).sort((a, b) => a.name.localeCompare(b.name, 'bg'));
-  const exL = WC.ex.filter(e => e.location === (loc || D.wcl || 'Боян Петров'));
+  const exL = WC.ex.filter(e => e.active !== false && e.location === (loc || D.wcl || 'Боян Петров'));
   const lb = {}; WC.sres.forEach(x => { if (inLoc(x)) (lb[x.client_id] ||= []).push(x); });
   const board = Object.entries(lb).map(([cid, rows]) => ({ cid, ...wcTotals(rows, byId), n: rows.filter(x => x.status === 'approved').length })).filter(x => x.n).sort((a, b) => b.total - a.total);
   const row = x => { const e = byId[x.ex_id]; return `<tr><td>${fmt(x.day)}</td><td><b>${esc(cname(x.client_id))}</b></td><td>${esc(e?.name || '')}<div class="mute" style="font-size:12px">${esc(e?.location || '')} · ${WC_DAYS[e?.weekday] || ''}</div></td><td>${esc(wcVal(e, x.value))}${x.variant ? '<div class="mute" style="font-size:12px">' + esc(x.variant) + '</div>' : ''}</td><td><b>${+x.points}</b>${x.pr ? ' 🏆' : ''}</td>`; };
