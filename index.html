@@ -3304,9 +3304,27 @@ function clientHistory() {
   const sumPk = (C.pkgs || []).reduce((a, p) => a + Number(p.price || 0), 0), sumCh = chs.reduce((a, x) => a + Number(x.amount), 0), sumPay = pays.reduce((a, x) => a + Number(x.amount), 0), bal = Math.round((sumPk + sumCh - sumPay) * 100) / 100;
   const pays3 = pays.filter(x => x.date >= c3), chs3 = chs.filter(x => x.date >= c3), pk3 = (C.pkgs || []).filter(p => p.end_date >= c3), rec = C.recent || [];
   const visits = `<h3 class="c-h">Посещения · последните 3 месеца</h3><section class="c-card c-list">${rec.length ? rec.map(v => `<div class="c-vrow"><b>${fmt(v.date)}</b><div><div class="c-st">${esc(v.title)}</div><div class="c-ss">${[v.time, v.loc, v.late ? 'късен отказ' : ''].filter(Boolean).map(esc).join(' · ')}</div></div></div>`).join('') : '<div class="c-mute" style="padding:12px 0">Няма посещения през последните 3 месеца.</div>'}</section>`;
-  return `${visits}<h3 class="c-h">${fin ? 'Плащания и абонаменти' : 'Абонаменти'} · последните 3 месеца</h3><section class="c-card">
-    ${fin ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><div><span class="c-mute">Платено за 3 месеца</span><br><b>${eur(pays3.reduce((a, x) => a + Number(x.amount), 0))}</b></div><div><span class="c-mute">${bal > 0 ? 'Дължимо' : bal < 0 ? 'В кредит' : 'Баланс'}</span><br><b>${eur(Math.abs(bal))}</b></div></div>` : ''}
-    ${subHistory(pk3, C.done, fin ? { pays: pays3, chs: chs3 } : null)}</section>`;
+  if (!fin) return `${visits}<h3 class="c-h">Абонаменти · последните 3 месеца</h3><section class="c-card">${subHistory(pk3, C.done, null)}</section>`;
+  return `${visits}${clientLedger(c3)}`;
+}
+/* ясна история: таксувания (+) и плащания (−) с текущ баланс */
+function clientLedger(c3) {
+  const MT = { 'в брой': 'в брой', cash: 'в брой', 'банков път': 'по банков път', bank: 'по банков път' };
+  const rows = [
+    ...(C.pkgs || []).filter(p => Number(p.price) > 0).map(p => ({ d: p.start_date, t: 'Абонамент · ' + (p.package_name || 'тренировки'), s: `${fmt(p.start_date)} – ${fmt(p.end_date)}`, a: Number(p.price) })),
+    ...(C.chs || []).map(x => ({ d: x.date, t: /салдо/i.test(x.note || '') ? 'Предишно задължение' : (x.note || 'Таксуване'), s: '', a: Number(x.amount) })),
+    ...(C.pays || []).map(x => ({ d: x.date, t: 'Плащане' + (MT[(x.method || '').toLowerCase()] ? ' ' + MT[(x.method || '').toLowerCase()] : ''), s: '', a: -Number(x.amount), pay: 1 }))
+  ].sort((a, b) => a.d.localeCompare(b.d) || (a.pay || 0) - (b.pay || 0));
+  let run = 0; rows.forEach(r => { run = Math.round((run + r.a) * 100) / 100; r.b = run; });
+  const bal = run, shown = rows.filter(r => r.d >= c3).reverse(), before = rows.filter(r => r.d < c3).pop();
+  const head = bal > 0.5 ? `<div class="c-lg-sum due"><span>Дължиш</span><b>${eur(bal)}</b></div>` : bal < -0.5 ? `<div class="c-lg-sum ok"><span>В кредит</span><b>${eur(-bal)}</b></div>` : `<div class="c-lg-sum ok"><span>Всичко е платено</span><b>${ic('check', 20)}</b></div>`;
+  const row = r => `<div class="c-lgr"><div class="c-lgd">${fmt(r.d).slice(0, 5)}</div><div class="c-lgt"><div>${esc(r.t)}</div>${r.s ? `<small>${esc(r.s)}</small>` : ''}</div><div class="c-lga ${r.pay ? 'pay' : ''}">${r.pay ? '−' : '+'}${eur(Math.abs(r.a))}<small>баланс ${eur(r.b)}</small></div></div>`;
+  return `<h3 class="c-h">Плащания и таксувания</h3><section class="c-card">${head}
+    <div class="c-lgl">${shown.length ? shown.map(row).join('') : '<div class="c-mute" style="padding:10px 0">Няма движения през последните 3 месеца.</div>'}
+    ${before ? `<div class="c-lgr muted"><div class="c-lgd">${fmt(c3).slice(0, 5)}</div><div class="c-lgt"><div>Баланс преди това</div></div><div class="c-lga">${eur(before.b)}</div></div>` : ''}</div>
+    <div class="c-mute" style="font-size:12px;margin-top:8px">+ таксуване · − плащане · последните 3 месеца</div></section>
+    <style>.c-lg-sum{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;margin-bottom:8px}.c-lg-sum span{font-size:13px;opacity:.85}.c-lg-sum b{font-size:22px}.c-lg-sum.due{background:color-mix(in srgb,var(--c-coral) 14%,transparent);color:var(--c-coral)}.c-lg-sum.ok{background:rgba(31,157,98,.14);color:#3ccf8e}
+    .c-lgr{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--c-line,rgba(255,255,255,.07))}.c-lgr:first-child{border-top:0}.c-lgr.muted{opacity:.6}.c-lgd{font-weight:700;font-size:13px;min-width:42px;font-variant-numeric:tabular-nums}.c-lgt{flex:1;min-width:0;font-size:14px}.c-lgt small,.c-lga small{display:block;font-size:11px;opacity:.6;font-weight:400;margin-top:2px}.c-lga{text-align:right;font-weight:700;font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums}.c-lga.pay{color:#3ccf8e}</style>`;
 }
 function clientProfile() {
   const me = S.me.row;
