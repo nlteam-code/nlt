@@ -3047,8 +3047,8 @@ function payReminder() {
   const bal = cBalance(); if (!(bal > 0.5)) return '';
   return `<section class="c-card c-due" data-act="cnav" data-t="pkg" style="cursor:pointer;border:1px solid var(--c-coral);background:color-mix(in srgb,var(--c-coral) 12%,var(--c-card))">
     <div class="c-k" style="color:var(--c-coral)">Напомняне за плащане</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b style="font-size:26px">${eur(bal)}</b><div class="c-mute" style="font-size:13px;margin-top:2px">неплатен абонамент / посещения</div></div>${ic('ring', 26)}</div>
-    <div class="c-note" style="margin-top:8px">Моля, плати при следващото си посещение в залата — в брой или по банков път. Ако вече си платил, пиши ни във Viber на 0895 748 765.</div></section>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b style="font-size:26px">${eur(bal)}</b></div>${ic('ring', 26)}</div>
+    <div class="c-note" style="margin-top:6px">Моля, плати при следващото си посещение.</div></section>`;
 }
 function clientHome(me, t, act) {
   const nb = C.bookings[0], first = (me.name || '').split(' ')[0];
@@ -3066,7 +3066,7 @@ function clientHome(me, t, act) {
       <div class="c-hero-s">${esc(se.title || (se.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}${se.location ? `<span class="c-pinl">${ic('pin', 14)}${esc(se.location)}</span>` : ''}</div>
       <div class="c-hero-b"><a class="c-btn glass" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}">${ic('calplus', 18)}В календара</a>
       ${se.kind === 'group' ? `<button class="c-btn glass" data-act="ccancel" data-bid="${nb.id}" data-sid="${nb.session_id}">${ic('edit', 18)}Промяна</button>` : ''}</div>
-    </section>` : `<section class="c-hero empty"><div class="c-hero-d" style="font-size:26px;line-height:1.15">Нямаш записана тренировка</div><div class="c-hero-s">Избери удобен час и се запиши за секунди.</div>
+    </section>` : `<section class="c-hero empty"><div class="c-hero-d" style="font-size:22px;line-height:1.15">Няма записан час</div>
       <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
   ${warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
   ${main ? `<section class="c-card c-sum" data-act="cnav" data-t="pkg">${rings(main, 132)}
@@ -3078,8 +3078,7 @@ function clientHome(me, t, act) {
   ${rewardCard()}
   ${massageCard(t)}
   ${weightCard()}
-  ${C.bookings.length > 1 ? `<h3 class="c-h">Предстоящи тренировки</h3><section class="c-card c-list">${C.bookings.slice(1).map(b => cSession(b, t)).join('')}</section>` : ''}
-  ${C.bookings.length ? `<button class="c-btn outline wide" data-act="gsub" style="margin-top:4px">${ic('calplus', 18)}Тренировките ми в Google Календар</button>` : ''}`;
+`;
 }
 function clientBookTab(me, t, act) {
   const days = []; for (let i = 0; i < 14; i++) days.push(ymd(addDays(parse(t), i)));
@@ -3280,6 +3279,7 @@ function clientPkg(t, act) {
   const main = act.slice().sort((a, b) => a.end_date.localeCompare(b.end_date))[0];
   return `<h2 class="c-title">Абонамент</h2>
   ${main ? `<section class="c-card c-sum big">${rings(main, 180)}<div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.left} от ${main.total}</b><span>оставащи посещения</span></div></div><div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>` : ''}
+  ${C.bookings.length ? `<h3 class="c-h">Предстоящи тренировки</h3><section class="c-card c-list">${C.bookings.map(b => cSession(b, t)).join('')}</section>` : ''}
   ${act.length ? act.map(card).join('') : '<div class="c-empty">Нямаш активен абонамент.<br>Свържи се с клуба, за да го подновиш.</div>'}
   ${old.length ? `<h3 class="c-h">Изтекли</h3>${old.slice(0, 5).map(card).join('')}` : ''}
   ${clientHistory()}`;
