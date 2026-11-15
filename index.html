@@ -2853,8 +2853,8 @@ async function clientApp() {
     (hvv.data || []).filter(h => !/cancel|no.?show|late/i.test(h.status || '')).forEach(h => C.done.push({ date: h.date }));
     const c3 = since3m();
     const rv = await sb.from('bookings').select('status,late,sessions!inner(date,start_time,title,location,kind)').eq('client_id', me.id).gte('sessions.date', c3).lte('sessions.date', t);
-    C.recent = (rv.data || []).filter(b => b.sessions && (b.status === 'done' || (b.status === 'cancelled' && b.late))).map(b => ({ date: b.sessions.date, time: hm(b.sessions.start_time), title: b.sessions.title || (b.sessions.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'), loc: b.sessions.location || '', late: b.status === 'cancelled' }))
-      .concat((hvv.data || []).filter(h => h.date >= c3 && h.date <= t && !/cancel|no.?show/i.test(h.status || '')).map(h => ({ date: h.date, time: '', title: h.title || 'Тренировка', loc: '', late: /late/i.test(h.status || '') })))
+    C.recent = (rv.data || []).filter(b => b.sessions && (b.status === 'done' || (b.status === 'cancelled' && b.late))).map(b => ({ date: b.sessions.date, time: hm(b.sessions.start_time), title: b.sessions.title || (b.sessions.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'), loc: b.sessions.location || '', kind: b.sessions.kind, late: b.status === 'cancelled' }))
+      .concat((hvv.data || []).filter(h => h.date >= c3 && h.date <= t && !/cancel|no.?show/i.test(h.status || '') && !(rv.data || []).some(b => b.sessions?.date === h.date && (b.status === 'done' || b.late))).map(h => ({ date: h.date, time: '', title: h.title || 'Тренировка', loc: '', late: /late/i.test(h.status || '') })))
       .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   } catch (e) { C.chs = []; C.pays = []; C.done = []; C.recent = []; }
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
@@ -2953,6 +2953,7 @@ const ICO = {
   ring: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/>',
   edit: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>',
   chart: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/>',
   leaf: '<path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z"/><path d="M5 19c3-4 6-7 10-9"/>',
   pin: '<path d="M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'
@@ -3303,9 +3304,27 @@ function clientHistory() {
   const fin = C.cv.showFinance !== false, chs = C.chs || [], pays = C.pays || [], c3 = since3m();
   const sumPk = (C.pkgs || []).reduce((a, p) => a + Number(p.price || 0), 0), sumCh = chs.reduce((a, x) => a + Number(x.amount), 0), sumPay = pays.reduce((a, x) => a + Number(x.amount), 0), bal = Math.round((sumPk + sumCh - sumPay) * 100) / 100;
   const pays3 = pays.filter(x => x.date >= c3), chs3 = chs.filter(x => x.date >= c3), pk3 = (C.pkgs || []).filter(p => p.end_date >= c3), rec = C.recent || [];
-  const visits = `<h3 class="c-h">Посещения · последните 3 месеца</h3><section class="c-card c-list">${rec.length ? rec.map(v => `<div class="c-vrow"><b>${fmt(v.date)}</b><div><div class="c-st">${esc(v.title)}</div><div class="c-ss">${[v.time, v.loc, v.late ? 'късен отказ' : ''].filter(Boolean).map(esc).join(' · ')}</div></div></div>`).join('') : '<div class="c-mute" style="padding:12px 0">Няма посещения през последните 3 месеца.</div>'}</section>`;
+  const visits = clientVisitGroups(rec);
   if (!fin) return `${visits}<h3 class="c-h">Абонаменти · последните 3 месеца</h3><section class="c-card">${subHistory(pk3, C.done, null)}</section>`;
   return `${visits}${clientLedger(c3)}`;
+}
+/* посещения по абонаменти (падащи менюта): кой абонамент ги покрива или еднократно */
+const APP_START = '2026-11-05';
+function clientVisitGroups(rec) {
+  if (!rec.length) return `<h3 class="c-h">Посещения · последните 3 месеца</h3><section class="c-card"><div class="c-mute" style="padding:6px 0">Няма посещения през последните 3 месеца.</div></section>`;
+  const pk = (C.pkgs || []).slice().sort((a, b) => b.start_date.localeCompare(a.start_date));
+  const single = new Set((C.chs || []).filter(x => /еднократ/i.test(x.note || '')).map(x => x.date));
+  const groups = {}, order = [];
+  const put = (key, label, sub, v, cls) => { if (!groups[key]) { groups[key] = { label, sub, cls, list: [] }; order.push(key); } groups[key].list.push(v); };
+  rec.forEach(v => {
+    const p = pk.find(p => v.date >= p.start_date && v.date <= p.end_date && (!v.kind || !p.kind || p.kind === v.kind));
+    if (p) put('p' + p.id, p.package_name || 'Абонамент', `${fmt(p.start_date)} – ${fmt(p.end_date)}`, v, '');
+    else if (single.has(v.date) || v.date >= APP_START) put('s' + v.date + v.time, 'Еднократно посещение', fmt(v.date), v, 'one');
+    else put('old', 'Предишни посещения', 'преди новото приложение', v, 'old');
+  });
+  const row = v => `<div class="c-vrow"><b>${fmt(v.date).slice(0, 5)}</b><div><div class="c-st">${esc(v.title)}</div><div class="c-ss">${[v.time, v.loc, v.late ? 'късен отказ' : ''].filter(Boolean).map(esc).join(' · ')}</div></div></div>`;
+  return `<h3 class="c-h">Посещения · последните 3 месеца</h3>${order.map((k, i) => { const g = groups[k]; return `<details class="c-card c-vg ${g.cls}" ${i === 0 ? 'open' : ''}><summary><div><b>${esc(g.label)}</b><small>${esc(g.sub)}</small></div><span class="c-vgn">${g.list.length}</span>${ic('chev', 16)}</summary><div class="c-list">${g.list.map(row).join('')}</div></details>`; }).join('')}
+  <style>.c-vg{padding:0;margin-bottom:10px;overflow:hidden}.c-vg summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer}.c-vg summary::-webkit-details-marker{display:none}.c-vg summary>div{flex:1;min-width:0}.c-vg summary small{display:block;font-size:12px;opacity:.6;margin-top:2px}.c-vgn{font:700 13px Montserrat,sans-serif;background:rgba(255,255,255,.08);border-radius:999px;padding:3px 10px}.c-vg.one .c-vgn{background:color-mix(in srgb,var(--c-orange) 22%,transparent);color:var(--c-orange)}.c-vg summary svg{transition:transform .2s;opacity:.6}.c-vg[open] summary svg{transform:rotate(180deg)}.c-vg .c-list{padding:0 16px 8px}</style>`;
 }
 /* ясна история: таксувания (+) и плащания (−) с текущ баланс */
 function clientLedger(c3) {
