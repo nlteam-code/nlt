@@ -3249,7 +3249,7 @@ function clientMassageTab() {
     <div style="padding:16px 18px"><div class="c-k">Масажно студио · Лерин</div><div class="c-st" style="font-size:17px;margin-top:4px">Възстановяване. Релакс. Ново ниво на усещане.</div>
     <div class="c-note" style="margin-top:6px">Всеки масаж се изпълнява с внимание, прецизност и индивидуален подход според нуждите ти. Плащане на място.</div>
     <a class="c-mh-l" style="background:var(--c-ringbg)" target="_blank" rel="noopener" href="${esc(navUrl('Лерин'))}">${ic('pin', 16)}<span>${esc(LOC_ADDR['Лерин'])}</span><b>Навигация</b></a>
-    <a href="https://www.google.com/maps/place/?q=place_id:${GPLACE['Лерин']}" target="_blank" rel="noopener" style="display:inline-flex;gap:6px;align-items:center;margin-top:10px;font:600 13px Roboto,sans-serif;color:var(--c-ink);text-decoration:none"><span style="color:#f5b301">★★★★★</span> 5.0 в Google · виж отзивите ›</a></div></section>
+    <a href="https://search.google.com/local/reviews?placeid=${GPLACE['Лерин']}" target="_blank" rel="noopener" style="display:inline-flex;gap:6px;align-items:center;margin-top:10px;font:600 13px Roboto,sans-serif;color:var(--c-ink);text-decoration:none"><span style="color:#f5b301">★★★★★</span> 5.0 в Google · виж отзивите ›</a></div></section>
   ${clientMassages()}
   <h3 class="c-h">Нашите терапии</h3>
   <section class="c-card c-list">${MAS_TH.map(([e, h, d]) => `<div style="display:flex;gap:12px;align-items:flex-start;padding:6px 0"><span style="font-size:20px;flex:none">${e}</span><div><div class="c-st" style="font-size:15px">${h}</div><div class="c-ss" style="margin-top:3px;line-height:1.45">${d}</div></div></div>`).join('')}
