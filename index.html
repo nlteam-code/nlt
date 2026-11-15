@@ -261,6 +261,14 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-hero-d{font:700 20px Montserrat,sans-serif;margin-top:6px;text-transform:capitalize}
 .c-hero-s{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;opacity:.88;margin-top:6px;font-size:15px}
 .c-pinl{display:inline-flex;align-items:center;gap:4px}
+.c-hero2{padding:18px 18px 16px;border-radius:26px}
+.c-h2r{display:flex;align-items:center;gap:12px;margin-top:8px}.c-h2i{flex:1;min-width:0}
+.c-h2t{font:800 40px/1 Montserrat,sans-serif;letter-spacing:-.04em}
+.c-h2d{font:700 15px Montserrat,sans-serif;margin-top:6px;text-transform:capitalize}
+.c-h2s{font-size:13px;opacity:.85;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-h2l{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:13px;color:#fff;opacity:.9;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.35)}
+.c-h2b{display:flex;flex-direction:column;gap:10px}
+.c-h2ib{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);cursor:pointer;padding:0}
 .c-hero-b{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 .c-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border-radius:16px;font:700 15px Roboto,sans-serif;border:1px solid var(--c-line);background:var(--c-card);color:var(--c-ink);text-decoration:none;cursor:pointer;transition:transform .12s,opacity .2s}
 .c-btn:active{transform:scale(.97)}
@@ -554,6 +562,8 @@ const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 const OWNER_EMAIL = 'axlrustem@gmail.com';
 const LOCS = ['Боян Петров', 'Лерин'];
 /* бонуси */
+const LOC_ADDR = { 'Боян Петров': 'ул. Боян Петров 3', 'Лерин': 'ул. Лерин 53' };
+const navUrl = l => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((LOC_ADDR[l] || l) + ', София')}${GPLACE[l] ? '&destination_place_id=' + GPLACE[l] : ''}`;
 const GPLACE = { 'Лерин': 'ChIJuU-P7SaFqkARxch53fm9qYk', 'Боян Петров': 'ChIJdRay5-6FqkARlJTme3lbhBU' };
 const reviewUrl = loc => 'https://search.google.com/local/writereview?placeid=' + (GPLACE[loc] || GPLACE['Лерин']);
 const BON_K = { review: 'Ревю в Google', referral: 'Препоръка', loyalty: '3 абонамента подред' };
@@ -3059,13 +3069,17 @@ function clientHome(me, t, act) {
   ${payReminder()}
   ${weighCard(t)}
   ${nutrCard()}
-  ${nb ? `<section class="c-hero">
+  ${nb ? `<section class="c-hero c-hero2">
       <div class="c-hero-k">${untilText(se) ? `<i class="c-live"></i>${untilText(se)}` : 'Следваща тренировка'}</div>
-      <div class="c-hero-t">${hm(se.start_time)}</div>
-      <div class="c-hero-d">${esc(dayWord(se.date, t))}</div>
-      <div class="c-hero-s">${esc(se.title || (se.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}${se.location ? `<span class="c-pinl">${ic('pin', 14)}${esc(se.location)}</span>` : ''}</div>
-      <div class="c-hero-b"><a class="c-btn glass" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}">${ic('calplus', 18)}В календара</a>
-      ${se.kind === 'group' ? `<button class="c-btn glass" data-act="ccancel" data-bid="${nb.id}" data-sid="${nb.session_id}">${ic('edit', 18)}Промяна</button>` : ''}</div>
+      <div class="c-h2r"><div class="c-h2i">
+        <div class="c-h2t">${hm(se.start_time)}</div>
+        <div class="c-h2d">${esc(dayWord(se.date, t))}</div>
+        <div class="c-h2s">${esc(se.title || (se.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}</div>
+        ${se.location ? `<a class="c-h2l" target="_blank" rel="noopener" href="${esc(navUrl(se.location))}">${ic('pin', 14)}${esc(LOC_ADDR[se.location] || se.location)}</a>` : ''}
+      </div><div class="c-h2b">
+        <a class="c-h2ib" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}" aria-label="Добави в календара" title="Добави в календара">${ic('calplus', 19)}</a>
+        ${se.kind === 'group' ? `<button class="c-h2ib" data-act="ccancel" data-bid="${nb.id}" data-sid="${nb.session_id}" aria-label="Промяна" title="Промяна">${ic('edit', 19)}</button>` : ''}
+      </div></div>
     </section>` : `<section class="c-hero empty"><div class="c-hero-d" style="font-size:22px;line-height:1.15">Няма записан час</div>
       <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
   ${warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
