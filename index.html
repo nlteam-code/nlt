@@ -3098,7 +3098,7 @@ function clientBookTab(me, t, act) {
     return `<div class="c-class ${s.mine ? 'mine' : ''}"><div class="c-ct">${hm(s.start_time)}</div><div class="c-cinfo"><div class="c-st">${esc(s.title || 'Групова тренировка')}</div>
       <div class="c-ss">${s.location ? esc(s.location) : ''}</div>
       ${s.free != null ? `<div class="c-spots"><div class="c-meter"><i style="width:${pct}%"></i></div><span class="${full ? 'bad' : ''}">${full ? 'пълен' : s.free + ' свободни'}</span></div>` : ''}</div>
-      ${s.mine ? `<span class="c-done">${ic('check', 18)}Записан</span>` : `<button class="c-btn solid sm" data-act="cask" data-id="${s.id}" ${full || !hasGroup ? 'disabled' : ''}>${full ? 'Пълен' : 'Запиши'}</button>`}</div>`;
+      ${s.mine ? `<span class="c-done">${ic('check', 18)}Записан</span>` : cDayTaken(s.date) ? `<span class="c-mute" style="font-size:12px">Имаш час този ден</span>` : `<button class="c-btn solid sm" data-act="cask" data-id="${s.id}" ${full || !hasGroup ? 'disabled' : ''}>${full ? 'Пълен' : 'Запиши'}</button>`}</div>`;
   }).join('') : '<div class="c-empty">Няма часове за този ден.</div>'}`;
 }
 
@@ -3133,7 +3133,7 @@ function cWeekHtml(me, t, hasGroup) {
   const row = x => {
     const past = new Date(`${x.date}T${hm(x.start_time)}:00`) <= now, m = mine.has(x.id), full = x.free === 0, can = C.classes.some(c => c.id === x.id);
     const sub = m ? 'записан си' : past ? 'минал' : full ? 'пълен' : x.free != null ? `${x.free} свободни` : '';
-    const right = m ? `<span class="ok">${ic('check', 16)}Записан</span>` : past ? '' : `<button class="c-btn solid sm" ${full || !hasGroup || !can ? 'disabled' : `data-act="cask" data-id="${x.id}"`}>${full ? 'Пълен' : 'Запиши'}</button>`;
+    const right = m ? `<span class="ok">${ic('check', 16)}Записан</span>` : past ? '' : cDayTaken(x.date) ? `<span class="c-mute" style="font-size:12px">Имаш час този ден</span>` : `<button class="c-btn solid sm" ${full || !hasGroup || !can ? 'disabled' : `data-act="cask" data-id="${x.id}"`}>${full ? 'Пълен' : 'Запиши'}</button>`;
     return `<div class="c-wr ${m ? 'mine' : ''} ${past ? 'past' : ''}"><span class="t">${hm(x.start_time)}</span><span class="n">${esc(x.title || 'Групова тренировка')}${sub ? `<small class="${full && !m && !past ? 'bad' : ''}">${sub}</small>` : ''}</span>${right}</div>`;
   };
   const DN = ['Неделя', 'Понеделник', 'Вторник', 'Сряда', 'Четвъртък', 'Петък', 'Събота'];
@@ -3330,6 +3330,8 @@ async function pwSave() {
   if (document.getElementById('c-sheet')) closeSheet(); else modal.close();
   toast(created ? 'Профилът е създаден с паролата ✓' : 'Паролата е сменена ✓');
 }
+/* един групов час на ден: ако клиентът вече е записан тази дата, може само да смени часа */
+const cDayTaken = d => (C.bookings || []).some(b => b.sessions && b.sessions.date === d && b.sessions.kind === 'group' && !b.sessions.cancelled);
 function clientAsk(sid) {
   const s = C.classes.find(x => x.id === sid); if (!s) return;
   const t = today(), pk = cActivePkgs(t).filter(p => p.kind === 'group' && p.start_date <= s.date && p.end_date >= s.date)[0] || cActivePkgs(t).find(p => p.kind === 'group');
