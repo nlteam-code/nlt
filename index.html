@@ -239,6 +239,7 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-seg button.on{color:var(--c-ink)}
 .c-seg3 i{width:calc(33.333% - 2px)!important}
 .c-mhero{border-radius:22px;padding:16px 18px;margin:14px 0 4px;color:#fff;background:#2f353f;background-image:radial-gradient(120% 90% at 100% 0%,rgba(235,76,81,.5),transparent 60%)}
+.c-mh-l{display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;border-radius:14px;background:rgba(0,0,0,.22);color:#fff;text-decoration:none;font-size:13px}.c-mh-l span{flex:1;min-width:0}.c-mh-l b{font-size:12px;color:#ff8a8d;white-space:nowrap}
 .c-mh-k{font-size:12px;opacity:.75}.c-mh-t{font:700 17px Montserrat,sans-serif;margin-top:4px}.c-mh-s{font-size:12px;opacity:.75;margin-top:4px}
 .c-mrow{display:flex;align-items:center;gap:12px;padding:12px 0}.c-mrow+.c-mrow{border-top:1px solid var(--c-line,rgba(255,255,255,.07))}
 .c-mic{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(235,76,81,.14);color:#ff7a7e;flex:none}
@@ -568,7 +569,7 @@ const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 const OWNER_EMAIL = 'axlrustem@gmail.com';
 const LOCS = ['Боян Петров', 'Лерин'];
 /* бонуси */
-const LOC_ADDR = { 'Боян Петров': 'ул. Боян Петров 3', 'Лерин': 'ул. Лерин 53' };
+const LOC_ADDR = { 'Боян Петров': 'ул. Боян Петров 3', 'Лерин': 'ж.к. Белите брези, ул. Лерин 53' };
 const navUrl = l => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((LOC_ADDR[l] || l) + ', София')}${GPLACE[l] ? '&destination_place_id=' + GPLACE[l] : ''}`;
 const GPLACE = { 'Лерин': 'ChIJuU-P7SaFqkARxch53fm9qYk', 'Боян Петров': 'ChIJdRay5-6FqkARlJTme3lbhBU' };
 const reviewUrl = loc => 'https://search.google.com/local/writereview?placeid=' + (GPLACE[loc] || GPLACE['Лерин']);
@@ -3419,7 +3420,7 @@ function clientServices() {
 /* Услуги → Масаж: цени от масажното студио, бутон „Запази“ отваря записването */
 function clientSvcMassage() {
   if (!MB.list && !MB.svcLoading && !MB.svcTried) { MB.svcLoading = true; MB.svcTried = true; mbCall({ action: 'services' }).then(r => { MB.list = r.services || []; }).catch(async e => { MB.svcErr = e.message || String(e); const r = await sb.from('massage_services').select('name,minutes,price'); if (r.data && r.data.length) MB.disp = r.data; }).finally(() => { MB.svcLoading = false; if (C.tab === 'svc') renderClient(); }); }
-  const hero = `<section class="c-mhero"><div class="c-mh-k">Масажно студио · Лерин</div><div class="c-mh-t">Възстановяване и по-малко болка</div><div class="c-mh-s">Плащане на място · отказ до 4 ч. преди</div></section>`;
+  const hero = `<section class="c-mhero"><div class="c-mh-k">Масажно студио · Лерин</div><div class="c-mh-t">Възстановяване и по-малко болка</div><div class="c-mh-s">Плащане на място · отказ до 4 ч. преди</div><a class="c-mh-l" target="_blank" rel="noopener" href="${esc(navUrl('Лерин'))}">${ic('pin', 16)}<span>${esc(LOC_ADDR['Лерин'])}</span><b>Навигация</b></a></section>`;
   const LST = MB.list || MB.disp;
   if (!LST) return hero + `<div class="c-note" style="text-align:center">${MB.svcErr ? 'Цените не се заредиха. Опитай пак по-късно.' : 'Зареждане…'}</div>`;
   const grp = {}; LST.forEach(x => { const [t, part] = String(x.name).split(/\s+-\s+/); (grp[t] = grp[t] || []).push({ ...x, part: part ? part[0].toUpperCase() + part.slice(1) : x.name }); });
