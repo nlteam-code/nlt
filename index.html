@@ -3439,11 +3439,11 @@ function clientCancelDialog(bid, sid) {
   const until = b.created_at ? new Date(Math.min(new Date(b.created_at).getTime() + 24 * 3600e3, start.getTime())) : null;
   const grace = false, must = true; // клиентите не отказват — само сменят деня (виж until по-горе, ако се върне гратисният период)
   const pk = C.pkgs.find(p => p.kind === 'group' && p.start_date <= b.sessions.date && p.end_date >= b.sessions.date);
-  const opts = C.classes.filter(s => !s.mine && s.free !== 0 && s.date !== b.sessions.date && pk && s.date >= pk.start_date && s.date <= pk.end_date);
+  const opts = C.classes.filter(s => !s.mine && s.free !== 0 && s.id !== b.session_id && pk && s.date >= pk.start_date && s.date <= pk.end_date);
   const hrs = C.cv.cancelMinHours ?? 12;
   const untilTxt = grace ? `${fmt(ymd(until))} ${pad(until.getHours())}:${pad(until.getMinutes())}` : '';
   modal.show(`<h2>Смяна на час</h2><div class="mute">${fmtLong(b.sessions.date)} · ${hm(b.sessions.start_time)}</div>
-    <p>${grace ? `Записал си се наскоро — можеш да откажеш часа без последствия до <b>${untilTxt}</b> (24 ч. след записването). Посещението се връща в абонамента ти.` : must ? `Часът не може да се откаже — може само да се премести в друг ден в рамките на абонамента ти. Смяна по-късно от ${hrs} ч. преди началото се брои като проведено посещение.` : 'Можеш да се откажеш или да преместиш часа.'}</p>
+    <p>${grace ? `Записал си се наскоро — можеш да откажеш часа без последствия до <b>${untilTxt}</b> (24 ч. след записването). Посещението се връща в абонамента ти.` : must ? `Часът не може да се откаже — може само да се премести в друг час в рамките на абонамента ти. Смяна по-късно от ${hrs} ч. преди началото се брои като проведено посещение.` : 'Можеш да се откажеш или да преместиш часа.'}</p>
     <label class="f">${grace ? 'Премести в друг час (по желание)' : 'Нов час'}<select id="re-sel">${must ? '' : '<option value="">— само отказ —</option>'}${opts.map(s => `<option value="${s.id}">${fmtLong(s.date)} · ${hm(s.start_time)} (${s.free ?? '?'} места)</option>`).join('')}</select></label>
     ${must && !opts.length ? '<div class="err">Няма свободни часове за друг ден в рамките на абонамента ти. Пиши на треньора си.</div>' : ''}
     <div class="row" style="margin-top:12px"><button class="pri" data-act="cdo" data-bid="${bid}" ${must && !opts.length ? 'disabled' : ''}>Потвърди</button></div>`);
