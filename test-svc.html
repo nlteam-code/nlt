@@ -3418,7 +3418,7 @@ function clientServices() {
 }
 /* Услуги → Масаж: цени от масажното студио, бутон „Запази“ отваря записването */
 function clientSvcMassage() {
-  if (!MB.list && !MB.svcLoading) { MB.svcLoading = true; mbCall({ action: 'services' }).then(r => { MB.list = r.services || []; }).catch(async e => { MB.svcErr = e.message || String(e); const r = await sb.from('massage_services').select('name,minutes,price'); if (r.data && r.data.length) MB.disp = r.data; }).finally(() => { MB.svcLoading = false; if (C.tab === 'svc') renderClient(); }); }
+  if (!MB.list && !MB.svcLoading && !MB.svcTried) { MB.svcLoading = true; MB.svcTried = true; mbCall({ action: 'services' }).then(r => { MB.list = r.services || []; }).catch(async e => { MB.svcErr = e.message || String(e); const r = await sb.from('massage_services').select('name,minutes,price'); if (r.data && r.data.length) MB.disp = r.data; }).finally(() => { MB.svcLoading = false; if (C.tab === 'svc') renderClient(); }); }
   const hero = `<section class="c-mhero"><div class="c-mh-k">Масажно студио · Лерин</div><div class="c-mh-t">Възстановяване и по-малко болка</div><div class="c-mh-s">Плащане на място · отказ до 4 ч. преди</div></section>`;
   const LST = MB.list || MB.disp;
   if (!LST) return hero + `<div class="c-note" style="text-align:center">${MB.svcErr ? 'Цените не се заредиха. Опитай пак по-късно.' : 'Зареждане…'}</div>`;
