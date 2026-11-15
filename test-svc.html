@@ -3418,11 +3418,12 @@ function clientServices() {
 }
 /* Услуги → Масаж: цени от масажното студио, бутон „Запази“ отваря записването */
 function clientSvcMassage() {
-  if (!MB.list && !MB.svcLoading) { MB.svcLoading = true; mbCall({ action: 'services' }).then(r => { MB.list = r.services || []; }).catch(e => { MB.svcErr = e.message || String(e); }).finally(() => { MB.svcLoading = false; if (C.tab === 'svc') renderClient(); }); }
+  if (!MB.list && !MB.svcLoading) { MB.svcLoading = true; mbCall({ action: 'services' }).then(r => { MB.list = r.services || []; }).catch(async e => { MB.svcErr = e.message || String(e); const r = await sb.from('massage_services').select('name,minutes,price'); if (r.data && r.data.length) MB.disp = r.data; }).finally(() => { MB.svcLoading = false; if (C.tab === 'svc') renderClient(); }); }
   const hero = `<section class="c-mhero"><div class="c-mh-k">Масажно студио · Лерин</div><div class="c-mh-t">Възстановяване и по-малко болка</div><div class="c-mh-s">Плащане на място · отказ до 4 ч. преди</div></section>`;
-  if (!MB.list) return hero + `<div class="c-note" style="text-align:center">${MB.svcErr ? 'Цените не се заредиха. Опитай пак по-късно.' : 'Зареждане…'}</div>`;
-  const grp = {}; MB.list.forEach(x => { const [t, part] = String(x.name).split(/\s+-\s+/); (grp[t] = grp[t] || []).push({ ...x, part: part ? part[0].toUpperCase() + part.slice(1) : x.name }); });
-  return hero + Object.entries(grp).map(([t, L]) => `<h3 class="c-h">${esc(t)}</h3><section class="c-card c-list">${L.sort((a, b) => a.minutes - b.minutes).map(x => `<div class="c-mrow"><span class="c-mic">${ic(x.minutes >= 60 ? 'spa' : 'leaf', 18)}</span><div class="c-mtx"><b>${esc(x.part)}</b><small>${x.minutes} мин</small></div>${x.price ? `<b class="c-mpr">${Math.round(x.price)} €</b>` : ''}<button class="c-btn solid sm" data-act="msvc" data-id="${x.id}">Запази</button></div>`).join('')}</section>`).join('');
+  const LST = MB.list || MB.disp;
+  if (!LST) return hero + `<div class="c-note" style="text-align:center">${MB.svcErr ? 'Цените не се заредиха. Опитай пак по-късно.' : 'Зареждане…'}</div>`;
+  const grp = {}; LST.forEach(x => { const [t, part] = String(x.name).split(/\s+-\s+/); (grp[t] = grp[t] || []).push({ ...x, part: part ? part[0].toUpperCase() + part.slice(1) : x.name }); });
+  return hero + Object.entries(grp).map(([t, L]) => `<h3 class="c-h">${esc(t)}</h3><section class="c-card c-list">${L.sort((a, b) => a.minutes - b.minutes).map(x => `<div class="c-mrow"><span class="c-mic">${ic(x.minutes >= 60 ? 'spa' : 'leaf', 18)}</span><div class="c-mtx"><b>${esc(x.part)}</b><small>${x.minutes} мин</small></div>${x.price ? `<b class="c-mpr">${Math.round(x.price)} €</b>` : ''}<button class="c-btn solid sm" data-act="${x.id != null ? 'msvc' : 'mbook'}" data-id="${x.id ?? ''}">Запази</button></div>`).join('')}</section>`).join('');
 }
 /* ── Хранителен план: екипът публикува за конкретен клиент; клиентът вижда само своите видими планове ── */
 const NUTR_BUCKET = 'nutrition';
