@@ -237,6 +237,12 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-seg{position:relative;display:flex;padding:3px;border-radius:14px;background:var(--c-ringbg)}
 .c-seg button{position:relative;z-index:1;flex:1;border:0;background:none;padding:9px 6px;font:600 14px Roboto,sans-serif;color:var(--c-mute);cursor:pointer;transition:color .25s}
 .c-seg button.on{color:var(--c-ink)}
+.c-seg3 i{width:calc(33.333% - 2px)!important}
+.c-mhero{border-radius:22px;padding:16px 18px;margin:14px 0 4px;color:#fff;background:#2f353f;background-image:radial-gradient(120% 90% at 100% 0%,rgba(235,76,81,.5),transparent 60%)}
+.c-mh-k{font-size:12px;opacity:.75}.c-mh-t{font:700 17px Montserrat,sans-serif;margin-top:4px}.c-mh-s{font-size:12px;opacity:.75;margin-top:4px}
+.c-mrow{display:flex;align-items:center;gap:12px;padding:12px 0}.c-mrow+.c-mrow{border-top:1px solid var(--c-line,rgba(255,255,255,.07))}
+.c-mic{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(235,76,81,.14);color:#ff7a7e;flex:none}
+.c-mtx{flex:1;min-width:0}.c-mtx small{display:block;font-size:12px;opacity:.6;margin-top:2px}.c-mpr{font-size:15px;white-space:nowrap}
 .c-seg i{position:absolute;top:3px;left:3px;width:calc(50% - 3px);height:calc(100% - 6px);border-radius:11px;background:var(--c-card);box-shadow:0 1px 3px rgba(20,28,40,.12),0 3px 10px rgba(20,28,40,.08);transition:transform .32s cubic-bezier(.3,.9,.3,1)}
 .c-plans{display:grid;gap:12px}
 .c-plan{position:relative;border-radius:28px;padding:20px 20px 18px;color:#fff;overflow:hidden;background:radial-gradient(90% 80% at 100% 0%,rgba(235,76,81,.22) 0%,rgba(235,76,81,0) 60%),linear-gradient(160deg,#343d4d 0%,#262d38 55%,#1b2028 100%);box-shadow:0 12px 30px rgba(38,45,56,.28)}
@@ -3397,9 +3403,11 @@ const SVC = {
   plans: [['Стартиращ', 8, 245, 275, ''], ['Ентусиаст', 12, 320, 360, 'Най-избиран'], ['Трансформация', 16, 415, 440, '']]
 };
 function clientServices() {
-  const g = (C.svcMode || 'group') === 'group';
+  const m = C.svcMode || 'group', g = m === 'group', idx = { group: 0, solo: 1, mas: 2 }[m] || 0;
+  const seg = `<div class="c-seg c-seg3" role="tablist"><button class="${m === 'group' ? 'on' : ''}" data-act="csvc" data-m="group">В група</button><button class="${m === 'solo' ? 'on' : ''}" data-act="csvc" data-m="solo">1:1 коучинг</button><button class="${m === 'mas' ? 'on' : ''}" data-act="csvc" data-m="mas">Масаж</button><i style="transform:translateX(${idx * 100}%)"></i></div>`;
+  if (m === 'mas') return `<h2 class="c-title">Услуги</h2>${seg}${clientSvcMassage()}`;
   return `<h2 class="c-title">Услуги</h2>
-  <div class="c-seg" role="tablist"><button class="${g ? 'on' : ''}" data-act="csvc" data-m="group">В група</button><button class="${g ? '' : 'on'}" data-act="csvc" data-m="solo">1:1 коучинг</button><i style="transform:translateX(${g ? 0 : 100}%)"></i></div>
+  ${seg}
   <h3 class="c-h">Месечни абонаменти</h3>
   <div class="c-plans">${SVC.plans.map(([n, k, pg, ps, badge]) => `<section class="c-plan ${badge ? 'hot' : ''}">${badge ? `<span class="c-badge">${badge}</span>` : ''}
     <div class="c-plan-n">${n}</div><div class="c-plan-k">${k} тренировки месечно</div>
@@ -3407,6 +3415,15 @@ function clientServices() {
   <h3 class="c-h">Еднократно посещение</h3>
   ${(([n, s, pr]) => `<section class="c-plan c-single"><div><div class="c-plan-n">${n}</div><div class="c-plan-k">${s}</div></div><div class="c-price"><b>${pr}</b><span>€</span></div></section>`)(SVC.single[g ? 0 : 1])}
   <div class="c-note" style="text-align:center">За абонамент или въпроси — питай треньора си в залата.</div>`;
+}
+/* Услуги → Масаж: цени от масажното студио, бутон „Запази“ отваря записването */
+function clientSvcMassage() {
+  if (!MB.list && !MB.svcLoading && !MB.svcTried) { MB.svcLoading = true; MB.svcTried = true; mbCall({ action: 'services' }).then(r => { MB.list = r.services || []; }).catch(async e => { MB.svcErr = e.message || String(e); const r = await sb.from('massage_services').select('name,minutes,price'); if (r.data && r.data.length) MB.disp = r.data; }).finally(() => { MB.svcLoading = false; if (C.tab === 'svc') renderClient(); }); }
+  const hero = `<section class="c-mhero"><div class="c-mh-k">Масажно студио · Лерин</div><div class="c-mh-t">Възстановяване и по-малко болка</div><div class="c-mh-s">Плащане на място · отказ до 4 ч. преди</div></section>`;
+  const LST = MB.list || MB.disp;
+  if (!LST) return hero + `<div class="c-note" style="text-align:center">${MB.svcErr ? 'Цените не се заредиха. Опитай пак по-късно.' : 'Зареждане…'}</div>`;
+  const grp = {}; LST.forEach(x => { const [t, part] = String(x.name).split(/\s+-\s+/); (grp[t] = grp[t] || []).push({ ...x, part: part ? part[0].toUpperCase() + part.slice(1) : x.name }); });
+  return hero + Object.entries(grp).map(([t, L]) => `<h3 class="c-h">${esc(t)}</h3><section class="c-card c-list">${L.sort((a, b) => a.minutes - b.minutes).map(x => `<div class="c-mrow"><span class="c-mic">${ic(x.minutes >= 60 ? 'spa' : 'leaf', 18)}</span><div class="c-mtx"><b>${esc(x.part)}</b><small>${x.minutes} мин</small></div>${x.price ? `<b class="c-mpr">${Math.round(x.price)} €</b>` : ''}<button class="c-btn solid sm" data-act="${x.id != null ? 'msvc' : 'mbook'}" data-id="${x.id ?? ''}">Запази</button></div>`).join('')}</section>`).join('');
 }
 /* ── Хранителен план: екипът публикува за конкретен клиент; клиентът вижда само своите видими планове ── */
 const NUTR_BUCKET = 'nutrition';
@@ -4356,7 +4373,7 @@ document.addEventListener('click', async e => {
       case 'cgsign': consentSign(); break;
       case 'cgclear': { const cv = $('#cg-sig'); if (cv) { cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); C.sig = false; } break; }
       case 'mbook': mbStart(); break;
-      case 'msvc': mbDays(el.dataset.id); break;
+      case 'msvc': if (S.previewClient) { toast('Само преглед — записването е изключено.'); break; } if (!MB.list) { mbStart(); break; } mbDays(el.dataset.id); break;
       case 'mday': mbSlots(el.dataset.d); break;
       case 'mtime': mbConfirm(el.dataset.t); break;
       case 'mgo': mbGo(); break;
