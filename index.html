@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-1755';
+const BUILD = '20261116-1825';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -725,7 +725,7 @@ sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') loginView('', 
 /* ═════════════════ ПЕРСОНАЛ ═════════════════ */
 async function staffApp() {
   const [c, p, s, q] = await Promise.all([
-    sb.from('clients').select('id,name,phone,email,status,location,notes,user_id,referred_by,invoice_company').order('name').range(0, 4999),
+    sb.from('clients').select('id,name,phone,email,status,location,notes,user_id,referred_by,invoice_company,created_at,legacy_id,source,massage_only').order('name').range(0, 4999),
     sb.from('packages').select('*').order('sort_order'),
     sb.from('staff').select('*').order('name'),
     sb.from('settings').select('*')
@@ -1165,7 +1165,11 @@ async function massageKpi() {
 const KLOCS = [['all', 'Двата обекта'], ['Боян Петров', 'Боян Петров'], ['Лерин', 'Лерин']];
 const pct = (a, b) => b ? Math.round((a - b) / b * 100) : 0;
 const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
-async function kpiView() { await (S.owner ? kpiOwner() : kpiTrainer()); if (S.tab === 'kpi') massageKpi(); }
+async function kpiView() {
+  await (S.owner ? kpiOwner() : kpiTrainer());
+  if (S.tab === 'kpi' && S.owner && $('#main') && !document.getElementById('cancelcard')) { $('#main').insertAdjacentHTML('beforeend', '<div class="card" id="cancelcard" style="margin-top:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>'); loadCancelCard(); }
+  if (S.tab === 'kpi') massageKpi();
+}
 async function kpiOwner() {
   D.kloc = D.kloc || 'all'; D.kchart = D.kchart || 'visits'; D.ktr = D.ktr || 'month'; D.klist = D.klist || 'lost';
   const L = D.kloc, loc = L === 'all' ? null : L, locs = L === 'all' ? ['Боян Петров', 'Лерин'] : [L];
@@ -2623,15 +2627,14 @@ async function dashView() {
         <div style="max-height:340px;overflow:auto">${shownActs.map(e => feRow(e, FEEDS)).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
       <div class="card">${subsFlowCard()}</div>
     </div>
-    <div id="cashcard"></div>
     <div id="invcard"></div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
-    <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
+    <div id="cashcard"></div>
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>
     <div id="npcard" style="margin-top:12px">${noProfCard()}</div>`;
-  loadCancelCard(); loadInvCard(); loadCashCard(); enrichMoves();
+  loadInvCard(); loadCashCard(); enrichMoves();
 }
 
 /* Абонаменти за месеца: нови клиенти (първи абонамент или връщане след прекъсване) и спрели (абонаментът е свършил и не е подновен) */
@@ -2639,23 +2642,29 @@ function subsFlowCard() {
   const m = D.month, me = ymd(addDays(addMonthsD(parse(m), 1), -1)), t = today(), GAP = 14;
   const P = (S.pstat || []).filter(p => S.clients.some(c => c.id === p.client_id));
   const by = {}; P.forEach(p => (by[p.client_id] = by[p.client_id] || []).push(p));
-  const neu = [], stop = [];
+  /* нов клиент = профилът е създаден в приложението през месеца (без прехвърлените от PT Minder) */
+  const neu = S.clients.filter(c => !c.massage_only && !c.legacy_id && c.source !== 'pt-minder' && c.created_at && ymd(new Date(c.created_at)) >= m && ymd(new Date(c.created_at)) <= me)
+    .map(c => { const L = (by[c.id] || []).sort((a, b) => b.start_date.localeCompare(a.start_date)); return { c, d: ymd(new Date(c.created_at)), p: L[0] }; }).sort((a, b) => b.d.localeCompare(a.d));
+  /* спрял = абонаментът е свършил през месеца и в следващите 14 дни няма нов */
+  const stop = [];
   Object.entries(by).forEach(([cid, L]) => {
     L.sort((a, b) => a.start_date.localeCompare(b.start_date));
     L.forEach((p, i) => {
-      const prev = L.slice(0, i).some(q => q.end_date >= ymd(addDays(parse(p.start_date), -GAP)));
-      if (p.start_date >= m && p.start_date <= me && !prev) neu.push({ cid, p });
       const next = L.slice(i + 1).some(q => q.start_date <= ymd(addDays(parse(p.end_date), GAP)));
-      if (p.end_date >= m && p.end_date <= me && p.end_date < t && !next && !L.some(q => q !== p && q.end_date > p.end_date)) stop.push({ cid, p });
+      if (p.end_date >= m && p.end_date <= me && p.end_date < t && !next && !L.some(q => q !== p && q.end_date > p.end_date)) stop.push({ c: S.clients.find(c => c.id === cid), p, d: p.end_date });
     });
   });
-  const li = (arr, sub) => arr.length ? arr.sort((a, b) => cname(a.cid).localeCompare(cname(b.cid), 'bg')).map(x => `<div class="bk"><div class="nm"><a href="#" data-act="client" data-id="${x.cid}">${esc(cname(x.cid))}</a></div><span class="mute">${esc(sub(x.p))}</span></div>`).join('') : '<div class="mute">Няма.</div>';
-  return `<h2>Абонаменти · ${mLabel(m)}</h2>
-    <div class="row" style="margin-bottom:8px"><button class="sm" data-act="dmonth" data-d="-1">‹</button><b>${mLabel(m)}</b><button class="sm" data-act="dmonth" data-d="1">›</button></div>
-    <div class="stat2"><div><b style="color:var(--ok,#1f9d62)">+${neu.length}</b><span>нови клиенти</span></div><div><b style="color:var(--bad)">−${stop.length}</b><span>спрели</span></div><div><b>${neu.length - stop.length >= 0 ? '+' : ''}${neu.length - stop.length}</b><span>разлика</span></div></div>
-    <details style="margin-top:8px"><summary><b>Нови (${neu.length})</b></summary>${li(neu, p => `${p.package_name || 'Абонамент'} · от ${fmt(p.start_date)}`)}</details>
-    <details style="margin-top:6px"><summary><b>Спрели (${stop.length})</b></summary>${li(stop, p => `${p.package_name || 'Абонамент'} · свършил ${fmt(p.end_date)}`)}</details>
-    <p class="mute" style="font-size:12px">Нов = първи абонамент или връщане след повече от ${GAP} дни прекъсване. Спрял = абонаментът е свършил и в следващите ${GAP} дни няма нов.</p>`;
+  stop.sort((a, b) => b.d.localeCompare(a.d));
+  const withSub = neu.filter(x => x.p).length;
+  const line = (x, right, sub) => `<div class="sf-r"><div style="min-width:0;flex:1"><a data-act="client" data-id="${x.c.id}">${esc(x.c.name)}</a><div class="mute">${sub}</div></div><span class="mute" style="white-space:nowrap">${right}</span></div>`;
+  const col = (h, n, col, arr, f) => `<div class="sf-c"><div class="sf-h"><b style="font-size:26px;color:${col}">${n}</b><span>${h}</span></div><div class="sf-l">${arr.length ? arr.map(f).join('') : '<div class="mute" style="padding:8px 0">Няма.</div>'}</div></div>`;
+  return `<style>.sf-g{display:grid;grid-template-columns:1fr 1fr;gap:14px}.sf-h{display:flex;align-items:baseline;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}.sf-l{max-height:300px;overflow:auto}.sf-r{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}.sf-r .mute{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:700px){.sf-g{grid-template-columns:1fr}}</style>
+    <div class="row" style="margin-bottom:10px"><h2 style="margin:0;flex:1">Клиенти · ${mLabel(m)}</h2><button class="sm" data-act="dmonth" data-d="-1">‹</button><button class="sm" data-act="dmonth" data-d="1">›</button></div>
+    <div class="sf-g">
+      ${col('нови клиенти', '+' + neu.length, 'var(--ok,#1f9d62)', neu, x => line(x, fmt(x.d), x.p ? esc(x.p.package_name || 'Абонамент') : 'без абонамент'))}
+      ${col('спрели абонамент', '−' + stop.length, 'var(--bad,#eb4c51)', stop, x => line(x, fmt(x.d), esc(x.p.package_name || 'Абонамент')))}
+    </div>
+    <p class="mute" style="font-size:12px;margin-top:8px">Нови: профил, създаден през месеца (${withSub} с абонамент). Спрели: абонаментът е свършил и в следващите ${GAP} дни няма нов.</p>`;
 }
 /* ── Пакети ── */
 const UNITS = { weeks: 'седмици', months: 'месеца' };
