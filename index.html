@@ -1560,7 +1560,7 @@ async function openSession(id) {
       <label class="f">Места<input type="number" id="s-cap" value="${s.capacity ?? ''}" min="1"></label>
     </div>
     <label class="f" style="margin-top:8px">Бележка<textarea id="s-notes" rows="2">${esc(s.notes || '')}</textarea></label>
-    <div class="row" style="margin-top:10px"><button class="pri" data-act="ssave">Запази</button>
+    <div class="row" style="margin-top:10px"><button class="pri" data-act="ssave">Запази</button>${s.series_id ? `<button data-act="ssaveall" title="Треньор, час, продължителност, заглавие и места се прилагат и за всички следващи часове от серията">Запази този и всички следващи</button>` : ''}
       <button data-act="scancel">${s.cancelled ? 'Върни часа' : 'Отмени часа'}</button><span class="sp"></span>
       <button class="danger" data-act="sdel">Изтрий часа</button></div>
     <h3>Записани (${act.length}${s.capacity && s.kind !== 'solo' ? ' от ' + s.capacity : ''})</h3>
@@ -1626,6 +1626,21 @@ async function saveSession() {
   if (error) return fail(error, 'Не се записа');
   if (trChanged) { await setTrainerScoped(old, $('#s-tr') ? $('#s-tr').value : old.trainer_id); } else toast('Записано');
   await refreshAfter(id);
+}
+/* „Запази този и всички следващи“: промените (без датата и бележката) отиват и в следващите часове от серията */
+async function saveSessionAll() {
+  const id = sessId();
+  const { data: old } = await sb.from('sessions').select('id,date,start_time,location,kind,series_id,trainer_id').eq('id', id).single();
+  if (!old) return;
+  const common = { start_time: $('#s-time').value, duration_min: +$('#s-dur').value || 60, trainer_id: $('#s-tr').value, title: $('#s-title').value.trim() || null, capacity: $('#s-cap').value ? +$('#s-cap').value : null };
+  const fs = (await followingSessions(old)).filter(x => x.id !== id);
+  if (!confirm(`Промените ще се запишат за този час и за ${fs.length} следващи от серията.\n\nДатите и бележките на следващите часове не се пипат.`)) return;
+  const { error } = await sb.from('sessions').update({ ...common, date: $('#s-date').value, notes: $('#s-notes').value.trim() || null }).eq('id', id);
+  if (error) return fail(error, 'Не се записа');
+  if (fs.length) { const r = await sb.from('sessions').update(common).in('id', fs.map(x => x.id)); if (r.error) return fail(r.error, 'Следващите часове не се промениха'); }
+  if (old.series_id) await sb.from('series').update({ trainer_id: common.trainer_id, start_time: common.start_time, title: common.title, capacity: common.capacity }).eq('id', old.series_id);
+  logEvent('change', `Промяна на ${fs.length + 1} часа от ${fmt(old.date)} ${hm(old.start_time)} (треньор ${trName(common.trainer_id)})`);
+  toast(`Записано за ${fs.length + 1} часа`); await refreshAfter(id);
 }
 async function moveSession(dm) {
   const id = sessId(); const cur = mins($('#s-time').value);
@@ -4235,6 +4250,7 @@ document.addEventListener('click', async e => {
         toast(m === 'plan' ? 'По абонамент' : m === 'free' ? 'Без такса' : `Таксувано ${money(upd.price)}${started ? '' : ' (при започване на часа)'}`); await sessClients(s.id); weekView(); break; }
       case 'nsave': { if ($('#n-cq').value.trim()) return toast('Избери клиента от списъка (или изтрий текста).'); await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked, clients: ($('#n-cid').value || '').split(',').filter(Boolean) }); break; }
       case 'ssave': await saveSession(); break;
+      case 'ssaveall': await saveSessionAll(); break;
       case 'mv': await moveSession(+el.dataset.dm); break;
       case 'scancel': { const { data: s } = await sb.from('sessions').select('cancelled').eq('id', sessId()).single(); await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', sessId()); await refreshAfter(sessId()); break; }
       case 'sdel': await delSession(sessId()); break;
