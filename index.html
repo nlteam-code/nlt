@@ -2922,6 +2922,7 @@ async function clientApp() {
       .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   } catch (e) { C.chs = []; C.pays = []; C.done = []; C.recent = []; }
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
+  try { const pq = await sb.from('progress_profile').select('start_weight,target_weight').eq('client_id', me.id).limit(1); C.wprof = (pq.data || [])[0] || null; } catch (e) { C.wprof = null; }
   try { const bq = await sb.from('bonuses').select('*').eq('client_id', me.id).order('created_at', { ascending: false }); C.bons = bq.error ? null : bq.data || []; } catch (e) { C.bons = null; }
   try { const nq = await sb.from('nutrition_plans').select('id,title,body,file_path,file_name,created_at').eq('client_id', me.id).eq('visible', true).order('created_at', { ascending: false }); C.nutr = nq.error ? [] : nq.data || []; } catch (e) { C.nutr = []; }
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
@@ -3068,6 +3069,15 @@ const PG_CLIENT_TABS = [['weight', 'Тегло'], ['chal', 'Предизвика
 function progLocked(title = 'Прогрес', sub = 'Скоро ще можеш да следиш теглото, измерванията и тестовете си тук.') {
   return `<h2 class="c-title">${title}</h2><div class="lockbox"><div class="lockfake" aria-hidden="true"><div class="lf-row"><i style="width:38%"></i><i style="width:22%"></i></div><svg viewBox="0 0 300 110" preserveAspectRatio="none"><path d="M0 90 C40 80 70 70 110 60 S190 40 230 30 S280 20 300 14" fill="none" stroke="currentColor" stroke-width="4"/></svg><div class="lf-row"><i style="width:60%"></i></div><div class="lf-row"><i style="width:45%"></i><i style="width:30%"></i></div></div><div class="lockmsg"><b>Услугата все още не е активна</b><span>${sub}</span></div></div>`;
 }
+/* Колко остава до целевото тегло: кг и % от целия път (старт → цел) */
+function wGoal(now, start, tgt) {
+  if (now == null || tgt == null) return null;
+  const left = Math.abs(now - tgt), span = start != null ? Math.abs(start - tgt) : 0;
+  const reached = start != null && start !== tgt ? (start > tgt ? now <= tgt : now >= tgt) : left < 0.05;
+  const pct = reached ? 0 : span > 0 ? Math.min(100, left / span * 100) : null;
+  return { left: reached ? 0 : left, pct, reached };
+}
+const wGoalBar = g => g && g.pct != null ? `<div class="c-bar" style="height:8px;margin-top:8px" title="Изминат път до целта"><i style="width:${(100 - g.pct).toFixed(1)}%"></i></div>` : '';
 function weightCard() {
   if (PROG_LOCKED) return `<section class="c-card" style="position:relative;overflow:hidden"><div class="c-k">Прогрес</div><div style="filter:blur(6px);opacity:.6;pointer-events:none" aria-hidden="true">72,4 кг · −1,8 кг</div><div class="mute" style="margin-top:6px">Услугата все още не е активна</div></section>`;
   const w = (C.weights || []).filter(x => x.weight_kg != null);
@@ -3076,9 +3086,13 @@ function weightCard() {
   const pts = w.slice(-12), mn = Math.min(...pts.map(x => +x.weight_kg)), mx = Math.max(...pts.map(x => +x.weight_kg)), rg = (mx - mn) || 1;
   const xy = pts.map((x, i) => `${pts.length > 1 ? i / (pts.length - 1) * 100 : 50},${28 - (x.weight_kg - mn) / rg * 24}`).join(' ');
   const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+  const pf = C.wprof || {}, tgt = pf.target_weight != null ? +pf.target_weight : null, st = pf.start_weight != null ? +pf.start_weight : +first.weight_kg;
+  const g = wGoal(+last.weight_kg, st, tgt), f1 = n => (+n).toFixed(1).replace('.', ',');
+  const goalLn = tgt == null ? '<div class="c-mute" style="font-size:12px;margin-top:6px">Целево тегло още не е зададено — попитай треньора си.</div>'
+    : `<div style="font-size:13px;margin-top:6px">Цел <b>${f1(tgt)} кг</b> · ${g.reached ? '<b>целта е постигната ✓</b>' : `остават <b>${g.pct != null ? Math.round(g.pct) + '%' : f1(g.left) + ' кг'}</b>${g.pct != null ? ` <span class="c-mute">(${f1(g.left)} кг)</span>` : ''}`}</div>${wGoalBar(g)}`;
   return `<section class="c-card" data-act="cnav" data-t="prog" style="cursor:pointer"><div class="c-k">Прогрес · тегло</div>
     <div style="display:flex;align-items:center;gap:14px;justify-content:space-between"><div><b style="font-size:26px">${(+last.weight_kg).toFixed(1)} кг</b><div class="c-mute" style="font-size:12px">${fmt(last.day)}${w.length > 1 ? ` · ${sign}${Math.abs(diff).toFixed(1)} кг от началото` : ''}</div></div>
-    ${pts.length > 1 ? `<svg viewBox="0 0 100 32" width="110" height="36" preserveAspectRatio="none" aria-hidden="true"><polyline points="${xy}" fill="none" stroke="var(--c-coral,#eb4c51)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>` : ''}</div></section>`;
+    ${pts.length > 1 ? `<svg viewBox="0 0 100 32" width="110" height="36" preserveAspectRatio="none" aria-hidden="true"><polyline points="${xy}" fill="none" stroke="var(--c-coral,#eb4c51)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>` : ''}</div>${goalLn}</section>`;
 }
 function bonusStreak() {
   const ps = (C.pkgs || []).slice().sort((a, b) => b.start_date.localeCompare(a.start_date)); if (!ps.length) return 0;
@@ -3867,7 +3881,9 @@ function pgConsent() {
 /* Тегло */
 function pgWeightTab() {
   const s = pgWeightStats(), w = PG.D.weights, e = PG.ed.w || {};
-  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>средно за 7 дни</small></div><div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div>${!PG.staff && s.tgt == null ? '' : `<div><span>До целта</span><b>${s.left == null ? '—' : pgF(s.left) + ' кг'}</b><small>${s.tgt ? 'цел ' + pgF(s.tgt) : 'няма цел'}</small></div>`}</div>
+  const g = wGoal(s.now, s.start, s.tgt);
+  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>средно за 7 дни</small></div><div><span>Целево тегло</span><b>${s.tgt == null ? '—' : pgF(s.tgt) + ' кг'}</b><small>${s.tgt == null ? (PG.staff ? 'задай в „Профил“' : 'още не е зададено') : 'старт ' + pgF(s.start)}</small></div><div><span>Остава до целта</span><b>${!g ? '—' : g.reached ? '0%' : g.pct != null ? Math.round(g.pct) + '%' : pgF(g.left) + ' кг'}</b><small>${!g ? 'няма цел' : g.reached ? 'целта е постигната ✓' : pgF(g.left) + ' кг'}</small></div><div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div></div>
+    ${g && g.pct != null ? `<div style="height:8px;border-radius:99px;background:var(--pg-line);overflow:hidden;margin-top:10px" title="Изминат път до целта"><i style="display:block;height:100%;width:${(100 - g.pct).toFixed(1)}%;background:var(--pg-acc);border-radius:99px"></i></div>` : ''}
     ${s.pace ? `<div class="pg-pace">Темпо: ${pgChip(s.pace[0], s.pace[1])} <span class="pg-mute">${s.pct > 0 ? '+' : ''}${pgF(s.pct * 100, 2)}% спрямо предходната седмица</span></div>` : ''}${s.hint ? `<div class="pg-mute pg-sm">${esc(s.hint)}</div>` : ''}` : '<div class="pg-empty">Въведи първото си тегло.</div>';
   const lst = w.slice().reverse().slice(0, 14).map(x => `<div class="pg-li"><span>${fmt(x.day)}</span><b>${pgF(x.weight_kg)} кг</b>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgwedit" data-d="${x.day}" data-v="${x.weight_kg}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgwdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>`).join('');
   return `<section class="pg-card"><h3 class="pg-h">${PG.staff ? 'Тегло' : 'Тегло днес'}</h3>
