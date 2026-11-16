@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-1735';
+const BUILD = '20261116-1745';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -1979,7 +1979,8 @@ async function bonusAct(act, el) {
 }
 /* ── клиенти без профил в приложението + покана до всички ── */
 function noProfList() {
-  const L = S.clients.filter(c => !c.massage_only && !c.user_id && c.status !== 'Inactive');
+  const lk = new Set(S.clients.filter(c => c.user_id && c.email).map(c => c.email.trim().toLowerCase())); /* същият имейл вече има профил (напр. семейство) */
+  const L = S.clients.filter(c => !c.massage_only && !c.user_id && c.status !== 'Inactive' && !(c.email && lk.has(c.email.trim().toLowerCase())));
   const send = L.filter(c => c.email && /^\S+@\S+\.\S+$/.test(c.email.trim()) && (c.status === 'Active' || c.status === 'Paused' || cstat(c) === 'active'));
   return { L, send, lead: L.filter(c => !send.includes(c) && c.email), noMail: L.filter(c => !c.email) };
 }
