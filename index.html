@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-1450';
+const BUILD = '20261116-1625';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -724,7 +724,7 @@ sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') loginView('', 
 /* ═════════════════ ПЕРСОНАЛ ═════════════════ */
 async function staffApp() {
   const [c, p, s, q] = await Promise.all([
-    sb.from('clients').select('id,name,phone,email,status,location,notes,user_id,referred_by').order('name').range(0, 4999),
+    sb.from('clients').select('id,name,phone,email,status,location,notes,user_id,referred_by,invoice_company').order('name').range(0, 4999),
     sb.from('packages').select('*').order('sort_order'),
     sb.from('staff').select('*').order('name'),
     sb.from('settings').select('*')
@@ -1869,6 +1869,7 @@ async function openClient(id, tab) {
       <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент, иначе Чакащ)'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => `<option value="${v}" ${v === (x.status === 'Lead' ? 'Active' : x.status) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     </div>
     <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
+    ${S.owner ? `<label class="f" style="margin-top:8px">Фирма за фактура<input id="c-inv" value="${esc(x.invoice_company || '')}" placeholder="празно = клиентът няма бутон „Заяви фактура“"></label>` : ''}
     <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button>${x.user_id || x.email ? `<button class="sm" data-act="cpw" data-cid="${x.id}" data-nm="${esc(x.name)}" title="${x.user_id ? 'Смени паролата на клиента' : 'Създава профил с имейла и тази парола'}">${x.user_id ? 'Нова парола' : 'Задай парола'}</button>` : ''}<button class="sm" style="margin-left:auto;color:var(--bad);border-color:var(--bad)" data-act="cdel">Изтрий клиента</button></div>
     ${S.owner ? `<div class="mute" style="margin-top:10px">Баланс: <b style="color:${bal > 0 ? 'var(--bad)' : 'var(--ok)'}">${bal > 0 ? 'Дължимо ' + money(bal) : bal < 0 ? 'Аванс ' + money(-bal) : 'Изравнено'}</b></div>` : ''}
     </div>
@@ -2008,7 +2009,7 @@ async function inviteAll() {
   if (modal.open() && $('#modal h2')?.textContent.startsWith('Без профил')) noProfView();
 }
 async function saveClient() {
-  const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, source: $('#c-src') ? $('#c-src').value : undefined, referred_by: $('#c-ref') ? ($('#c-ref').value || null) : undefined, notes: $('#c-notes').value.trim() || null };
+  const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, source: $('#c-src') ? $('#c-src').value : undefined, referred_by: $('#c-ref') ? ($('#c-ref').value || null) : undefined, notes: $('#c-notes').value.trim() || null, invoice_company: $('#c-inv') ? ($('#c-inv').value.trim() || null) : undefined };
   if (!p.name) return toast('Името е задължително.');
   const { error } = await sb.from('clients').update(p).eq('id', cid());
   if (error) return fail(error, 'Не се записа');
@@ -2603,6 +2604,7 @@ async function dashView() {
         <div class="stat2"><div><b>${eur(st.proj)}</b><span>Прогнозен приход</span></div><div><b>${eur(st.done)}</b><span>Реализиран до момента</span></div><div><b>${st.n_done} / ${st.n}</b><span>Проведени / всички посещения</span></div><div><b>${eur(st.n ? st.proj / st.n : 0)}</b><span>Средна цена на посещение</span></div></div>
         <p class="mute">${diff === null ? 'Няма данни за предишния месец.' : `Спрямо ${mLabel(shiftM(D.month, -1))}: ${diff >= 0 ? '+' : ''}${diff}% (${eur(pv.proj)}).`} Цената на пакета ÷ броя посещения в него; еднократните — по тяхната цена. Отказаните не се броят.</p></div>
     </div>
+    <div id="invcard"></div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
     <div class="card" style="margin-bottom:12px"><h2>Финансова графика по месеци</h2>
@@ -2610,7 +2612,7 @@ async function dashView() {
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>`;
-  loadCancelCard(); enrichMoves();
+  loadCancelCard(); loadInvCard(); enrichMoves();
 }
 
 /* ── Пакети ── */
@@ -2924,6 +2926,7 @@ async function clientApp() {
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
   try { const pq = await sb.from('progress_profile').select('start_weight,target_weight').eq('client_id', me.id).limit(1); C.wprof = (pq.data || [])[0] || null; } catch (e) { C.wprof = null; }
   try { const bq = await sb.from('bonuses').select('*').eq('client_id', me.id).order('created_at', { ascending: false }); C.bons = bq.error ? null : bq.data || []; } catch (e) { C.bons = null; }
+  try { const iq = me.invoice_company ? await sb.from('invoice_requests').select('id,company,status,created_at,handled_at').eq('client_id', me.id).order('created_at', { ascending: false }).limit(12) : { data: [] }; C.inv = iq.error ? null : iq.data || []; } catch (e) { C.inv = null; }
   try { const nq = await sb.from('nutrition_plans').select('id,title,body,file_path,file_name,created_at').eq('client_id', me.id).eq('visible', true).order('created_at', { ascending: false }); C.nutr = nq.error ? [] : nq.data || []; } catch (e) { C.nutr = []; }
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
   C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.wcCfg = (set.data || []).find(s => s.key === 'challenge')?.value || null; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {}; C.bcfg = (set.data || []).find(s => s.key === 'bonus')?.value || {};
@@ -3376,7 +3379,35 @@ function clientPkg(t, act) {
   ${C.bookings.length ? `<h3 class="c-h">Предстоящи тренировки</h3><section class="c-card c-list">${C.bookings.map(b => cSession(b, t)).join('')}</section>` : ''}
   ${act.length ? act.map(card).join('') : '<div class="c-empty">Нямаш активен абонамент.<br>Свържи се с клуба, за да го подновиш.</div>'}
   ${old.length ? `<h3 class="c-h">Изтекли</h3>${old.slice(0, 5).map(card).join('')}` : ''}
+  ${clientInvoiceCard()}
   ${clientHistory()}`;
+}
+/* ── заявка за фактура (само клиенти с попълнена „Фирма за фактура") ── */
+function clientInvoiceCard() {
+  const me = S.me.row; if (!me.invoice_company || C.inv === null) return '';
+  const inv = C.inv || [], open = inv.find(x => x.status === 'new'), last = inv.find(x => x.status === 'issued');
+  return `<h3 class="c-h">Фактура</h3><section class="c-card"><b>${esc(me.invoice_company)}</b>
+    <div class="c-note" style="margin:6px 0 12px">${open ? `Заявката ти от ${fmt(ymd(new Date(open.created_at)))} е получена. Ще получиш фактурата по имейл.` : 'Заяви фактура за абонамента си — ще я получиш по имейл.'}</div>
+    ${open ? '<span class="c-chip ok">заявена</span>' : '<button class="c-btn solid wide" data-act="cinvreq">Заяви фактура</button>'}
+    ${last ? `<div class="c-mute" style="margin-top:10px;font-size:13px">Последно издадена: ${fmt(ymd(new Date(last.handled_at || last.created_at)))}</div>` : ''}</section>`;
+}
+async function clientInvoiceReq() {
+  if (S.previewClient) return toast('Само преглед — заявката е изключена.');
+  const me = S.me.row; if (!me.invoice_company) return;
+  const { error } = await sb.from('invoice_requests').insert({ client_id: me.id, company: me.invoice_company });
+  if (error && error.code !== '23505') return fail(error, 'Заявката не се изпрати');
+  toast(error ? 'Вече имаш изпратена заявка.' : 'Заявката за фактура е изпратена'); clientApp();
+}
+async function loadInvCard() {
+  const el = document.getElementById('invcard'); if (!el || !S.owner) return;
+  const { data, error } = await sb.from('invoice_requests').select('*').eq('status', 'new').order('created_at');
+  if (error || !data || !data.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="card" style="margin-bottom:12px"><h2>Заявки за фактура <span class="mute">· ${data.length}</span></h2>${data.map(r => { const c = S.clients.find(x => x.id === r.client_id);
+    return `<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0"><b>${esc(r.company)}</b><div class="mute">${esc(c ? c.name : 'клиент')} · заявена на ${fmt(ymd(new Date(r.created_at)))}</div></div><button class="sm" data-act="invdone" data-id="${r.id}">Издадена</button><button class="sm" data-act="invno" data-id="${r.id}">Откажи</button></div>`; }).join('')}</div>`;
+}
+async function invoiceAct(act, el) {
+  const { error } = await sb.from('invoice_requests').update({ status: act === 'invdone' ? 'issued' : 'declined', handled_at: new Date().toISOString() }).eq('id', el.dataset.id);
+  if (error) return fail(error, 'Не се записа'); toast(act === 'invdone' ? 'Отбелязана като издадена' : 'Заявката е отказана'); loadInvCard();
 }
 function since3m() { const d = new Date(); d.setMonth(d.getMonth() - 3); return ymd(d); }
 function clientHistory() {
@@ -4182,6 +4213,8 @@ document.addEventListener('click', async e => {
       case 'skippw': boot(); break;
       case 'othermail': S.otpEmail = ''; loginView('', 'code'); break;
       case 'cnav': C.tab = el.dataset.t; renderClient(); window.scrollTo(0, 0); break;
+      case 'cinvreq': await clientInvoiceReq(); break;
+      case 'invdone': case 'invno': await invoiceAct(act, el); break;
       case 'weighgo': C.tab = 'prog'; PG.tab = 'weight'; renderClient(); window.scrollTo(0, 0); break;
       case 'csvc': C.svcMode = el.dataset.m; renderClient(); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
