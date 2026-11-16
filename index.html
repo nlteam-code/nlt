@@ -567,6 +567,22 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
+const BUILD = '20261116-1430';
+/* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
+(function () {
+  let last = Date.now();
+  const check = async () => {
+    if (Date.now() - last < 5 * 60e3) return; last = Date.now();
+    try {
+      const t = await (await fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' })).text();
+      const m = t.match(/const BUILD = '([^']+)'/);
+      const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+      if (m && m[1] !== BUILD && !typing && !document.querySelector('#modal .ov')) location.reload();
+    } catch (e) {}
+  };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+  setInterval(() => { if (document.visibilityState === 'visible') check(); }, 15 * 60e3);
+})();
 const LOCS = ['Боян Петров', 'Лерин'];
 /* бонуси */
 const LOC_ADDR = { 'Боян Петров': 'ул. Боян Петров 3', 'Лерин': 'ж.к. Белите брези, ул. Лерин 53' };
