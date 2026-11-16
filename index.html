@@ -3837,9 +3837,8 @@ function pgWeightStats() {
   const w = PG.D.weights, p = PG.D.profile || {}, t = today();
   if (!w.length) return { n: 0 };
   const from = ymd(addDays(parse(t), -6)), recent = w.filter(x => x.day >= from);
-  const now = recent.length ? pgAvg(recent.map(x => Number(x.weight_kg))) : Number(w[w.length - 1].weight_kg);
-  const first = w.filter(x => x.day < ymd(addDays(parse(w[0].day), 7)));
-  const start = p.start_weight != null ? Number(p.start_weight) : pgAvg(first.map(x => Number(x.weight_kg)));
+  const now = Number(w[w.length - 1].weight_kg), avg7 = recent.length ? pgAvg(recent.map(x => Number(x.weight_kg))) : null;
+  const start = p.start_weight != null ? Number(p.start_weight) : Number(w[0].weight_kg);
   const wk = {}; w.forEach(x => (wk[pgMon(x.day)] ||= []).push(Number(x.weight_kg)));
   const wl = Object.keys(wk).sort().map(k => ({ k, v: pgAvg(wk[k]) }));
   let pct = null; if (wl.length >= 2) pct = (wl[wl.length - 1].v - wl[wl.length - 2].v) / wl[wl.length - 2].v;
@@ -3852,7 +3851,7 @@ function pgWeightStats() {
   }
   const hint = !goal ? '' : goal === 'Отслабване' ? 'Препоръчително темпо: −0,5% до −1,0% от теглото на седмица' + (start ? ` (≈ ${pgF(start * .005)}–${pgF(start * .01)} кг)` : '') : goal.startsWith('Покачване') ? 'Препоръчително темпо: +0,25% до +0,5% от теглото на седмица' + (start ? ` (≈ ${pgF(start * .0025, 2)}–${pgF(start * .005, 2)} кг)` : '') : 'Поддържане/рекомпозиция: теглото остава в ±0,5% седмично — следете обиколките, снимките и силата в залата.';
   const ma = w.map(x => { const lo = ymd(addDays(parse(x.day), -6)); return { d: x.day, v: pgAvg(w.filter(y => y.day >= lo && y.day <= x.day).map(y => Number(y.weight_kg))) }; });
-  return { n: w.length, now, start, change: start != null ? now - start : null, left: tgt != null ? Math.abs(now - tgt) : null, tgt, pct, pace, hint, ma };
+  return { n: w.length, now, avg7, last: w[w.length - 1].day, start, change: start != null ? now - start : null, left: tgt != null ? Math.abs(now - tgt) : null, tgt, pct, pace, hint, ma };
 }
 
 /* ── рендиране ── */
@@ -3882,7 +3881,7 @@ function pgConsent() {
 function pgWeightTab() {
   const s = pgWeightStats(), w = PG.D.weights, e = PG.ed.w || {};
   const g = wGoal(s.now, s.start, s.tgt);
-  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>средно за 7 дни</small></div><div><span>Целево тегло</span><b>${s.tgt == null ? '—' : pgF(s.tgt) + ' кг'}</b><small>${s.tgt == null ? (PG.staff ? 'задай в „Профил“' : 'още не е зададено') : 'старт ' + pgF(s.start)}</small></div><div><span>Остава до целта</span><b>${!g ? '—' : g.reached ? '0%' : g.pct != null ? Math.round(g.pct) + '%' : pgF(g.left) + ' кг'}</b><small>${!g ? 'няма цел' : g.reached ? 'целта е постигната ✓' : pgF(g.left) + ' кг'}</small></div><div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div></div>
+  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>${pgDm(s.last)}${s.avg7 != null ? ' · средно 7 дни ' + pgF(s.avg7) : ''}</small></div><div><span>Целево тегло</span><b>${s.tgt == null ? '—' : pgF(s.tgt) + ' кг'}</b><small>${s.tgt == null ? (PG.staff ? 'задай в „Профил“' : 'още не е зададено') : 'старт ' + pgF(s.start)}</small></div><div><span>Остава до целта</span><b>${!g ? '—' : g.reached ? '0%' : g.pct != null ? Math.round(g.pct) + '%' : pgF(g.left) + ' кг'}</b><small>${!g ? 'няма цел' : g.reached ? 'целта е постигната ✓' : pgF(g.left) + ' кг'}</small></div><div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div></div>
     ${g && g.pct != null ? `<div style="height:8px;border-radius:99px;background:var(--pg-line);overflow:hidden;margin-top:10px" title="Изминат път до целта"><i style="display:block;height:100%;width:${(100 - g.pct).toFixed(1)}%;background:var(--pg-acc);border-radius:99px"></i></div>` : ''}
     ${s.pace ? `<div class="pg-pace">Темпо: ${pgChip(s.pace[0], s.pace[1])} <span class="pg-mute">${s.pct > 0 ? '+' : ''}${pgF(s.pct * 100, 2)}% спрямо предходната седмица</span></div>` : ''}${s.hint ? `<div class="pg-mute pg-sm">${esc(s.hint)}</div>` : ''}` : '<div class="pg-empty">Въведи първото си тегло.</div>';
   const lst = w.slice().reverse().slice(0, 14).map(x => `<div class="pg-li"><span>${fmt(x.day)}</span><b>${pgF(x.weight_kg)} кг</b>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgwedit" data-d="${x.day}" data-v="${x.weight_kg}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgwdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>`).join('');
