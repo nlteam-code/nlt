@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-1625';
+const BUILD = '20261116-1715';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -1983,6 +1983,22 @@ function noProfList() {
   const send = L.filter(c => c.email && /^\S+@\S+\.\S+$/.test(c.email.trim()) && (c.status === 'Active' || c.status === 'Paused' || cstat(c) === 'active'));
   return { L, send, lead: L.filter(c => !send.includes(c) && c.email), noMail: L.filter(c => !c.email) };
 }
+/* карта в Обобщение: неактивирани профили + бутон за имейл за активация */
+function noProfCard() {
+  const { send, noMail } = noProfList(), r = D.inv, sent = D.inv1 = D.inv1 || {};
+  const vis = c => !S.view || (S.view.locations || []).includes(c.location);
+  const mine = c => S.owner || !S.me.row || actLocs(S.me.row).includes(c.location) || !c.location;
+  const A = send.filter(c => vis(c) && mine(c)), B = noMail.filter(c => vis(c) && mine(c) && (c.status === 'Active' || c.status === 'Paused' || cstat(c) === 'active'));
+  if (!A.length && !B.length) return '';
+  const st = c => { const e = (c.email || '').trim().toLowerCase(); return sent[e] || (r && r.ok.includes(e)) ? '<span class="chip ok">изпратен</span>' : r && r.err[e] ? '<span class="chip bad">грешка</span>' : `<button class="sm" data-act="cinv1" data-id="${c.id}">Изпрати</button>`; };
+  const row = c => `<div class="row" style="padding:7px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0"><a data-act="client" data-id="${c.id}"><b>${esc(c.name)}</b></a><div class="mute" style="font-size:12px;overflow:hidden;text-overflow:ellipsis">${esc(c.email || 'няма имейл — добави го в профила')}${c.location ? ' · ' + esc(c.location) : ''}</div></div>${c.email ? st(c) : '<span class="chip">без имейл</span>'}</div>`;
+  const busy = r && !r.done;
+  return `<div class="card" style="margin-bottom:12px"><h2>Неактивирани профили <span class="mute">· ${A.length + B.length}</span></h2>
+    <div class="mute" style="margin-bottom:6px">Клиенти, които още не са влезли в приложението.</div>
+    <div style="max-height:300px;overflow:auto">${A.map(row).join('')}${B.map(row).join('')}</div>
+    <div class="row" style="margin-top:10px">${busy ? `<span>Изпращане… ${r.ok.length + Object.keys(r.err).length}/${r.total}</span><button class="sm" data-act="cinvstop">Спри</button>` : `<button class="pri" data-act="cinvall" ${A.length ? '' : 'disabled'}>Изпрати имейл за активация${A.length > 1 ? ` на всички (${A.length})` : ''}</button>`}</div></div>`;
+}
+function drawNoProfCard() { const el = document.getElementById('npcard'); if (el) el.innerHTML = noProfCard(); }
 function noProfView() {
   const { L, send, lead, noMail } = noProfList(), r = D.inv;
   const row = c => `<tr><td><a data-act="client" data-id="${c.id}">${esc(c.name)}</a></td><td>${esc(c.email || '—')}</td><td>${esc(c.location || '')}</td><td>${esc(CST[cstat(c)] || '')}</td><td>${r && r.ok.includes((c.email || '').trim().toLowerCase()) ? '<span class="chip ok">изпратена</span>' : r && r.err[(c.email || '').trim().toLowerCase()] ? `<span class="chip bad" title="${esc(r.err[(c.email || '').trim().toLowerCase()])}">грешка</span>` : ''}</td></tr>`;
@@ -1994,7 +2010,7 @@ function noProfView() {
     ${tbl('Ще получат покана (активни, на пауза или с текущ пакет)', send)}${tbl('Потенциални (Lead) без пакет — не се пращат', lead)}${tbl('Без имейл — въведи имейл в профила им', noMail)}`, true);
 }
 async function inviteAll() {
-  const { send } = noProfList(); if (!send.length) return;
+  let { send } = noProfList(); if (!S.owner && S.me.row) send = send.filter(c => !c.location || actLocs(S.me.row).includes(c.location)); if (!send.length) return;
   if (!confirm(`Да се изпрати покана за приложението на ${send.length} клиента?`)) return;
   const em = [...new Set(send.map(c => c.email.trim().toLowerCase()))];
   D.inv = { ok: [], err: {}, total: em.length, done: false }; D.invStop = false; noProfView();
@@ -2004,9 +2020,10 @@ async function inviteAll() {
     if (error && /rate|seconds|security purposes/i.test(error.message)) { await new Promise(r => setTimeout(r, 65000)); ({ error } = await sb.auth.signInWithOtp({ email: e, options: { shouldCreateUser: true } })); }
     if (error) D.inv.err[e] = error.message; else D.inv.ok.push(e);
     if (modal.open() && $('#modal h2')?.textContent.startsWith('Без профил')) noProfView();
+    drawNoProfCard();
     await new Promise(r => setTimeout(r, 15000));
   }
-  D.inv.done = true; toast(`Поканите са изпратени: ${D.inv.ok.length}${Object.keys(D.inv.err).length ? ` · грешки ${Object.keys(D.inv.err).length}` : ''}`);
+  D.inv.done = true; drawNoProfCard(); toast(`Поканите са изпратени: ${D.inv.ok.length}${Object.keys(D.inv.err).length ? ` · грешки ${Object.keys(D.inv.err).length}` : ''}`);
   if (modal.open() && $('#modal h2')?.textContent.startsWith('Без профил')) noProfView();
 }
 async function saveClient() {
@@ -2250,6 +2267,7 @@ async function trainerDash() {
   D.bal = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c && (!S.view || (S.view.locations || []).includes(r.c.location)));
   $('#main').innerHTML = `
     <div class="card" style="margin-bottom:12px">${soon}</div>
+    <div id="npcard">${noProfCard()}</div>
     ${actCardHtml(acts)}
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>`;
   enrichMoves();
@@ -2603,6 +2621,7 @@ async function dashView() {
       <div class="card">${subsFlowCard()}</div>
     </div>
     <div id="invcard"></div>
+    <div id="npcard">${noProfCard()}</div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
@@ -4276,6 +4295,7 @@ document.addEventListener('click', async e => {
       case 'bonloy': { const on = !RW.bcfg?.loyalty; if (on && !confirm('Да се включи ли лоялността? Клиентите с 3 абонамента подред ще получават −10% автоматично.')) { el.checked = false; break; } const { error } = await sb.from('settings').upsert({ key: 'bonus', value: { ...(RW.bcfg || {}), loyalty: on } }); if (error) return fail(error, 'Не се записа'); toast(on ? 'Лоялността е включена' : 'Лоялността е изключена'); rewardsView(); break; }
       case 'bonpick': { if (S.previewClient) return toast('Само преглед.'); const { error } = await sb.rpc('choose_bonus', { p_id: +el.dataset.id, p_reward: el.dataset.r }); if (error) return fail(error, 'Не се записа'); toast('Избрано'); clientApp(); break; }
       case 'cinvall': inviteAll(); break;
+      case 'cinv1': { const c = S.clients.find(x => String(x.id) === el.dataset.id); if (!c || !c.email) break; el.disabled = true; if (await sendInvite(c.email)) { D.inv1[c.email.trim().toLowerCase()] = 1; } drawNoProfCard(); break; }
       case 'cinvstop': D.invStop = true; break;
       case 'cemails': {
         const L = (S.clist || []).filter(c => !c.massage_only), ok = L.filter(c => c.email && c.email.includes('@')), em = [...new Set(ok.map(c => c.email.trim().toLowerCase()))], no = L.filter(c => !(c.email && c.email.includes('@')));
