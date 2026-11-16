@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-1715';
+const BUILD = '20261116-1735';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -2620,6 +2620,7 @@ async function dashView() {
         <div style="max-height:340px;overflow:auto">${shownActs.map(e => feRow(e, FEEDS)).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
       <div class="card">${subsFlowCard()}</div>
     </div>
+    <div id="cashcard"></div>
     <div id="invcard"></div>
     <div id="npcard">${noProfCard()}</div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
@@ -2627,7 +2628,7 @@ async function dashView() {
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>`;
-  loadCancelCard(); loadInvCard(); enrichMoves();
+  loadCancelCard(); loadInvCard(); loadCashCard(); enrichMoves();
 }
 
 /* Абонаменти за месеца: нови клиенти (първи абонамент или връщане след прекъсване) и спрели (абонаментът е свършил и не е подновен) */
@@ -3435,6 +3436,43 @@ async function clientInvoiceReq() {
   const { error } = await sb.from('invoice_requests').insert({ client_id: me.id, company: me.invoice_company });
   if (error && error.code !== '23505') return fail(error, 'Заявката не се изпрати');
   toast(error ? 'Вече имаш изпратена заявка.' : 'Заявката за фактура е изпратена'); clientApp();
+}
+/* пари в брой, събрани от служители (не от собственика) − предадени на собственика */
+const CASH_FROM = '2026-11-05';
+async function loadCashCard() {
+  const el = document.getElementById('cashcard'); if (!el || !S.owner) return;
+  const [pq, hq] = await Promise.all([
+    sb.from('payments').select('id,client_id,amount,date,method,taken_by').in('method', ['В брой', 'Cash']).gte('date', CASH_FROM).not('taken_by', 'is', null).order('date', { ascending: false }),
+    sb.from('cash_handovers').select('*').order('date', { ascending: false })]);
+  if (pq.error || hq.error) { el.innerHTML = ''; return; }
+  const meId = S.me && S.me.row && S.me.row.id, by = {};
+  for (const p of pq.data) { if (p.taken_by === meId) continue; const o = by[p.taken_by] = by[p.taken_by] || { pays: [], ho: [], got: 0, giv: 0 }; o.pays.push(p); o.got += Number(p.amount); }
+  for (const h of hq.data) { const o = by[h.staff_id] = by[h.staff_id] || { pays: [], ho: [], got: 0, giv: 0 }; o.ho.push(h); o.giv += Number(h.amount); }
+  D.cash = by;
+  const ids = Object.keys(by); if (!ids.length) { el.innerHTML = ''; return; }
+  const nm = id => (S.staff.find(x => x.id === id) || {}).name || 'служител';
+  el.innerHTML = `<div class="card" style="margin-bottom:12px"><h2>Пари в брой у служители</h2>
+    <div class="mute" style="margin-bottom:6px">Плащания в брой, въведени от служител (от ${fmt(CASH_FROM)}), минус това, което ти е предал. Банковите не влизат.</div>
+    ${ids.map(id => { const o = by[id], due = Math.round((o.got - o.giv) * 100) / 100;
+      return `<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="row"><div style="flex:1;min-width:0"><b>${esc(nm(id))}</b><div class="mute" style="font-size:12px">събрани ${money(o.got)} · предадени ${money(o.giv)}</div></div>
+        <div style="text-align:right;margin-right:8px"><div class="mute" style="font-size:12px">трябва да получиш</div><b style="font-size:20px;color:${due > 0 ? 'var(--accent,#eb4c51)' : 'inherit'}">${money(due)}</b></div>
+        <button class="sm" data-act="cashgot" data-id="${id}" ${due > 0 ? '' : 'disabled'}>Получих</button></div>
+        <details style="margin-top:6px"><summary class="mute" style="cursor:pointer;font-size:13px">Плащания (${o.pays.length})${o.ho.length ? ` и предавания (${o.ho.length})` : ''}</summary>
+        ${o.ho.map(h => `<div class="fe"><span>${fmt(h.date)} · <b>предадени</b>${h.note ? ' · ' + esc(h.note) : ''}</span><span>−${money(h.amount)} <button class="sm" data-act="cashdel" data-id="${h.id}" title="Изтрий">✕</button></span></div>`).join('')}
+        ${o.pays.map(p => `<div class="fe"><span>${fmt(p.date)} · ${esc(cname(p.client_id))}</span><span>${money(p.amount)}</span></div>`).join('')}</details></div>`; }).join('')}</div>`;
+}
+async function cashAct(act, el) {
+  if (act === 'cashgot') {
+    const id = el.dataset.id, o = (D.cash || {})[id]; if (!o) return; const due = Math.round((o.got - o.giv) * 100) / 100;
+    const v = prompt('Колко пари в брой получи? (€)', String(due)); if (v === null) return;
+    const a = Math.round(Number(String(v).replace(',', '.')) * 100) / 100; if (!(a > 0)) return toast('Въведи сума.');
+    const { error } = await sb.from('cash_handovers').insert({ staff_id: id, amount: a, date: today() });
+    if (error) return fail(error, 'Не се записа'); toast('Записано: получени ' + money(a));
+  } else {
+    if (!confirm('Да изтрия ли това предаване?')) return;
+    const { error } = await sb.from('cash_handovers').delete().eq('id', el.dataset.id); if (error) return fail(error, 'Не се изтри');
+  }
+  loadCashCard();
 }
 async function loadInvCard() {
   const el = document.getElementById('invcard'); if (!el || !S.owner) return;
@@ -4253,6 +4291,7 @@ document.addEventListener('click', async e => {
       case 'cnav': C.tab = el.dataset.t; renderClient(); window.scrollTo(0, 0); break;
       case 'cinvreq': await clientInvoiceReq(); break;
       case 'invdone': case 'invno': await invoiceAct(act, el); break;
+      case 'cashgot': case 'cashdel': await cashAct(act, el); break;
       case 'weighgo': C.tab = 'prog'; PG.tab = 'weight'; renderClient(); window.scrollTo(0, 0); break;
       case 'csvc': C.svcMode = el.dataset.m; renderClient(); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
