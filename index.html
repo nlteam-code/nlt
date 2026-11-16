@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-1745';
+const BUILD = '20261116-1755';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -1991,13 +1991,15 @@ function noProfCard() {
   const mine = c => S.owner || !S.me.row || actLocs(S.me.row).includes(c.location) || !c.location;
   const A = send.filter(c => vis(c) && mine(c)), B = noMail.filter(c => vis(c) && mine(c) && (c.status === 'Active' || c.status === 'Paused' || cstat(c) === 'active'));
   if (!A.length && !B.length) return '';
-  const st = c => { const e = (c.email || '').trim().toLowerCase(); return sent[e] || (r && r.ok.includes(e)) ? '<span class="chip ok">изпратен</span>' : r && r.err[e] ? '<span class="chip bad">грешка</span>' : `<button class="sm" data-act="cinv1" data-id="${c.id}">Изпрати</button>`; };
-  const row = c => `<div class="row" style="padding:7px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0"><a data-act="client" data-id="${c.id}"><b>${esc(c.name)}</b></a><div class="mute" style="font-size:12px;overflow:hidden;text-overflow:ellipsis">${esc(c.email || 'няма имейл — добави го в профила')}${c.location ? ' · ' + esc(c.location) : ''}</div></div>${c.email ? st(c) : '<span class="chip">без имейл</span>'}</div>`;
+  const isSent = c => { const e = (c.email || '').trim().toLowerCase(); return sent[e] || (r && r.ok.includes(e)); }, isErr = c => r && r.err[(c.email || '').trim().toLowerCase()];
+  const chipC = c => `<div class="np-c${c.email ? '' : ' np-no'}" title="${esc(c.email || 'няма имейл — добави го в профила')}"><a data-act="client" data-id="${c.id}">${esc(c.name)}</a>${!c.email ? '<span class="np-s">без имейл</span>' : isSent(c) ? '<span class="np-s ok">✓</span>' : isErr(c) ? '<span class="np-s bad">!</span>' : `<button class="np-b" data-act="cinv1" data-id="${c.id}" title="Изпрати имейл за активация">✉</button>`}</div>`;
+  const all = A.concat(B), locs = [...new Set(all.map(c => c.location || 'Без обект'))].sort((x, y) => LOCS.indexOf(x) - LOCS.indexOf(y));
   const busy = r && !r.done;
-  return `<div class="card" style="margin-bottom:12px"><h2>Неактивирани профили <span class="mute">· ${A.length + B.length}</span></h2>
-    <div class="mute" style="margin-bottom:6px">Клиенти, които още не са влезли в приложението.</div>
-    <div style="max-height:300px;overflow:auto">${A.map(row).join('')}${B.map(row).join('')}</div>
-    <div class="row" style="margin-top:10px">${busy ? `<span>Изпращане… ${r.ok.length + Object.keys(r.err).length}/${r.total}</span><button class="sm" data-act="cinvstop">Спри</button>` : `<button class="pri" data-act="cinvall" ${A.length ? '' : 'disabled'}>Изпрати имейл за активация${A.length > 1 ? ` на всички (${A.length})` : ''}</button>`}</div></div>`;
+  return `<style>.np-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;margin:6px 0 12px}.np-c{display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line);border-radius:10px;font-size:13px;min-width:0}.np-c a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.np-no{opacity:.55}.np-b{padding:2px 7px;font-size:13px;line-height:1.2}.np-s{font-size:11px;color:var(--mute,#999);white-space:nowrap}.np-s.ok{color:#3fb950}.np-s.bad{color:#eb4c51}</style>
+    <div class="card" style="margin-bottom:12px"><h2>Неактивирани профили <span class="mute">· ${all.length}</span></h2>
+    <div class="mute" style="margin-bottom:6px">Клиенти, които още не са влезли в приложението. ✉ праща имейл за активация.</div>
+    ${locs.map(l => { const g = all.filter(c => (c.location || 'Без обект') === l).sort((a, z) => a.name.localeCompare(z.name, 'bg')); return `<div style="font-weight:600;margin-top:6px">${esc(l)} <span class="mute" style="font-weight:400">· ${g.length}</span></div><div class="np-g">${g.map(chipC).join('')}</div>`; }).join('')}
+    <div class="row">${busy ? `<span>Изпращане… ${r.ok.length + Object.keys(r.err).length}/${r.total}</span><button class="sm" data-act="cinvstop">Спри</button>` : `<button class="pri" data-act="cinvall" ${A.length ? '' : 'disabled'}>Изпрати имейл за активация${A.length > 1 ? ` на всички (${A.length})` : ''}</button>`}</div></div>`;
 }
 function drawNoProfCard() { const el = document.getElementById('npcard'); if (el) el.innerHTML = noProfCard(); }
 function noProfView() {
@@ -2268,9 +2270,9 @@ async function trainerDash() {
   D.bal = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c && (!S.view || (S.view.locations || []).includes(r.c.location)));
   $('#main').innerHTML = `
     <div class="card" style="margin-bottom:12px">${soon}</div>
-    <div id="npcard">${noProfCard()}</div>
     ${actCardHtml(acts)}
-    <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>`;
+    <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
+    <div id="npcard">${noProfCard()}</div>`;
   enrichMoves();
 }
 async function loadCancelCard() {
@@ -2623,12 +2625,12 @@ async function dashView() {
     </div>
     <div id="cashcard"></div>
     <div id="invcard"></div>
-    <div id="npcard">${noProfCard()}</div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
-      ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>`;
+      ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>
+    <div id="npcard" style="margin-top:12px">${noProfCard()}</div>`;
   loadCancelCard(); loadInvCard(); loadCashCard(); enrichMoves();
 }
 
