@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-1825';
+const BUILD = '20261116-2150';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -2301,12 +2301,12 @@ async function loadCancelCard() {
 }
 function actLocs(r) { const a = r && r.act_locations; return (Array.isArray(a) && a.length ? a : (r && r.locations) || []); }
 function actCardHtml(acts) {
-  const FEEDS = { cancel: 'Отказан', change: 'Сменен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' }, dd = parse(D.day);
+  const FEEDS = { cancel: 'Отказан', change: 'Сменен', move: 'Смяна', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' }, dd = parse(D.day);
   const cnt = t => acts.filter(e => e.type === t).length, shown = acts.filter(e => D.filter === 'all' || e.type === D.filter);
   const chip = (v, l, extra = '') => `<button class="sm ${D.filter === v ? 'on' : ''}" data-act="afilter" data-v="${v}">${l}${extra}</button>`;
   return `<div class="card" style="margin-bottom:12px"><h2>Дневна активност <span class="mute" style="font-weight:400">· ${esc(actLocs(S.me.row).join(', '))}</span></h2>
     <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
-    <div class="chips">${chip('all', 'Всички', S.owner ? ` ${acts.length}` : '')}${chip('cancel', 'Отказани', S.owner ? ` ${cnt('cancel')}` : '')}${chip('change', 'Сменени', S.owner ? ` ${cnt('change')}` : '')}${chip('attended', 'Проведени', S.owner ? ` ${cnt('attended')}` : '')}${chip('new', 'Записани', S.owner ? ` ${cnt('new')}` : '')}${chip('activated', 'Нови профили', ` ${cnt('activated')}`)}</div>
+    <div class="chips">${chip('all', 'Всички', S.owner ? ` ${acts.length}` : '')}${chip('move', 'Смени на час', ` ${cnt('move')}`)}${chip('cancel', 'Отказани', S.owner ? ` ${cnt('cancel')}` : '')}${chip('change', 'Сменени', S.owner ? ` ${cnt('change')}` : '')}${chip('attended', 'Проведени', S.owner ? ` ${cnt('attended')}` : '')}${chip('new', 'Записани', S.owner ? ` ${cnt('new')}` : '')}${chip('activated', 'Нови профили', ` ${cnt('activated')}`)}</div>
     <div style="max-height:340px;overflow:auto">${shown.map(e => feRow(e, FEEDS)).join('') || '<div class="mute">Няма събития за този ден.</div>'}</div></div>`;
 }
 async function nextClients() {
@@ -2609,7 +2609,7 @@ async function dashView() {
     svg += `<text x="${cx}" y="${H - 8}" text-anchor="middle" ${x === cur ? 'style="fill:var(--ink);font-weight:700"' : ''}>${MSHORT[+x.slice(5, 7) - 1]}</text>`; });
   svg += '</svg>';
   // дневна активност
-  const FEEDS = { cancel: 'Отказан', change: 'Сменен', paid: 'Платен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' };
+  const FEEDS = { cancel: 'Отказан', change: 'Сменен', move: 'Смяна', paid: 'Платен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' };
   D.aloc = D.aloc || 'all';
   const acts = (act.data || []).filter(e => D.aloc === 'all' || e.location === D.aloc), cnt = t => acts.filter(e => e.type === t).length;
   const alocBtns = `<div class="seg" style="margin-bottom:8px;flex-wrap:wrap">${['all', ...LOCS].map(l => { const who = l === 'all' ? '' : S.staff.filter(t => t.active !== false && t.role !== 'admin' && actLocs(t).includes(l)).map(t => t.name.split(' ')[0]).join(', '); return `<button class="${D.aloc === l ? 'on' : ''}" data-act="aloc" data-v="${esc(l)}">${l === 'all' ? 'Всички' : esc(l)}${who ? ` <span class="mute" style="font-weight:400">· ${esc(who)}</span>` : ''}</button>`; }).join('')}</div>`;
@@ -2623,7 +2623,7 @@ async function dashView() {
       <div class="card"><h2>Дневна активност</h2>
         ${alocBtns}
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
-        <div class="chips">${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'activated', 'Нови профили', D.filter, ` ${cnt('activated')}`)}</div>
+        <div class="chips">${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}${chip('afilter', 'move', 'Смени на час', D.filter, ` ${cnt('move')}`)}${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'activated', 'Нови профили', D.filter, ` ${cnt('activated')}`)}</div>
         <div style="max-height:340px;overflow:auto">${shownActs.map(e => feRow(e, FEEDS)).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
       <div class="card">${subsFlowCard()}</div>
     </div>
