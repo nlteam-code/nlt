@@ -622,6 +622,7 @@ const modal = {
   close() { $('#modal').innerHTML = ''; },
   open() { return !!$('#modal .ov'); }
 };
+const addMonthsD = (d, n) => { const x = new Date(d); x.setDate(1); x.setMonth(x.getMonth() + n); return x; };
 const addMonths = (d, n) => { const x = new Date(d); const day = x.getDate(); x.setDate(1); x.setMonth(x.getMonth() + n); x.setDate(Math.min(day, new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate())); return x; };
 function pkgEnd(start, p) {
   const s = parse(start);
@@ -2069,7 +2070,7 @@ const mLabel = m => `${MONTHS[+m.slice(5, 7) - 1]} ${m.slice(0, 4)}`;
 const canPrice = () => !!(S.owner || (S.me && S.me.role === 'staff' && S.me.row && S.me.row.perm_prices));
 const eur = n => `€${(Math.round((+n || 0) * 100) / 100).toLocaleString('bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dmm = d => `${d.slice(8)}.${d.slice(5, 7)}`;
-const D = { month: firstOf(today()), tab: 'due', chart: 'pay', day: today(), filter: 'all' };
+const D = { month: firstOf(today()), tab: 'due', chart: 'pay', day: today(), filter: 'paid' };
 
 function logEvent(type, text, loc) { sb.from('activity').insert({ type, text, location: loc || (LOCS.includes(S.loc) ? S.loc : null), actor: S.me?.row?.user_id || null }).then(() => {}, () => {}); }
 /* имената на записаните клиенти в час(ове) — за дневника */
@@ -2240,7 +2241,7 @@ function exitPreview() { S.previewClient = null; S.me = S.view || S.real; S.owne
 async function trainerDash() {
   loadMain();
   D.tab = 'due'; D.ploc = D.ploc || 'all';
-  D.day = D.day || today(); D.filter = D.filter || 'all';
+  D.day = D.day || today(); D.filter = D.filter || 'paid';
   const dA = new Date(D.day + 'T00:00:00'), dB = new Date(dA.getTime() + 864e5), myLocs = actLocs(S.me.row);
   const [bal, soon, actq] = await Promise.all([sb.rpc('my_debtors'), nextClients(), sb.from('activity').select('*').gte('at', dA.toISOString()).lt('at', dB.toISOString()).order('at', { ascending: false }).limit(300)]);
   const acts = (actq.data || []).filter(e => e.type !== 'paid' && e.location && myLocs.includes(e.location));
@@ -2592,29 +2593,47 @@ async function dashView() {
   // КПД
   const trows = tr.data.map(r => ({ ...r, t: S.staff.find(x => x.id === r.trainer_id) })).filter(r => r.t).sort((a, z) => a.t.name.localeCompare(z.t.name, 'bg'));
   $('#main').innerHTML = `
-    <div class="kpis">${kpi('Приход', eur(cr.pay), 'получени плащания този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
+    <div class="kpis">${kpi('Приход', eur(cr.pay), 'получени плащания този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Прогнозен приход', eur(cr.proj), `реализиран ${eur(cr.done)} · ${cr.n_done}/${cr.n} посещения`)}${kpi('Средна цена', eur(cr.n ? cr.proj / cr.n : 0), 'на посещение този месец')}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
     <div class="cols">
       <div class="card"><h2>Дневна активност</h2>
         ${alocBtns}
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
-        <div class="chips">${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}${chip('afilter', 'activated', 'Нови профили', D.filter, ` ${cnt('activated')}`)}</div>
+        <div class="chips">${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'activated', 'Нови профили', D.filter, ` ${cnt('activated')}`)}</div>
         <div style="max-height:340px;overflow:auto">${shownActs.map(e => feRow(e, FEEDS)).join('') || '<div class="mute">Няма събития за този ден. Отказани, сменени и платени часове се записват оттук нататък.</div>'}</div></div>
-      <div class="card"><h2>Прогноза за месеца</h2>
-        <div class="row" style="margin-bottom:8px"><button class="sm" data-act="dmonth" data-d="-1">‹</button><b>${mLabel(D.month)}</b><button class="sm" data-act="dmonth" data-d="1">›</button></div>
-        <div class="stat2"><div><b>${eur(st.proj)}</b><span>Прогнозен приход</span></div><div><b>${eur(st.done)}</b><span>Реализиран до момента</span></div><div><b>${st.n_done} / ${st.n}</b><span>Проведени / всички посещения</span></div><div><b>${eur(st.n ? st.proj / st.n : 0)}</b><span>Средна цена на посещение</span></div></div>
-        <p class="mute">${diff === null ? 'Няма данни за предишния месец.' : `Спрямо ${mLabel(shiftM(D.month, -1))}: ${diff >= 0 ? '+' : ''}${diff}% (${eur(pv.proj)}).`} Цената на пакета ÷ броя посещения в него; еднократните — по тяхната цена. Отказаните не се броят.</p></div>
+      <div class="card">${subsFlowCard()}</div>
     </div>
     <div id="invcard"></div>
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div class="card" id="cancelcard" style="margin-bottom:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>
-    <div class="card" style="margin-bottom:12px"><h2>Финансова графика по месеци</h2>
-      <div class="chips">${chip('ctab', 'pay', 'Плащания', D.chart)}${chip('ctab', 'chg', 'Такси', D.chart)}${chip('ctab', 'proj', 'Прогноза по посещения', D.chart)}</div>${svg}</div>
     <div class="card"><h2>КПД на треньорите · ${mLabel(D.month)}</h2>
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>`;
   loadCancelCard(); loadInvCard(); enrichMoves();
 }
 
+/* Абонаменти за месеца: нови клиенти (първи абонамент или връщане след прекъсване) и спрели (абонаментът е свършил и не е подновен) */
+function subsFlowCard() {
+  const m = D.month, me = ymd(addDays(addMonthsD(parse(m), 1), -1)), t = today(), GAP = 14;
+  const P = (S.pstat || []).filter(p => S.clients.some(c => c.id === p.client_id));
+  const by = {}; P.forEach(p => (by[p.client_id] = by[p.client_id] || []).push(p));
+  const neu = [], stop = [];
+  Object.entries(by).forEach(([cid, L]) => {
+    L.sort((a, b) => a.start_date.localeCompare(b.start_date));
+    L.forEach((p, i) => {
+      const prev = L.slice(0, i).some(q => q.end_date >= ymd(addDays(parse(p.start_date), -GAP)));
+      if (p.start_date >= m && p.start_date <= me && !prev) neu.push({ cid, p });
+      const next = L.slice(i + 1).some(q => q.start_date <= ymd(addDays(parse(p.end_date), GAP)));
+      if (p.end_date >= m && p.end_date <= me && p.end_date < t && !next && !L.some(q => q !== p && q.end_date > p.end_date)) stop.push({ cid, p });
+    });
+  });
+  const li = (arr, sub) => arr.length ? arr.sort((a, b) => cname(a.cid).localeCompare(cname(b.cid), 'bg')).map(x => `<div class="bk"><div class="nm"><a href="#" data-act="client" data-id="${x.cid}">${esc(cname(x.cid))}</a></div><span class="mute">${esc(sub(x.p))}</span></div>`).join('') : '<div class="mute">Няма.</div>';
+  return `<h2>Абонаменти · ${mLabel(m)}</h2>
+    <div class="row" style="margin-bottom:8px"><button class="sm" data-act="dmonth" data-d="-1">‹</button><b>${mLabel(m)}</b><button class="sm" data-act="dmonth" data-d="1">›</button></div>
+    <div class="stat2"><div><b style="color:var(--ok,#1f9d62)">+${neu.length}</b><span>нови клиенти</span></div><div><b style="color:var(--bad)">−${stop.length}</b><span>спрели</span></div><div><b>${neu.length - stop.length >= 0 ? '+' : ''}${neu.length - stop.length}</b><span>разлика</span></div></div>
+    <details style="margin-top:8px"><summary><b>Нови (${neu.length})</b></summary>${li(neu, p => `${p.package_name || 'Абонамент'} · от ${fmt(p.start_date)}`)}</details>
+    <details style="margin-top:6px"><summary><b>Спрели (${stop.length})</b></summary>${li(stop, p => `${p.package_name || 'Абонамент'} · свършил ${fmt(p.end_date)}`)}</details>
+    <p class="mute" style="font-size:12px">Нов = първи абонамент или връщане след повече от ${GAP} дни прекъсване. Спрял = абонаментът е свършил и в следващите ${GAP} дни няма нов.</p>`;
+}
 /* ── Пакети ── */
 const UNITS = { weeks: 'седмици', months: 'месеца' };
 async function packagesView() {
