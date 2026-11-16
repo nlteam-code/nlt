@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-1430';
+const BUILD = '20261116-1450';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -1576,7 +1576,7 @@ async function openSession(id) {
       <label class="f">Места<input type="number" id="s-cap" value="${s.capacity ?? ''}" min="1"></label>
     </div>
     <label class="f" style="margin-top:8px">Бележка<textarea id="s-notes" rows="2">${esc(s.notes || '')}</textarea></label>
-    <div class="row" style="margin-top:10px"><button class="pri" data-act="ssave">Запази</button>${s.series_id ? `<button data-act="ssaveall" title="Треньор, час, продължителност, заглавие и места се прилагат и за всички следващи часове от серията">Запази този и всички следващи</button>` : ''}
+    <div class="row" style="margin-top:10px"><button class="pri" data-act="ssave">Запази</button>${!s.series_id && !s.cancelled ? `<button data-act="smkrec" title="Часът ще се повтаря всяка седмица в същия ден и час">↻ Направи повтарящ се</button>` : ''}${s.series_id ? `<button data-act="ssaveall" title="Треньор, час, продължителност, заглавие и места се прилагат и за всички следващи часове от серията">Запази този и всички следващи</button>` : ''}
       <button data-act="scancel">${s.cancelled ? 'Върни часа' : 'Отмени часа'}</button><span class="sp"></span>
       <button class="danger" data-act="sdel">Изтрий часа</button></div>
     <h3>Записани (${act.length}${s.capacity && s.kind !== 'solo' ? ' от ' + s.capacity : ''})</h3>
@@ -1641,6 +1641,30 @@ async function saveSession() {
   const { error } = await sb.from('sessions').update(patch).eq('id', id);
   if (error) return fail(error, 'Не се записа');
   if (trChanged) { await setTrainerScoped(old, $('#s-tr') ? $('#s-tr').value : old.trainer_id); } else toast('Записано');
+  await refreshAfter(id);
+}
+/* Еднократен час → повтарящ се всяка седмица (същия ден, час, обект и треньор) */
+async function makeRecurring() {
+  const id = sessId();
+  const { data: s0, error: e0 } = await sb.from('sessions').select('*').eq('id', id).single();
+  if (e0 || !s0) return fail(e0, 'Часът не се намери');
+  if (s0.series_id) return toast('Часът вече е повтарящ се.');
+  const wd = (parse(s0.date).getDay() + 6) % 7, days = ['понеделник', 'вторник', 'сряда', 'четвъртък', 'петък', 'събота', 'неделя'][wd];
+  const { data: bk } = await sb.from('bookings').select('client_id,status').eq('session_id', id).neq('status', 'cancelled');
+  const cl = [...new Set((bk || []).map(b => b.client_id))];
+  if (!confirm(`„${s0.title || 'Час'}“ ще се повтаря всеки ${days} от ${hm(s0.start_time)} (${s0.location}) за година напред.`)) return;
+  const addCl = cl.length ? confirm(`Да се запишат ли и ${cl.map(cname).join(', ')} всяка седмица в този час?\n\nOK = да, постоянно\nОтказ = само в този час`) : false;
+  const { data: ser, error } = await sb.from('series').insert({ kind: s0.kind, trainer_id: s0.trainer_id, location: s0.location, weekday: wd, start_time: s0.start_time, title: s0.title, capacity: s0.capacity, green: s0.green, starts_on: s0.date }).select('id').single();
+  if (error) return fail(error, 'Не се създаде');
+  /* този час и вече създадени еднократни часове в същия ден/час/обект стават част от серията — без дубликати */
+  const { data: same } = await sb.from('sessions').select('id,date').is('series_id', null).eq('cancelled', false).eq('location', s0.location).eq('start_time', s0.start_time).eq('kind', s0.kind).gte('date', s0.date).range(0, 999);
+  const link = [id, ...(same || []).filter(x => x.id !== id && (parse(x.date).getDay() + 6) % 7 === wd).map(x => x.id)];
+  const r1 = await sb.from('sessions').update({ series_id: ser.id }).in('id', link); if (r1.error) return fail(r1.error, 'Часът не се свърза със серията');
+  const singles = []; if (addCl) for (const c of cl) if (await seriesJoin(ser.id, c, s0.kind)) singles.push(cname(c));
+  const r2 = await sb.rpc('extend_series', { horizon_weeks: 53 }); if (r2.error) return fail(r2.error, 'Не се разписа напред');
+  const { count } = await sb.from('sessions').select('id', { count: 'exact', head: true }).eq('series_id', ser.id).gte('date', s0.date);
+  logEvent('change', `Повтарящ се час: ${s0.title || ''} всеки ${days} ${hm(s0.start_time)} · ${s0.location}`);
+  toast(`Повтаря се всеки ${days} · ${count || 0} часа напред${addCl ? ' · клиентите са записани постоянно' : ''}${singles.length ? ` · еднократно: ${singles.join(', ')}` : ''}`);
   await refreshAfter(id);
 }
 /* „Запази този и всички следващи“: промените (без датата и бележката) отиват и в следващите часове от серията */
@@ -4267,6 +4291,7 @@ document.addEventListener('click', async e => {
       case 'nsave': { if ($('#n-cq').value.trim()) return toast('Избери клиента от списъка (или изтрий текста).'); await createSession({ kind: $('#n-kind').value, date: $('#n-date').value, time: $('#n-time').value, dur: +$('#n-dur').value || 60, trainer: $('#n-tr').value, title: $('#n-title').value.trim(), cap: +$('#n-cap').value || null, repeat: $('#n-rep').checked, clients: ($('#n-cid').value || '').split(',').filter(Boolean) }); break; }
       case 'ssave': await saveSession(); break;
       case 'ssaveall': await saveSessionAll(); break;
+      case 'smkrec': await makeRecurring(); break;
       case 'mv': await moveSession(+el.dataset.dm); break;
       case 'scancel': { const { data: s } = await sb.from('sessions').select('cancelled').eq('id', sessId()).single(); await sb.from('sessions').update({ cancelled: !s.cancelled }).eq('id', sessId()); await refreshAfter(sessId()); break; }
       case 'sdel': await delSession(sessId()); break;
