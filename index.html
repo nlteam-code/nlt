@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261117-1845';
+const BUILD = '20261117-2045';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -2619,6 +2619,7 @@ async function dashView() {
   const trows = tr.data.map(r => ({ ...r, t: S.staff.find(x => x.id === r.trainer_id) })).filter(r => r.t).sort((a, z) => a.t.name.localeCompare(z.t.name, 'bg'));
   $('#main').innerHTML = `
     <div class="kpis">${kpi('Приход', eur(cr.pay), 'получени плащания този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Прогнозен приход', eur(cr.proj), `реализиран ${eur(cr.done)} · ${cr.n_done}/${cr.n} посещения`)}${kpi('Средна цена', eur(cr.n ? cr.proj / cr.n : 0), 'на посещение този месец')}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
+    <div id="dupcard"></div>
     <div class="cols">
       <div class="card"><h2>Дневна активност</h2>
         ${alocBtns}
@@ -2634,7 +2635,7 @@ async function dashView() {
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>
     <div id="npcard" style="margin-top:12px">${noProfCard()}</div>`;
-  loadInvCard(); loadCashCard(); enrichMoves();
+  loadInvCard(); loadCashCard(); loadDupCard(); enrichMoves();
 }
 
 /* Абонаменти за месеца: нови клиенти (първи абонамент или връщане след прекъсване) и спрели (абонаментът е свършил и не е подновен) */
@@ -3510,6 +3511,15 @@ async function cashAct(act, el) {
     const { error } = await sb.from('cash_handovers').delete().eq('id', el.dataset.id); if (error) return fail(error, 'Не се изтри');
   }
   loadCashCard();
+}
+/* клиенти, записани в 2+ часа в един и същи ден — винаги видимо в Обобщение */
+async function loadDupCard() {
+  const el = document.getElementById('dupcard'); if (!el) return;
+  const { data, error } = await sb.rpc('dup_bookings');
+  if (error || !data || !data.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="card" style="margin-bottom:12px;border:1px solid var(--bad,#eb4c51)"><h2>⚠ Дублирани часове <span class="mute">· ${data.length} клиента</span></h2>
+    <div class="mute" style="margin-bottom:6px">Клиенти, записани в повече от един час в един и същи ден (от миналата седмица нататък).</div>
+    ${data.map(r => `<div class="fe"><span style="min-width:0"><a data-act="client" data-id="${r.client_id}"><b>${esc(r.name)}</b></a> <span class="mute">· ${r.days} ${r.days === 1 ? 'ден' : 'дни'} · от ${fmt(r.first_date)}${r.last_date !== r.first_date ? ' до ' + fmt(r.last_date) : ''}</span><div class="mute" style="font-size:12px">${esc(r.pattern)}</div></span></div>`).join('')}</div>`;
 }
 async function loadInvCard() {
   const el = document.getElementById('invcard'); if (!el || !S.owner) return;
