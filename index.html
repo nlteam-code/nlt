@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-2150';
+const BUILD = '20261116-2210';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -3457,11 +3457,13 @@ async function loadCashCard() {
     sb.from('payments').select('id,client_id,amount,date,method,taken_by').in('method', ['В брой', 'Cash']).gte('date', CASH_FROM).not('taken_by', 'is', null).order('date', { ascending: false }),
     sb.from('cash_handovers').select('*').order('date', { ascending: false })]);
   if (pq.error || hq.error) { el.innerHTML = ''; return; }
+  const hoMas = hq.data.filter(h => h.kind === 'massage'); hq.data = hq.data.filter(h => h.kind !== 'massage');
+  const masHtml = await massageCashHtml(hoMas);
   const meId = S.me && S.me.row && S.me.row.id, by = {};
   for (const p of pq.data) { if (p.taken_by === meId) continue; const o = by[p.taken_by] = by[p.taken_by] || { pays: [], ho: [], got: 0, giv: 0 }; o.pays.push(p); o.got += Number(p.amount); }
   for (const h of hq.data) { const o = by[h.staff_id] = by[h.staff_id] || { pays: [], ho: [], got: 0, giv: 0 }; o.ho.push(h); o.giv += Number(h.amount); }
   D.cash = by;
-  const ids = Object.keys(by); if (!ids.length) { el.innerHTML = ''; return; }
+  const ids = Object.keys(by); if (!ids.length && !masHtml) { el.innerHTML = ''; return; }
   const nm = id => (S.staff.find(x => x.id === id) || {}).name || 'служител';
   el.innerHTML = `<div class="card" style="margin-bottom:12px"><h2>Пари в брой у служители</h2>
     <div class="mute" style="margin-bottom:6px">Плащания в брой, въведени от служител (от ${fmt(CASH_FROM)}), минус това, което ти е предал. Банковите не влизат.</div>
@@ -3471,14 +3473,37 @@ async function loadCashCard() {
         <button class="sm" data-act="cashgot" data-id="${id}" ${due > 0 ? '' : 'disabled'}>Получих</button></div>
         <details style="margin-top:6px"><summary class="mute" style="cursor:pointer;font-size:13px">Плащания (${o.pays.length})${o.ho.length ? ` и предавания (${o.ho.length})` : ''}</summary>
         ${o.ho.map(h => `<div class="fe"><span>${fmt(h.date)} · <b>предадени</b>${h.note ? ' · ' + esc(h.note) : ''}</span><span>−${money(h.amount)} <button class="sm" data-act="cashdel" data-id="${h.id}" title="Изтрий">✕</button></span></div>`).join('')}
-        ${o.pays.map(p => `<div class="fe"><span>${fmt(p.date)} · ${esc(cname(p.client_id))}</span><span>${money(p.amount)}</span></div>`).join('')}</details></div>`; }).join('')}</div>`;
+        ${o.pays.map(p => `<div class="fe"><span>${fmt(p.date)} · ${esc(cname(p.client_id))}</span><span>${money(p.amount)}</span></div>`).join('')}</details></div>`; }).join('')}</div>${masHtml}`;
+}
+/* масажно: проведени масажи по график × цена на услугата − предадени */
+const MAS_FROM = '2026-11-01';
+async function massageCashHtml(ho) {
+  const [mb, ms] = await Promise.all([sb.from('massage_bookings').select('id,client_id,guest_name,date,start_time,service,provider,status').eq('status', 'booked').gte('date', MAS_FROM).lte('date', today()).order('date', { ascending: false }).order('start_time', { ascending: false }), sb.from('massage_services').select('name,price')]);
+  if (mb.error) return '';
+  const pr = Object.fromEntries((ms.data || []).map(x => [x.name, Number(x.price || 0)])), nowT = new Date().toTimeString().slice(0, 5);
+  const done = (mb.data || []).filter(x => x.date < today() || (x.start_time || '').slice(0, 5) <= nowT);
+  const prov = {}; done.forEach(x => (prov[x.provider || 'Масажист'] = prov[x.provider || 'Масажист'] || []).push(x));
+  D.masCash = {};
+  const rows = Object.entries(prov).map(([pn, L]) => {
+    const st = S.staff.find(t => t.name === pn), sid = st ? st.id : null, H = ho.filter(h => h.staff_id === sid);
+    const got = L.reduce((a, x) => a + (pr[x.service] || 0), 0), giv = H.reduce((a, h) => a + Number(h.amount), 0), due = Math.round((got - giv) * 100) / 100;
+    if (sid) D.masCash[sid] = due;
+    const nm = x => x.client_id ? cname(x.client_id) : (x.guest_name || 'гост');
+    return `<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="row"><div style="flex:1;min-width:0"><b>${esc(pn)}</b><div class="mute" style="font-size:12px">${L.length} масажа по график = ${money(got)} · предадени ${money(giv)}</div></div>
+      <div style="text-align:right;margin-right:8px"><div class="mute" style="font-size:12px">трябва да получиш</div><b style="font-size:20px;color:${due > 0 ? 'var(--accent,#eb4c51)' : 'inherit'}">${money(due)}</b></div>
+      ${sid ? `<button class="sm" data-act="cashgot" data-k="massage" data-id="${sid}" ${due > 0 ? '' : 'disabled'}>Получих</button>` : ''}</div>
+      <details style="margin-top:6px"><summary class="mute" style="cursor:pointer;font-size:13px">Масажи (${L.length})${H.length ? ` и предавания (${H.length})` : ''}</summary>
+      ${H.map(h => `<div class="fe"><span>${fmt(h.date)} · <b>предадени</b></span><span>−${money(h.amount)} <button class="sm" data-act="cashdel" data-id="${h.id}" title="Изтрий">✕</button></span></div>`).join('')}
+      ${L.map(x => `<div class="fe"><span>${fmt(x.date)} ${hm(x.start_time)} · ${esc(nm(x))} · <span class="mute">${esc(x.service || '')}</span></span><span>${pr[x.service] != null ? money(pr[x.service]) : '—'}</span></div>`).join('')}</details></div>`;
+  }).join('');
+  return rows ? `<div class="card" style="margin-bottom:12px"><h2>Масажно · пари за получаване</h2><div class="mute" style="margin-bottom:6px">Проведени масажи по график от ${fmt(MAS_FROM)} × цената на услугата, минус това, което ти е предадено. Отказаните не влизат.</div>${rows}</div>` : '';
 }
 async function cashAct(act, el) {
   if (act === 'cashgot') {
-    const id = el.dataset.id, o = (D.cash || {})[id]; if (!o) return; const due = Math.round((o.got - o.giv) * 100) / 100;
+    const id = el.dataset.id, mas = el.dataset.k === 'massage', o = (D.cash || {})[id]; if (!mas && !o) return; const due = mas ? (D.masCash || {})[id] || 0 : Math.round((o.got - o.giv) * 100) / 100;
     const v = prompt('Колко пари в брой получи? (€)', String(due)); if (v === null) return;
     const a = Math.round(Number(String(v).replace(',', '.')) * 100) / 100; if (!(a > 0)) return toast('Въведи сума.');
-    const { error } = await sb.from('cash_handovers').insert({ staff_id: id, amount: a, date: today() });
+    const { error } = await sb.from('cash_handovers').insert({ staff_id: id, amount: a, date: today(), kind: mas ? 'massage' : 'cash' });
     if (error) return fail(error, 'Не се записа'); toast('Записано: получени ' + money(a));
   } else {
     if (!confirm('Да изтрия ли това предаване?')) return;
