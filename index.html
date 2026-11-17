@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261117-2045';
+const BUILD = '20261117-2135';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -3741,6 +3741,7 @@ function clientCancelDialog(bid, sid) {
   const untilTxt = grace ? `${fmt(ymd(until))} ${pad(until.getHours())}:${pad(until.getMinutes())}` : '';
   modal.show(`<h2>Смяна на час</h2><div class="mute">${fmtLong(b.sessions.date)} · ${hm(b.sessions.start_time)}</div>
     <p>${grace ? `Записал си се наскоро — можеш да откажеш часа без последствия до <b>${untilTxt}</b> (24 ч. след записването). Посещението се връща в абонамента ти.` : must ? `Часът не може да се откаже — може само да се премести в друг час в рамките на абонамента ти. Смяна по-късно от ${hrs} ч. преди началото се брои като проведено посещение.` : 'Можеш да се откажеш или да преместиш часа.'}</p>
+    ${start.getTime() - Date.now() < hrs * 3600e3 ? `<div class="err" style="margin:8px 0">Остават по-малко от ${hrs} ч. до часа. Ако го смениш сега, той се брои като късен отказ и се отчита от абонамента ти, а новият час е допълнително посещение.</div>` : ''}
     <label class="f">${grace ? 'Премести в друг час (по желание)' : 'Нов час'}<select id="re-sel">${must ? '' : '<option value="">— само отказ —</option>'}${opts.map(s => `<option value="${s.id}">${fmtLong(s.date)} · ${hm(s.start_time)} (${s.free ?? '?'} места)</option>`).join('')}</select></label>
     ${must && !opts.length ? '<div class="err">Няма свободни часове за друг ден в рамките на абонамента ти. Пиши на треньора си.</div>' : ''}
     <div class="row" style="margin-top:12px"><button class="pri" data-act="cdo" data-bid="${bid}" ${must && !opts.length ? 'disabled' : ''}>Потвърди</button></div>`);
