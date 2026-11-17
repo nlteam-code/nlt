@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261116-2210';
+const BUILD = '20261117-1845';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -3119,7 +3119,7 @@ function cSession(b, t) {
 }
 
 const PROG_LOCKED = false, REW_LOCKED = true;
-const PG_CLIENT_TABS = [['weight', 'Тегло'], ['chal', 'Предизвикателство']]; // клиентите виждат само теглото; останалите раздели са на пауза
+const PG_CLIENT_TABS = [['weight', 'Тегло'], ['meas', 'Обиколки'], ['chal', 'Предизвикателство']]; // клиентите: тегло, обиколки, предизвикателство; останалите раздели са на пауза
 function progLocked(title = 'Прогрес', sub = 'Скоро ще можеш да следиш теглото, измерванията и тестовете си тук.') {
   return `<h2 class="c-title">${title}</h2><div class="lockbox"><div class="lockfake" aria-hidden="true"><div class="lf-row"><i style="width:38%"></i><i style="width:22%"></i></div><svg viewBox="0 0 300 110" preserveAspectRatio="none"><path d="M0 90 C40 80 70 70 110 60 S190 40 230 30 S280 20 300 14" fill="none" stroke="currentColor" stroke-width="4"/></svg><div class="lf-row"><i style="width:60%"></i></div><div class="lf-row"><i style="width:45%"></i><i style="width:30%"></i></div></div><div class="lockmsg"><b>Услугата все още не е активна</b><span>${sub}</span></div></div>`;
 }
@@ -4043,7 +4043,7 @@ function pgMeasTab() {
     if (!last || !last.waist_navel) return '';
     const out = [];
     if (p.height_cm) { const r = last.waist_navel / p.height_cm; out.push(`<div><span>Талия / ръст</span><b>${pgF(r, 2)}</b>${pgChip(r < .5 ? 'добре' : r < .6 ? 'внимание' : 'висок риск', r < .5 ? 'ok' : r < .6 ? 'warn' : 'bad')}</div>`); }
-    else out.push('<div><span>Талия / ръст</span><small>въведи ръст в „Профил“</small></div>');
+    else if (PG.staff) out.push('<div><span>Талия / ръст</span><small>въведи ръст в „Профил“</small></div>');
     if (last.hip) { const r = last.waist_navel / last.hip, lim = p.sex === 'Мъж' ? .9 : .85; out.push(`<div><span>Талия / ханш</span><b>${pgF(r, 2)}</b>${p.sex ? pgChip(r >= lim ? 'риск' : 'добре', r >= lim ? 'bad' : 'ok') : '<small>въведи пол в „Профил“</small>'}</div>`); }
     return `<div class="pg-stats">${out.join('')}</div>`;
   };
