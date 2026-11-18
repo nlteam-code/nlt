@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261117-2205';
+const BUILD = '20261118-0645';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -1623,7 +1623,16 @@ async function followingSessions(s) {
   q = s.series_id ? q.eq('series_id', s.series_id) : q.eq('start_time', s.start_time).eq('location', s.location).eq('kind', s.kind);
   const { data } = await q.order('date').range(0, 999);
   const dow = parse(s.date).getDay();
-  return (data || []).filter(x => s.series_id || parse(x.date).getDay() === dow);
+  let L = (data || []).filter(x => s.series_id || parse(x.date).getDay() === dow);
+  /* без серия: само часовете на същия треньор със същите клиенти — не чужди персонални часове в същия час */
+  if (!s.series_id && L.length) {
+    if (s.trainer_id) L = L.filter(x => x.id === s.id || x.trainer_id === s.trainer_id);
+    const { data: bk } = await sb.from('bookings').select('session_id,client_id').in('session_id', L.map(x => x.id)).neq('status', 'cancelled');
+    const by = {}; (bk || []).forEach(b => (by[b.session_id] = by[b.session_id] || new Set()).add(b.client_id));
+    const mine = by[s.id] || new Set();
+    if (mine.size) L = L.filter(x => x.id === s.id || [...(by[x.id] || [])].some(c => mine.has(c)) && [...(by[x.id] || [])].every(c => mine.has(c)));
+  }
+  return L;
 }
 async function setTrainerScoped(s, tr) {
   const fs = await followingSessions(s); let scope = 'one';
