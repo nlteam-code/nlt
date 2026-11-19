@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261119-1520';
+const BUILD = '20261119-1650';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -2282,11 +2282,12 @@ async function trainerDash() {
   S.pstat = S.pstat || await loadPstat();
   D.bal = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c && (!S.view || (S.view.locations || []).includes(r.c.location)));
   $('#main').innerHTML = `
+    <div id="ttcard"></div>
     <div class="card" style="margin-bottom:12px">${soon}</div>
     ${actCardHtml(acts)}
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div id="npcard">${noProfCard()}</div>`;
-  enrichMoves();
+  enrichMoves(); loadTeamTasks();
 }
 async function loadCancelCard() {
   const el = document.getElementById('cancelcard'); if (!el) return;
@@ -2628,6 +2629,7 @@ async function dashView() {
   const trows = tr.data.map(r => ({ ...r, t: S.staff.find(x => x.id === r.trainer_id) })).filter(r => r.t).sort((a, z) => a.t.name.localeCompare(z.t.name, 'bg'));
   $('#main').innerHTML = `
     <div class="kpis">${kpi('Приход', eur(cr.pay), 'получени плащания този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Прогнозен приход', eur(cr.proj), `реализиран ${eur(cr.done)} · ${cr.n_done}/${cr.n} посещения`)}${kpi('Средна цена', eur(cr.n ? cr.proj / cr.n : 0), 'на посещение този месец')}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
+    <div id="ttcard"></div>
     <div id="dupcard"></div>
     <div id="chkcard"></div>
     <div class="cols">
@@ -2645,7 +2647,7 @@ async function dashView() {
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>
     <div id="npcard" style="margin-top:12px">${noProfCard()}</div>`;
-  loadInvCard(); loadCashCard(); loadDupCard(); loadChkCard(); enrichMoves();
+  loadInvCard(); loadCashCard(); loadDupCard(); loadChkCard(); loadTeamTasks(); enrichMoves();
 }
 
 /* Абонаменти за месеца: нови клиенти (първи абонамент или връщане след прекъсване) и спрели (абонаментът е свършил и не е подновен) */
@@ -3540,6 +3542,64 @@ async function loadDupCard() {
     <div class="mute" style="margin-bottom:6px">Клиенти, записани в повече от един час в един и същи ден (от миналата седмица нататък).</div>
     ${data.map(r => `<div class="fe"><span style="min-width:0"><a data-act="client" data-id="${r.client_id}"><b>${esc(r.name)}</b></a> <span class="mute">· ${r.days} ${r.days === 1 ? 'ден' : 'дни'} · от ${fmt(r.first_date)}${r.last_date !== r.first_date ? ' до ' + fmt(r.last_date) : ''}</span><div class="mute" style="font-size:12px">${esc(r.pattern)}</div></span></div>`).join('')}</div>`;
 }
+/* ── Ежедневни задачи за екипа ── */
+const TT = { tasks: [], done: [] };
+const ttTeam = () => (S.staff || []).filter(x => x.active !== false && x.role !== 'admin').sort((a, b) => a.name.localeCompare(b.name, 'bg'));
+const ttInit = n => (n || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+async function loadTeamTasks() {
+  const el = document.getElementById('ttcard'); if (!el) return;
+  const from = ymd(addDays(new Date(), -6));
+  const [tq, dq] = await Promise.all([sb.from('team_tasks').select('*').eq('active', true).order('sort'), sb.from('team_task_done').select('*').gte('day', from)]);
+  if (tq.error || dq.error) { el.innerHTML = ''; return; }
+  TT.tasks = tq.data || []; TT.done = dq.data || []; drawTeamTasks();
+}
+function drawTeamTasks() {
+  const el = document.getElementById('ttcard'); if (!el) return;
+  const t = today(), team = ttTeam(), me = S.me && S.me.row ? S.me.row.id : null, late = new Date().getHours() >= 20;
+  if (!TT.tasks.length && !S.owner) { el.innerHTML = ''; return; }
+  const days = [...Array(7)].map((_, i) => ymd(addDays(new Date(), i - 6)));
+  const isDone = (tid, sid, d) => TT.done.find(x => x.task_id === tid && x.staff_id === sid && x.day === d);
+  const task = k => {
+    const doneN = team.filter(p => isDone(k.id, p.id, t)).length, all = doneN === team.length && team.length;
+    const mine = me && team.some(p => p.id === me), myDone = mine && isDone(k.id, me, t);
+    return `<div class="tt-t">
+      <div class="row" style="gap:10px"><div style="flex:1;min-width:0"><b style="font-size:16px">${esc(k.title)}</b>${k.description ? `<div class="mute" style="font-size:12px">${esc(k.description)}</div>` : ''}</div>
+        <span class="tt-n ${all ? 'ok' : ''}">${doneN}/${team.length}</span>${S.owner ? `<button class="sm" data-act="ttdel" data-id="${k.id}" title="Махни задачата">✕</button>` : ''}</div>
+      <div class="tt-p">${team.map(p => { const d = isDone(k.id, p.id, t), cls = d ? 'ok' : late ? 'bad' : '';
+        const can = S.owner || p.id === me;
+        return `<div class="tt-m ${cls}" ${can ? `data-act="tttog" data-t="${k.id}" data-s="${p.id}" style="cursor:pointer"` : ''} title="${d ? 'Свършено в ' + new Date(d.done_at).toTimeString().slice(0, 5) : late ? 'Не е свършено' : 'Още не е отчетено'}">
+          <span class="tt-a">${d ? '✓' : ttInit(p.name)}</span><span class="tt-nm">${esc(p.name.split(' ')[0])}</span>
+          <span class="tt-s">${d ? new Date(d.done_at).toTimeString().slice(0, 5) : late ? 'не е свършено' : 'чака'}</span>
+          <span class="tt-w">${days.map(dd => `<i class="${isDone(k.id, p.id, dd) ? 'on' : dd === t ? 'td' : ''}"></i>`).join('')}</span></div>`; }).join('')}</div>
+      ${mine ? `<button class="${myDone ? 'sm' : 'pri'}" style="margin-top:10px;width:100%" data-act="tttog" data-t="${k.id}" data-s="${me}">${myDone ? '✓ Отчетено · отмени' : 'Свърших ✓'}</button>` : ''}
+    </div>`;
+  };
+  el.innerHTML = `<style>.tt-t{padding:10px 0;border-top:1px solid var(--line)}.tt-t:first-of-type{border-top:0}.tt-n{font-weight:700;padding:3px 10px;border-radius:999px;background:var(--line)}.tt-n.ok{background:#1f9d62;color:#fff}
+    .tt-p{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}.tt-m{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto auto;column-gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:14px}
+    .tt-a{grid-row:1/3;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid var(--line)}
+    .tt-m.ok{border-color:#1f9d62}.tt-m.ok .tt-a{background:#1f9d62;border-color:#1f9d62;color:#fff;font-size:17px}.tt-m.bad{border-color:#eb4c51}.tt-m.bad .tt-a{border-color:#eb4c51;color:#eb4c51}
+    .tt-nm{font-weight:600}.tt-s{font-size:11px;color:var(--mute,#999)}.tt-m.ok .tt-s{color:#1f9d62}.tt-m.bad .tt-s{color:#eb4c51}
+    .tt-w{grid-column:1/3;display:flex;gap:3px;margin-top:6px}.tt-w i{flex:1;height:5px;border-radius:3px;background:var(--line)}.tt-w i.on{background:#1f9d62}.tt-w i.td{outline:1px dashed var(--mute,#888)}</style>
+    <div class="card" style="margin-bottom:12px"><div class="row"><h2 style="flex:1;margin:0">Задачи за днес <span class="mute" style="font-weight:400">· ${esc(dayWord(t, t))}</span></h2>${S.owner ? '<button class="sm" data-act="ttadd">+ Задача</button>' : ''}</div>
+    <div class="mute" style="font-size:12px;margin:4px 0 2px">Отчети до края на деня. Целият екип вижда кой е свършил. Чертичките отдолу са последните 7 дни.</div>
+    ${TT.tasks.length ? TT.tasks.map(task).join('') : '<div class="mute" style="padding:8px 0">Няма задачи. Добави с „+ Задача“.</div>'}</div>`;
+}
+async function ttAct(act, el) {
+  if (act === 'tttog') {
+    const tid = el.dataset.t, sid = el.dataset.s, t = today(), d = TT.done.find(x => x.task_id === tid && x.staff_id === sid && x.day === t);
+    if (d) { const { error } = await sb.from('team_task_done').delete().match({ task_id: tid, staff_id: sid, day: t }); if (error) return fail(error, 'Не се промени'); TT.done = TT.done.filter(x => x !== d); }
+    else { const { data, error } = await sb.from('team_task_done').insert({ task_id: tid, staff_id: sid, day: t }).select().single(); if (error) return fail(error, 'Не се отчете'); TT.done.push(data); toast('Отчетено ✓'); }
+    drawTeamTasks();
+  } else if (act === 'ttadd') {
+    const title = prompt('Нова ежедневна задача (напр. „5 сторита“):'); if (!title || !title.trim()) return;
+    const desc = prompt('Кратко описание (по желание):') || null;
+    const { error } = await sb.from('team_tasks').insert({ title: title.trim(), description: desc && desc.trim() || null, sort: TT.tasks.length + 1 }); if (error) return fail(error, 'Не се добави');
+    loadTeamTasks();
+  } else if (act === 'ttdel') {
+    if (!confirm('Да махна ли тази задача? Историята остава.')) return;
+    const { error } = await sb.from('team_tasks').update({ active: false }).eq('id', el.dataset.id); if (error) return fail(error, 'Не се махна'); loadTeamTasks();
+  }
+}
 /* автоматични проверки (само показват, нищо не променят) */
 async function loadChkCard() {
   const el = document.getElementById('chkcard'); if (!el || !S.owner) return;
@@ -4369,6 +4429,7 @@ document.addEventListener('click', async e => {
       case 'cinvreq': await clientInvoiceReq(); break;
       case 'invdone': case 'invno': await invoiceAct(act, el); break;
       case 'cashgot': case 'cashdel': await cashAct(act, el); break;
+      case 'tttog': case 'ttadd': case 'ttdel': await ttAct(act, el); break;
       case 'weighgo': C.tab = 'prog'; PG.tab = 'weight'; renderClient(); window.scrollTo(0, 0); break;
       case 'csvc': C.svcMode = el.dataset.m; renderClient(); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
