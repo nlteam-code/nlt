@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261119-1450';
+const BUILD = '20261119-1455';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -3481,15 +3481,16 @@ async function loadCashCard() {
   D.cash = by;
   const ids = Object.keys(by); if (!ids.length && !masHtml) { el.innerHTML = ''; return; }
   const nm = id => (S.staff.find(x => x.id === id) || {}).name || 'служител';
-  el.innerHTML = `<div class="card" style="margin-bottom:12px"><h2>Пари в брой у служители</h2>
-    <div class="mute" style="margin-bottom:6px">Плащания в брой, въведени от служител (от ${fmt(CASH_FROM)}), минус това, което ти е предал. Банковите не влизат.</div>
+  const totDue = Math.round((ids.reduce((a, id) => a + by[id].got - by[id].giv, 0) + Object.values(D.masCash || {}).reduce((a, x) => a + x, 0)) * 100) / 100;
+  el.innerHTML = `<div class="card" style="margin-bottom:12px"><div class="row"><h2 style="flex:1;margin:0">Пари в брой у служители</h2><div style="text-align:right"><div class="mute" style="font-size:12px">общо за получаване</div><b style="font-size:22px">${money(totDue)}</b></div></div>
+    <div class="mute" style="margin:6px 0">Плащания в брой, въведени от служител (от ${fmt(CASH_FROM)}), и масажното, минус това, което ти е предадено. Банковите не влизат.</div>
     ${ids.map(id => { const o = by[id], due = Math.round((o.got - o.giv) * 100) / 100;
       return `<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="row"><div style="flex:1;min-width:0"><b>${esc(nm(id))}</b><div class="mute" style="font-size:12px">събрани ${money(o.got)} · предадени ${money(o.giv)}</div></div>
         <div style="text-align:right;margin-right:8px"><div class="mute" style="font-size:12px">трябва да получиш</div><b style="font-size:20px;color:${due > 0 ? 'var(--accent,#eb4c51)' : 'inherit'}">${money(due)}</b></div>
         <button class="sm" data-act="cashgot" data-id="${id}" ${due > 0 ? '' : 'disabled'}>Получих</button></div>
         <details style="margin-top:6px"><summary class="mute" style="cursor:pointer;font-size:13px">Плащания (${o.pays.length})${o.ho.length ? ` и предавания (${o.ho.length})` : ''}</summary>
         ${o.ho.map(h => `<div class="fe"><span>${fmt(h.date)} · <b>предадени</b>${h.note ? ' · ' + esc(h.note) : ''}</span><span>−${money(h.amount)} <button class="sm" data-act="cashdel" data-id="${h.id}" title="Изтрий">✕</button></span></div>`).join('')}
-        ${o.pays.map(p => `<div class="fe"><span>${fmt(p.date)} · ${esc(cname(p.client_id))}</span><span>${money(p.amount)}</span></div>`).join('')}</details></div>`; }).join('')}</div>${masHtml}`;
+        ${o.pays.map(p => `<div class="fe"><span>${fmt(p.date)} · ${esc(cname(p.client_id))}</span><span>${money(p.amount)}</span></div>`).join('')}</details></div>`; }).join('')}${masHtml}</div>`;
 }
 /* масажно: проведени масажи по график × цена на услугата − предадени */
 const MAS_FROM = '2026-11-01';
@@ -3512,7 +3513,7 @@ async function massageCashHtml(ho) {
       ${H.map(h => `<div class="fe"><span>${fmt(h.date)} · <b>предадени</b></span><span>−${money(h.amount)} <button class="sm" data-act="cashdel" data-id="${h.id}" title="Изтрий">✕</button></span></div>`).join('')}
       ${L.map(x => `<div class="fe"><span>${fmt(x.date)} ${hm(x.start_time)} · ${esc(nm(x))} · <span class="mute">${esc(x.service || '')}</span></span><span>${pr[x.service] != null ? money(pr[x.service]) : '—'}</span></div>`).join('')}</details></div>`;
   }).join('');
-  return rows ? `<div class="card" style="margin-bottom:12px"><h2>Масажно · пари за получаване</h2><div class="mute" style="margin-bottom:6px">Проведени масажи по график от ${fmt(MAS_FROM)} × цената на услугата, минус това, което ти е предадено. Отказаните не влизат.</div>${rows}</div>` : '';
+  return rows ? `<div style="margin-top:10px;padding-top:6px;border-top:2px solid var(--line)"><b>Масажно</b> <span class="mute" style="font-size:12px">· само в брой · проведени масажи от ${fmt(MAS_FROM)} × цената на услугата, отказаните не влизат</span></div>${rows}` : '';
 }
 async function cashAct(act, el) {
   if (act === 'cashgot') {
