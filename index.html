@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261118-1835';
+const BUILD = '20261119-1445';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -2665,6 +2665,11 @@ function subsFlowCard() {
       if (p.end_date >= m && p.end_date <= me && p.end_date < t && !next && !L.some(q => q !== p && q.end_date > p.end_date)) stop.push({ c: S.clients.find(c => c.id === cid), p, d: p.end_date });
     });
   });
+  /* + клиенти, станали „Неактивни“, чийто последен абонамент е бил активен през месеца */
+  S.clients.filter(c => c.status === 'Inactive' && !stop.some(x => x.c && x.c.id === c.id)).forEach(c => {
+    const L = (by[c.id] || []).slice().sort((a, b) => b.end_date.localeCompare(a.end_date)); const p = L[0];
+    if (p && p.end_date >= m && p.start_date <= me) stop.push({ c, p, d: p.end_date < t ? p.end_date : t });
+  });
   stop.sort((a, b) => b.d.localeCompare(a.d));
   const withSub = neu.filter(x => x.p).length;
   const line = (x, right, sub) => `<div class="sf-r"><div style="min-width:0;flex:1"><a data-act="client" data-id="${x.c.id}">${esc(x.c.name)}</a><div class="mute">${sub}</div></div><span class="mute" style="white-space:nowrap">${right}</span></div>`;
@@ -2675,7 +2680,7 @@ function subsFlowCard() {
       ${col('нови клиенти', '+' + neu.length, 'var(--ok,#1f9d62)', neu, x => line(x, fmt(x.d), x.p ? esc(x.p.package_name || 'Абонамент') : 'без абонамент'))}
       ${col('спрели абонамент', '−' + stop.length, 'var(--bad,#eb4c51)', stop, x => line(x, fmt(x.d), esc(x.p.package_name || 'Абонамент')))}
     </div>
-    <p class="mute" style="font-size:12px;margin-top:8px">Нови: профил, създаден през месеца (${withSub} с абонамент). Спрели: абонаментът е свършил и в следващите ${GAP} дни няма нов.</p>`;
+    <p class="mute" style="font-size:12px;margin-top:8px">Нови: профил, създаден през месеца (${withSub} с абонамент). Спрели: абонаментът е свършил и в следващите ${GAP} дни няма нов, или клиентът е станал „Неактивен“.</p>`;
 }
 /* ── Пакети ── */
 const UNITS = { weeks: 'седмици', months: 'месеца' };
