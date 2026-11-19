@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261119-1455';
+const BUILD = '20261119-1520';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -3195,8 +3195,11 @@ async function bonusReviewClaim() {
 function massageCard(t) {
   const m = (C.massages || []).filter(x => x.status === 'booked' && x.date >= t)[0];
   if (!m) return '';
-  return `<section class="c-card" data-act="cnav" data-t="mas" style="cursor:pointer"><div class="c-k">Масаж · Лерин</div>
-    <div style="display:flex;gap:14px;align-items:center"><div class="c-ct" style="font-size:24px;font-weight:700">${hm(m.start_time)}</div><div><div class="c-st">${esc(m.service)}</div><div class="c-ss">${esc(dayWord(m.date, t))} · плащане на място</div></div></div></section>`;
+  const loc = m.location || 'Лерин', addr = loc === 'Лерин' ? 'ул. Лерин 53' : (LOC_ADDR[loc] || loc);
+  return `<section class="c-card" style="cursor:pointer" data-act="cnav" data-t="mas"><div class="c-k">Записан масаж</div>
+    <div style="display:flex;gap:14px;align-items:center"><div class="c-ct" style="font-size:26px;font-weight:700">${hm(m.start_time)}</div>
+    <div style="min-width:0"><div class="c-st">${esc(dayWord(m.date, t))} · ${fmt(m.date)}</div><div class="c-ss">${esc(m.service || 'Масаж')} · плащане на място</div>
+    <a class="c-h2l" style="margin-top:6px" target="_blank" rel="noopener" href="${esc(navUrl(loc))}" onclick="event.stopPropagation()">${ic('pin', 14)}${esc(addr)}</a></div></div></section>`;
 }
 function cBalance() {
   const sumPk = (C.pkgs || []).reduce((a, p) => a + Number(p.price || 0), 0), sumCh = (C.chs || []).reduce((a, x) => a + Number(x.amount), 0), sumPay = (C.pays || []).reduce((a, x) => a + Number(x.amount), 0);
@@ -3231,6 +3234,7 @@ function clientHome(me, t, act) {
       </div></div>
     </section>` : `<section class="c-hero empty"><div class="c-hero-d" style="font-size:22px;line-height:1.15">Няма записан час</div>
       <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
+  ${massageCard(t)}
   ${warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
   ${main ? `<section class="c-card c-sum" data-act="cnav" data-t="pkg">${rings(main, 132)}
       <div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.total - main.left} от ${main.total}</b><span>изразходени посещения · остават ${main.left}</span></div></div>
@@ -3239,7 +3243,6 @@ function clientHome(me, t, act) {
   ${wcHomeCard()}
   ${bonusCard(me)}
   ${rewardCard()}
-  ${massageCard(t)}
   ${weightCard()}
 `;
 }
