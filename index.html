@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261119-1445';
+const BUILD = '20261119-1450';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -2654,7 +2654,7 @@ function subsFlowCard() {
   const P = (S.pstat || []).filter(p => S.clients.some(c => c.id === p.client_id));
   const by = {}; P.forEach(p => (by[p.client_id] = by[p.client_id] || []).push(p));
   /* нов клиент = профилът е създаден в приложението през месеца (без прехвърлените от PT Minder) */
-  const neu = S.clients.filter(c => !c.massage_only && !c.legacy_id && c.source !== 'pt-minder' && c.created_at && ymd(new Date(c.created_at)) >= m && ymd(new Date(c.created_at)) <= me)
+  const neu = S.clients.filter(c => c.status === 'Active' && !c.massage_only && !c.legacy_id && c.source !== 'pt-minder' && c.created_at && ymd(new Date(c.created_at)) >= m && ymd(new Date(c.created_at)) <= me)
     .map(c => { const L = (by[c.id] || []).sort((a, b) => b.start_date.localeCompare(a.start_date)); return { c, d: ymd(new Date(c.created_at)), p: L[0] }; }).sort((a, b) => b.d.localeCompare(a.d));
   /* спрял = абонаментът е свършил през месеца и в следващите 14 дни няма нов */
   const stop = [];
@@ -2672,15 +2672,15 @@ function subsFlowCard() {
   });
   stop.sort((a, b) => b.d.localeCompare(a.d));
   const withSub = neu.filter(x => x.p).length;
-  const line = (x, right, sub) => `<div class="sf-r"><div style="min-width:0;flex:1"><a data-act="client" data-id="${x.c.id}">${esc(x.c.name)}</a><div class="mute">${sub}</div></div><span class="mute" style="white-space:nowrap">${right}</span></div>`;
+  const line = (x, right, sub, star) => `<div class="sf-r"><div style="min-width:0;flex:1"><a data-act="client" data-id="${x.c.id}">${star ? '<b style="color:#f5b301">★</b> ' : ''}${esc(x.c.name)}</a><div class="mute">${sub}</div></div><span class="mute" style="white-space:nowrap">${right}</span></div>`;
   const col = (h, n, col, arr, f) => `<div class="sf-c"><div class="sf-h"><b style="font-size:26px;color:${col}">${n}</b><span>${h}</span></div><div class="sf-l">${arr.length ? arr.map(f).join('') : '<div class="mute" style="padding:8px 0">Няма.</div>'}</div></div>`;
   return `<style>.sf-g{display:grid;grid-template-columns:1fr 1fr;gap:14px}.sf-h{display:flex;align-items:baseline;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}.sf-l{max-height:300px;overflow:auto}.sf-r{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}.sf-r .mute{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:700px){.sf-g{grid-template-columns:1fr}}</style>
     <div class="row" style="margin-bottom:10px"><h2 style="margin:0;flex:1">Клиенти · ${mLabel(m)}</h2><button class="sm" data-act="dmonth" data-d="-1">‹</button><button class="sm" data-act="dmonth" data-d="1">›</button></div>
     <div class="sf-g">
-      ${col('нови клиенти', '+' + neu.length, 'var(--ok,#1f9d62)', neu, x => line(x, fmt(x.d), x.p ? esc(x.p.package_name || 'Абонамент') : 'без абонамент'))}
+      ${col('нови клиенти', '+' + neu.length, 'var(--ok,#1f9d62)', neu, x => line(x, fmt(x.d), x.p ? esc(x.p.package_name || 'Абонамент') : 'без абонамент', !!x.p))}
       ${col('спрели абонамент', '−' + stop.length, 'var(--bad,#eb4c51)', stop, x => line(x, fmt(x.d), esc(x.p.package_name || 'Абонамент')))}
     </div>
-    <p class="mute" style="font-size:12px;margin-top:8px">Нови: профил, създаден през месеца (${withSub} с абонамент). Спрели: абонаментът е свършил и в следващите ${GAP} дни няма нов, или клиентът е станал „Неактивен“.</p>`;
+    <p class="mute" style="font-size:12px;margin-top:8px">Нови: активни клиенти с профил, създаден през месеца; ★ = с абонамент (${withSub}). Спрели: абонаментът е свършил и в следващите ${GAP} дни няма нов, или клиентът е станал „Неактивен“.</p>`;
 }
 /* ── Пакети ── */
 const UNITS = { weeks: 'седмици', months: 'месеца' };
