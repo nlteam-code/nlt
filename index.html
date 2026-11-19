@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261119-1650';
+const BUILD = '20261119-2130';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -744,18 +744,14 @@ async function staffApp() {
     if ((ren || ch) && S.tab === 'week' && $('#grid') && !document.querySelector('.modal.on, dialog[open]')) weekView();
   });
 }
-/* ── Напомняне: Христо качва 5 сторита от работа с клиенти — вторник, четвъртък, събота ── */
-const STORY = { who: /^Христо/, days: [2, 4, 6], tag: 'Сторита: ' };
+/* ── Лично напомняне за ежедневните задачи (вижда го само служителят, докато не отчете) ── */
+const STORY = { tag: 'Сторита: ' };
 async function storyNudge() {
-  const box = $('#nudge'); if (!box || !STORY.days.includes(new Date().getDay())) return;
-  const hr = (S.staff || []).find(t => STORY.who.test(t.name || '') && t.active !== false); if (!hr) return;
-  const isHim = STORY.who.test(S.me?.row?.name || ''); if (!isHim && !S.owner) return;
-  const d0 = new Date(today() + 'T00:00:00');
-  const { data } = await sb.from('activity').select('at').like('text', STORY.tag + '%').gte('at', d0.toISOString()).limit(1);
-  const done = !!(data && data.length), first = hr.name.split(' ')[0];
-  box.innerHTML = isHim
-    ? (done ? '' : `<div class="wrap" style="padding-bottom:0"><div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-left:4px solid var(--acc);margin:0">📸 <b>Днес: качи 5 сторита от работа с клиенти</b><span class="mute">вторник, четвъртък и събота</span><span class="sp"></span><button class="pri sm" data-act="storydone">Качих ги ✓</button></div></div>`)
-    : `<div class="wrap" style="padding-bottom:0"><div class="mute" style="font-size:13px">📸 Сторита от ${esc(first)} днес: ${done ? '<b style="color:var(--ok,#0f8a5f)">качени ✓</b>' : 'още не са отбелязани'}</div></div>`;
+  const box = $('#nudge'); if (!box) return;
+  const me = S.me && S.me.row; if (!me || S.owner || me.role === 'admin') { box.innerHTML = ''; return; }
+  const [tq, dq] = await Promise.all([sb.from('team_tasks').select('id,title').eq('active', true).order('sort'), sb.from('team_task_done').select('task_id').eq('staff_id', me.id).eq('day', today())]);
+  const left = (tq.data || []).filter(t => !(dq.data || []).some(d => d.task_id === t.id));
+  box.innerHTML = left.length ? `<div class="wrap" style="padding-bottom:0"><div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-left:4px solid var(--acc);margin:0">🔔 <b>${esc(me.name.split(' ')[0])}, днес още не си отчел/а:</b><span>${left.map(t => esc(t.title)).join(' · ')}</span><span class="sp"></span>${left.map(t => `<button class="pri sm" data-act="tttog" data-t="${t.id}" data-s="${me.id}">${esc(t.title)} ✓</button>`).join('')}</div></div>` : '';
 }
 const DEMO_CLIENT = '79e3ca5f-7d33-4859-afef-74671ebd389c'; // ПРОБЕН ПРОБЕН — служителите могат да видят приложението през него
 function renderStaff() {
@@ -3586,10 +3582,11 @@ function drawTeamTasks() {
 }
 async function ttAct(act, el) {
   if (act === 'tttog') {
+    if (!TT.tasks.length) await loadTeamTasks();
     const tid = el.dataset.t, sid = el.dataset.s, t = today(), d = TT.done.find(x => x.task_id === tid && x.staff_id === sid && x.day === t);
     if (d) { const { error } = await sb.from('team_task_done').delete().match({ task_id: tid, staff_id: sid, day: t }); if (error) return fail(error, 'Не се промени'); TT.done = TT.done.filter(x => x !== d); }
     else { const { data, error } = await sb.from('team_task_done').insert({ task_id: tid, staff_id: sid, day: t }).select().single(); if (error) return fail(error, 'Не се отчете'); TT.done.push(data); toast('Отчетено ✓'); }
-    drawTeamTasks();
+    drawTeamTasks(); storyNudge();
   } else if (act === 'ttadd') {
     const title = prompt('Нова ежедневна задача (напр. „5 сторита“):'); if (!title || !title.trim()) return;
     const desc = prompt('Кратко описание (по желание):') || null;
