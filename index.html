@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261119-2130';
+const BUILD = '20261121-1505';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -2279,11 +2279,12 @@ async function trainerDash() {
   D.bal = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c && (!S.view || (S.view.locations || []).includes(r.c.location)));
   $('#main').innerHTML = `
     <div id="ttcard"></div>
+    <div id="leadcard"></div>
     <div class="card" style="margin-bottom:12px">${soon}</div>
     ${actCardHtml(acts)}
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div id="npcard">${noProfCard()}</div>`;
-  enrichMoves(); loadTeamTasks();
+  enrichMoves(); loadTeamTasks(); loadLeads();
 }
 async function loadCancelCard() {
   const el = document.getElementById('cancelcard'); if (!el) return;
@@ -2626,6 +2627,7 @@ async function dashView() {
   $('#main').innerHTML = `
     <div class="kpis">${kpi('Приход', eur(cr.pay), 'получени плащания този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Прогнозен приход', eur(cr.proj), `реализиран ${eur(cr.done)} · ${cr.n_done}/${cr.n} посещения`)}${kpi('Средна цена', eur(cr.n ? cr.proj / cr.n : 0), 'на посещение този месец')}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
     <div id="ttcard"></div>
+    <div id="leadcard"></div>
     <div id="dupcard"></div>
     <div id="chkcard"></div>
     <div class="cols">
@@ -2643,7 +2645,7 @@ async function dashView() {
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>
     <div id="npcard" style="margin-top:12px">${noProfCard()}</div>`;
-  loadInvCard(); loadCashCard(); loadDupCard(); loadChkCard(); loadTeamTasks(); enrichMoves();
+  loadInvCard(); loadCashCard(); loadDupCard(); loadChkCard(); loadTeamTasks(); loadLeads(); enrichMoves();
 }
 
 /* Абонаменти за месеца: нови клиенти (първи абонамент или връщане след прекъсване) и спрели (абонаментът е свършил и не е подновен) */
@@ -3538,6 +3540,35 @@ async function loadDupCard() {
     <div class="mute" style="margin-bottom:6px">Клиенти, записани в повече от един час в един и същи ден (от миналата седмица нататък).</div>
     ${data.map(r => `<div class="fe"><span style="min-width:0"><a data-act="client" data-id="${r.client_id}"><b>${esc(r.name)}</b></a> <span class="mute">· ${r.days} ${r.days === 1 ? 'ден' : 'дни'} · от ${fmt(r.first_date)}${r.last_date !== r.first_date ? ' до ' + fmt(r.last_date) : ''}</span><div class="mute" style="font-size:12px">${esc(r.pattern)}</div></span></div>`).join('')}</div>`;
 }
+/* ── Запитвания за консултация от сайта (отговорникът на обекта ги вижда) ── */
+const LEAD_ST = { contacted: ['Писахме във Viber', ''], scheduled: ['Насрочена консултация', 'ok'], client: ['Стана клиент', 'ok'], lost: ['Отказ / не отговаря', 'bad'] };
+let LEADS = [];
+async function loadLeads() {
+  const el = document.getElementById('leadcard'); if (!el) return;
+  const { data, error } = await sb.from('leads').select('*').gte('received_at', new Date(Date.now() - 45 * 864e5).toISOString()).order('received_at', { ascending: false });
+  if (error) { el.innerHTML = ''; return; }
+  const mine = l => S.owner || !S.me.row || !l.location || actLocs(S.me.row).includes(l.location);
+  LEADS = (data || []).filter(mine);
+  const open = LEADS.filter(l => l.status === 'contacted' || l.status === 'scheduled'), done = LEADS.filter(l => !open.includes(l));
+  if (!LEADS.length) { el.innerHTML = ''; return; }
+  const dt = x => x ? new Date(x).toLocaleString('bg-BG', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+  const row = l => { const st = LEAD_ST[l.status] || [l.status, ''];
+    return `<div class="ld-r"><div style="flex:1;min-width:0"><b>${esc(l.name)}</b> <span class="chip ${st[1]}">${esc(st[0])}</span>
+      <div class="mute" style="font-size:12px">${l.phone ? `<a href="tel:${esc(l.phone)}">${esc(l.phone)}</a> · ` : ''}${esc(l.location || '')}${l.source_page ? ' · ' + esc(l.source_page) : ''}</div>
+      <div class="mute" style="font-size:12px">запитване ${dt(l.received_at)}${l.contacted_at ? ` · писахме във ${esc(l.channel || 'Viber')} ${dt(l.contacted_at)}` : ''}${l.note ? ' · ' + esc(l.note) : ''}</div></div>
+      <div class="ld-b">${['scheduled', 'client', 'lost'].filter(k => k !== l.status).map(k => `<button class="sm" data-act="leadst" data-id="${l.id}" data-s="${k}">${esc(LEAD_ST[k][0])}</button>`).join('')}<button class="sm" data-act="leadnote" data-id="${l.id}" title="Бележка">✎</button></div></div>`; };
+  el.innerHTML = `<style>.ld-r{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);flex-wrap:wrap}.ld-b{display:flex;gap:6px;flex-wrap:wrap}</style>
+    <div class="card" style="margin-bottom:12px"><h2>Запитвания за консултация <span class="mute">· ${open.length} отворени</span></h2>
+    <div class="mute" style="font-size:12px;margin-bottom:4px">От формата на сайта. Вече сме им писали във Viber да изберат удобно време. Отбележете какво е станало.</div>
+    ${open.map(row).join('') || '<div class="mute" style="padding:6px 0">Няма отворени запитвания.</div>'}
+    ${done.length ? `<details style="margin-top:6px"><summary class="mute" style="cursor:pointer">Приключени (${done.length})</summary>${done.map(row).join('')}</details>` : ''}</div>`;
+}
+async function leadAct(act, el) {
+  const id = el.dataset.id, who = S.me && S.me.row ? S.me.row.id : null;
+  if (act === 'leadst') { const { error } = await sb.from('leads').update({ status: el.dataset.s, updated_at: new Date().toISOString(), updated_by: who }).eq('id', id); if (error) return fail(error, 'Не се промени'); }
+  else { const l = LEADS.find(x => x.id === id); const n = prompt('Бележка (напр. „консултация в сряда 18:00“):', l && l.note || ''); if (n === null) return; const { error } = await sb.from('leads').update({ note: n.trim() || null, updated_at: new Date().toISOString(), updated_by: who }).eq('id', id); if (error) return fail(error, 'Не се записа'); }
+  loadLeads();
+}
 /* ── Ежедневни задачи за екипа ── */
 const TT = { tasks: [], done: [] };
 const ttTeam = () => (S.staff || []).filter(x => x.active !== false && x.role !== 'admin').sort((a, b) => a.name.localeCompare(b.name, 'bg'));
@@ -4427,6 +4458,7 @@ document.addEventListener('click', async e => {
       case 'invdone': case 'invno': await invoiceAct(act, el); break;
       case 'cashgot': case 'cashdel': await cashAct(act, el); break;
       case 'tttog': case 'ttadd': case 'ttdel': await ttAct(act, el); break;
+      case 'leadst': case 'leadnote': await leadAct(act, el); break;
       case 'weighgo': C.tab = 'prog'; PG.tab = 'weight'; renderClient(); window.scrollTo(0, 0); break;
       case 'csvc': C.svcMode = el.dataset.m; renderClient(); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
