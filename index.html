@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261121-1505';
+const BUILD = '20261121-1850';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -1495,7 +1495,7 @@ function drawGrid() {
       const full = e.kind === 'group' && e.capacity && act.length >= e.capacity;
       const top = (s - h0 * 60) / 60 * HH, hgt = Math.max(((e.duration_min || 60) / 60) * HH - 2, 18);
       const charged = !e.cancelled && act.length && new Date(`${e.date}T${hm(e.start_time)}:00`) <= new Date();
-      const label = e.kind === 'solo' ? (act.length ? esc(act.map(b => cname(b.client_id)).join(', ')) : '<span class="n">свободен</span>') : `${esc(e.title || 'Групов час')}`;
+      const label = e.free ? `🗨 Консултация${act.length ? ' · ' + esc(act.map(b => cname(b.client_id)).join(', ')) : ''}` : e.kind === 'solo' ? (act.length ? esc(act.map(b => cname(b.client_id)).join(', ')) : '<span class="n">свободен</span>') : `${esc(e.title || 'Групов час')}`;
       const tn0 = trName(e.trainer_id), trc = /^Петя/.test(tn0) ? 'tr-red' : /^Аксел/.test(tn0) ? 'tr-violet' : /^Мартин/.test(tn0) ? 'tr-blue' : '';
       return `<div class="ev ${e.kind === 'solo' ? 'solo' : ''} ${trc} ${e.cancelled ? 'evcx' : ''} ${full ? 'full' : ''}" draggable="true" data-act="sess" data-id="${e.id}"
         style="top:${top}px;height:${hgt}px;left:calc(${col / n * 100}% + 1px);width:calc(${100 / n}% - 3px)" title="${esc(names)}">
@@ -1731,9 +1731,11 @@ async function setBookingStatus(bid, st) {
   await refreshAfter(sessId());
 }
 async function createSession(f) {
+  /* консултация = персонален час без такса и без отчитане от абонамент */
+  const consult = f.kind === 'consult'; if (consult) { f = { ...f, kind: 'solo', title: f.title || 'Консултация', repeat: false }; }
   const { data: t } = { data: S.staff.find(x => x.id === f.trainer) };
   const cl = (f.clients || []).filter(Boolean);
-  const row = { kind: f.kind, trainer_id: f.trainer, location: S.loc, title: f.title || null, capacity: f.kind === 'solo' ? Math.max(1, cl.length) : (f.cap || null), green: f.kind === 'solo', duration_min: f.dur };
+  const row = { kind: f.kind, trainer_id: f.trainer, location: S.loc, title: f.title || null, capacity: f.kind === 'solo' ? Math.max(1, cl.length) : (f.cap || null), green: f.kind === 'solo', duration_min: f.dur, free: consult };
   if (f.repeat) {
     const wd = (parse(f.date).getDay() + 6) % 7;
     const { data: ser, error } = await sb.from('series').insert({ kind: f.kind, trainer_id: f.trainer, location: S.loc, weekday: wd, start_time: f.time, title: row.title, capacity: row.capacity, green: row.green, starts_on: f.date }).select('id').single();
@@ -1756,7 +1758,7 @@ async function createSession(f) {
 }
 function newSessionDialog(date, time) {
   modal.show(`<h2>Нов час</h2><div class="grid2" id="ns">
-    <label class="f">Вид<select id="n-kind"><option value="group">Групов</option><option value="solo">Персонален</option></select></label>
+    <label class="f">Вид<select id="n-kind"><option value="group">Групов</option><option value="solo">Персонален</option><option value="consult">Консултация (без такса)</option></select></label>
     <label class="f">Дата<input type="date" id="n-date" value="${date || today()}"></label>
     <label class="f">Начало<input type="time" step="1800" id="n-time" value="${time || '08:30'}"></label>
     <label class="f">Продължителност (мин)<input type="number" id="n-dur" value="60" step="5"></label>
@@ -2922,7 +2924,8 @@ async function bookClient(sid, cid2, auto, seriesMode) {
   const { data: anyPk } = await sb.from('package_status').select('id').eq('client_id', cid2).eq('kind', s.kind).gte('end_date', today()).limit(1);
   const hasPlan = !!valid || !!(anyPk && anyPk.length);
   let use_plan = true, price = null;
-  if (!hasPlan) {
+  if (s.free) { use_plan = false; price = null; }
+  else if (!hasPlan) {
     if (!auto && !seriesMode) {
       const why = (ps || []).length ? 'пакетът му е изчерпан' : 'няма ' + (s.kind === 'solo' ? 'пакет с персонални тренировки' : 'пакет с групови класове') + ' за тази дата';
       if (!confirm(`${cname(cid2)}: ${why}.\n\nOK = добави като еднократно посещение (${money(visitPrice(s.kind))}).\nОтказ = не добавяй.`)) return false;
