@@ -567,7 +567,7 @@ const GROUP_VISIT_PRICE = 33; // еднократно посещение в гр
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
-const BUILD = '20261121-1850';
+const BUILD = '20261123-1300';
 /* Автоматично обновяване: когато приложението се върне на екран и има нова версия — презарежда (ако не се пише нещо) */
 (function () {
   let last = Date.now();
@@ -585,6 +585,7 @@ const BUILD = '20261121-1850';
 })();
 const LOCS = ['Боян Петров', 'Лерин'];
 /* бонуси */
+const LOC_NAME = { 'Боян Петров': 'NLT Боян Петров 3', 'Лерин': 'NLT Лерин 53' }, locName = l => LOC_NAME[l] || l;
 const LOC_ADDR = { 'Боян Петров': 'ул. Боян Петров 3', 'Лерин': 'ж.к. Белите брези, ул. Лерин 53' };
 const navUrl = l => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((LOC_ADDR[l] || l) + ', София')}${GPLACE[l] ? '&destination_place_id=' + GPLACE[l] : ''}`;
 const GPLACE = { 'Лерин': 'ChIJuU-P7SaFqkARxch53fm9qYk', 'Боян Петров': 'ChIJdRay5-6FqkARlJTme3lbhBU' };
@@ -732,17 +733,14 @@ async function staffApp() {
   ]);
   if (c.error || p.error || s.error) return fail(c.error || p.error || s.error, 'Грешка при зареждане');
   S.clients = c.data; S.packages = p.data; S.staff = s.data;
-  if (!window.__chargeT) window.__chargeT = setInterval(async () => { try { const r = await sb.rpc('charge_started'); if (!$('#grid')) return; if (!r.error && r.data > 0 && S.tab === 'week' && !document.querySelector('.modal.on, dialog[open]')) weekView(); else drawGrid(); } catch (e) { } }, 60000);
+  /* таксуването върви на сървъра всяка минута (cron) — тук само опресняваме графика */
+  if (!window.__chargeT) window.__chargeT = setInterval(() => { try { if ($('#grid')) drawGrid(); } catch (e) { } }, 60000);
+  sb.rpc('single_clients', { p_days: 60 }).then(r => { if (r.error) return; S.singles = new Set((r.data || []).map(x => typeof x === 'string' ? x : x.single_clients)); if (S.tab === 'clients' && $('#main')) clientsView(); }, () => {});
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
   S.waitCfg = { add: [], hide: [], ...((q.data || []).find(x => x.key === 'waitlist')?.value || {}) };
   renderStaff();
-  /* таксуване и авто-подновяване вървят във фона — не забавят отварянето; ако променят нещо, графикът се опреснява */
-  Promise.all([sb.rpc('charge_started').then(r => r, () => ({})), sb.rpc('auto_renew_sync').then(r => r, () => ({}))]).then(async ([a, r]) => {
-    const ren = !r.error && r.data > 0, ch = !a.error && a.data > 0;
-    if (ren) S.pstat = await loadPstat();
-    if ((ren || ch) && S.tab === 'week' && $('#grid') && !document.querySelector('.modal.on, dialog[open]')) weekView();
-  });
+  /* таксуване и авто-подновяване: на сървъра (cron), не при отваряне — приложението се отваря по-бързо */
 }
 /* ── Лично напомняне за ежедневните задачи (вижда го само служителят, докато не отчете) ── */
 const STORY = { tag: 'Сторита: ' };
@@ -761,9 +759,9 @@ function renderStaff() {
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
     <div class="tabs">
-      ${[['dash', 'Обобщение']].concat(S.owner || S.me.row.perm_visits_loc || S.me.row.perm_revenue ? [['kpi', 'KPI']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Задачи'], ['rewards', 'Награди']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['reports', 'Отчети'], ['fin', 'Финанси']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
+      ${[['dash', 'Обобщение']].concat(S.owner ? [['kpi', 'KPI и отчети']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Проследяване']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['fin', 'Финанси']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
-    <span class="seg" id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<button class="${l === S.loc ? 'on' : ''}" data-act="hloc" data-l="${esc(l)}">${esc(l)}</button>`).join('')}</span>
+    <span class="seg" id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<button class="${l === S.loc ? 'on' : ''}" data-act="hloc" data-l="${esc(l)}">${esc(locName(l))}</button>`).join('')}</span>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<select id="tsel" title="Виж приложението като клиент"><option value="">${esc(S.me.row.name)}</option><option value="${DEMO_CLIENT}">Като клиент: Пробен Пробен</option></select>`}<button class="sm" data-act="mypw" title="Смени своята парола">Парола</button><button class="sm" data-act="logout">Изход</button></div>
   ${S.view ? `<div style="background:var(--bad);color:#fff;text-align:center;padding:6px;font-size:13px">Гледаш като ${esc(S.view.name)} — така го виждат те. Върни се горе вдясно.</div>` : ''}
   <div id="nudge"></div><div class="wrap" id="main"></div>`;
@@ -776,12 +774,14 @@ function renderStaff() {
     if (e.target.value === '__client') { e.target.value = S.view?.id || ''; return pickClientPreview(); }
     const t = S.staff.find(x => x.id === e.target.value);
     S.view = t || null; S.me = t ? { role: 'staff', row: t } : S.real; S.owner = S.realOwner && !t;
-    if (t && ['settings', 'fin', 'reports', 'tasks', 'rewards', 'team'].includes(S.tab)) S.tab = 'week'; D.ploc = null; renderStaff();
+    if (t && ['settings', 'fin', 'reports', 'tasks', 'rewards', 'team', 'kpi'].includes(S.tab)) S.tab = 'week'; D.ploc = null; renderStaff();
   };
   renderTab();
 }
 function loadMain() { const m = $('#main'); if (!m) return; if (m.dataset.ld === '1' || !m.firstElementChild) { m.innerHTML = '<div class="mute">Зареждане…</div>'; m.dataset.ld = ''; } }
 function renderTab() {
+  if (['rewards', 'reports'].includes(S.tab)) { if (S.tab === 'reports') D.ksub = 'rep'; S.tab = S.owner ? 'kpi' : 'week'; }
+  if (S.tab === 'kpi' && !S.owner) S.tab = 'week';
   const m = $('#main'); if (m && m.dataset.rt !== S.tab) { m.dataset.rt = S.tab; m.dataset.ld = '1'; }
   ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, progress: progressView, tasks: tasksView, rewards: rewardsView, reports: reportsView, fin: finView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
 }
@@ -1147,7 +1147,7 @@ async function massageKpi() {
   const mx = Math.max(1, ...weeks.map(w => w.n));
   const rev28 = d28n.reduce((a, x) => a + (price[x.service] || 0), 0), revPrev = dPrev.reduce((a, x) => a + (price[x.service] || 0), 0);
   const k = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
-  const h0 = main.firstElementChild, html = `<h3 style="margin-top:6px">Масажно студио · Лерин</h3>
+  const h0 = main.querySelector(':scope > .row') || main.firstElementChild, html = `<h3 style="margin-top:6px">Масажно студио · Лерин</h3>
     <div class="kpis">${k('Масажи · 28 дни', d28n.length, delta(d28n.length, dPrev.length))}${k('Клиенти', active.size, neu + ' нови')}${k('Повтарящи се', repeat + '%', 'с 2+ масажа за 90 дни')}
     ${k('Отказани', cancelPct + '%', c28.length + ' часа · ' + cc28 + ' от приложението')}${k('Предстоящи 7 дни', upc, 'записани масажа')}${k('Средно между масажи', avgGap == null ? '–' : avgGap + ' дни', 'на един клиент')}${S.owner ? k('Приход (по ценоразпис)', eur(rev28), delta(rev28, revPrev)) : ''}</div>
     <div class="row" style="align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px">
@@ -1161,8 +1161,14 @@ async function massageKpi() {
 const KLOCS = [['all', 'Двата обекта'], ['Боян Петров', 'Боян Петров'], ['Лерин', 'Лерин']];
 const pct = (a, b) => b ? Math.round((a - b) / b * 100) : 0;
 const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
+function kpiSub() {
+  const m = $('#main'); if (!m || S.tab !== 'kpi' || document.getElementById('ksub')) return;
+  m.insertAdjacentHTML('afterbegin', `<div class="seg" id="ksub" style="margin-bottom:12px">${[['kpi', 'KPI'], ['rep', 'Отчети · Заплати']].map(([k, l]) => `<button class="${(D.ksub || 'kpi') === k ? 'on' : ''}" data-act="ksub" data-k="${k}">${l}</button>`).join('')}</div>`);
+}
 async function kpiView() {
-  await (S.owner ? kpiOwner() : kpiTrainer());
+  if (!S.owner) { S.tab = 'week'; return renderStaff(); }
+  if (D.ksub === 'rep') { await reportsView(); return kpiSub(); }
+  await kpiOwner(); kpiSub();
   if (S.tab === 'kpi' && S.owner && $('#main') && !document.getElementById('cancelcard')) { $('#main').insertAdjacentHTML('beforeend', '<div class="card" id="cancelcard" style="margin-top:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>'); loadCancelCard(); }
   if (S.tab === 'kpi') massageKpi();
 }
@@ -1243,6 +1249,7 @@ async function kpiOwner() {
   $('#main').innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">KPI</b><span class="sp"></span>
     <div class="seg">${KLOCS.map(([k, l]) => `<button class="${L === k ? 'on' : ''}" data-act="kloc" data-l="${k}">${l}</button>`).join('')}</div></div>
     ${brief}${top}${crack}${charts}${list}${trainers}${more}`;
+  kpiSub();
 }
 function stackChart(rows, locs, key, unit) {
   const wk = unit === 'week', per = [...new Set(rows.map(r => r.period))].sort(), W = 720, H = 240, pl = 36, pb = 26, pt = 22, cw = (W - pl) / per.length, n = locs.length, bw = Math.max(5, Math.min(22, (cw - 8) / n));
@@ -1782,8 +1789,9 @@ async function loadPstat() {
   if (error) { fail(error, 'Пакетите не се заредиха (изпълнен ли е 03_popravki.sql?)'); return []; }
   return data;
 }
-const CST = { active: 'Активни', wait: 'Чакащи', pause: 'Пауза', inactive: 'Неактивни' };
-function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 'Inactive') return 'inactive'; if (curPkg(c.id)) return 'active'; const t = today(); return (S.pstat || []).some(p => p.client_id === c.id && p.start_date > t) ? 'active' : 'wait'; }
+const CST = { active: 'Активни', single: 'Еднократни', wait: 'Чакащи', pause: 'Пауза', inactive: 'Неактивни' };
+/* „Еднократни“ = без абонамент, но с единично посещение през последните 60 дни */
+function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 'Inactive') return 'inactive'; if (curPkg(c.id)) return 'active'; const t = today(); if ((S.pstat || []).some(p => p.client_id === c.id && p.start_date > t)) return 'active'; return S.singles && S.singles.has(c.id) ? 'single' : 'wait'; }
 function curPkg(cid) {
   const t = today();
   const list = (S.pstat || []).filter(p => p.client_id === cid);
@@ -1813,13 +1821,13 @@ function drawClients() {
     if (S.csts.length && !S.csts.includes(cstat(c))) return false;
     if (S.cfilter === 'exp') { const p = curPkg(c.id); if (!p) return false; const left = p.total - p.used, days = (parse(p.end_date) - parse(today())) / 864e5; return left <= 1 || days <= 3; }
     return true;
-  }).sort((a, b) => ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(a)] - ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
-  if (S.csort) { const { k, d } = S.csort, SO = { active: 0, wait: 1, pause: 2, inactive: 3 };
+  }).sort((a, b) => ({ active: 0, single: 1, wait: 2, pause: 3, inactive: 4 })[cstat(a)] - ({ active: 0, single: 1, wait: 2, pause: 3, inactive: 4 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
+  if (S.csort) { const { k, d } = S.csort, SO = { active: 0, single: 1, wait: 2, pause: 3, inactive: 4 };
     const pv = c => { const p = curPkg(c.id); return p ? (p.total - p.used) * 1000 + Math.max(0, (parse(p.end_date) - parse(today())) / 864e5) : -1; };
     const key = { name: c => c.name, st: c => SO[cstat(c)], loc: c => c.location || '', ph: c => c.phone || '', pkg: pv, prof: c => c.user_id ? 0 : 1 }[k];
     list.sort((a, b) => { const x = key(a), y = key(b); return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'bg')) * d || a.name.localeCompare(b.name, 'bg'); }); }
   const th = (k, l, t) => `<th class="click" data-act="csort" data-k="${k}" style="cursor:pointer;user-select:none;white-space:nowrap"${t ? ` title="${t}"` : ''}>${l} ${S.csort && S.csort.k === k ? (S.csort.d > 0 ? '▲' : '▼') : '<span class="mute">↕</span>'}</th>`;
-  const stCls = { active: 'ok', wait: 'warn', pause: '', inactive: '' };
+  const stCls = { active: 'ok', single: 'warn', wait: '', pause: '', inactive: '' };
   S.clist = list;
   $('#main').innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap">
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
@@ -2190,7 +2198,7 @@ function payCard() {
 function payCardHead() {
   const { due, cred, even } = payLists();
   const ch = (act, v, l, cur2, extra = '') => `<button class="sm ${cur2 === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}${extra}</button>`;
-  const locs = [['all', 'Всички обекти'], ...LOCS.map(l => [l, l])];
+  const locs = [['all', 'Всички обекти'], ...LOCS.map(l => [l, locName(l)])];
   const cnt = l => (D.bal || []).filter(r => r.bal > 0 && (l === 'all' || r.c.location === l || !r.c.location)).length;
   return `<h2>Плащания</h2><div class="chips" style="margin-bottom:6px">${locs.map(([v, l]) => ch('ploc', v, l, payLoc(), ` <span class="mute">${cnt(v)}</span>`)).join('')}</div>
     <div class="chips" style="margin-bottom:8px">${S.owner ? `${ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length} · ${eur(sumAbs(due))}`)}${ch('ptab', 'credit', 'Преплатили', D.tab, ` ${cred.length} · ${eur(sumAbs(cred))}`)}${ch('ptab', 'even', 'Изравнени', D.tab, ` ${even.length}`)}` : ch('ptab', 'due', 'Трябва да платят', D.tab, ` ${due.length}`)}${ch('ptab', 'hist', 'История', D.tab)}${S.owner ? ch('ptab', 'audit', '🕓 Дневник', D.tab) : ''}</div>`;
@@ -2198,7 +2206,7 @@ function payCardHead() {
 function payCardBody() {
   const { due, cred, even } = payLists(), list = D.tab === 'due' ? due : D.tab === 'credit' ? cred : even;
   const ch = (act, v, l, cur2, extra = '') => `<button class="sm ${cur2 === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}${extra}</button>`;
-  const locs = [['all', 'Всички обекти'], ...LOCS.map(l => [l, l])].filter(([v]) => S.owner || v === 'all' || (S.me.row.locations || []).includes(v));
+  const locs = [['all', 'Всички обекти'], ...LOCS.map(l => [l, locName(l)])].filter(([v]) => S.owner || v === 'all' || (S.me.row.locations || []).includes(v));
   const cnt = l => (D.bal || []).filter(r => r.bal > 0 && (l === 'all' || r.c.location === l || !r.c.location)).length;
   return `<h2>Плащания</h2>
     <div class="chips" style="margin-bottom:6px">${locs.map(([v, l]) => ch('ploc', v, l, payLoc(), ` <span class="mute">${cnt(v)}</span>`)).join('')}</div>
@@ -2364,12 +2372,12 @@ function pgvClients() {
   const main = $('#main'); if (!main) return;
   const q = (D.pgq || '').toLowerCase(), sts = D.pgs || [], by = Object.fromEntries(PGV.data.map(r => [r.client_id, r]));
   const base = S.clients.filter(c => !c.massage_only && (D.pgl === 'all' || c.location === D.pgl) && (!q || c.name.toLowerCase().includes(q)));
-  const list = base.filter(c => !sts.length || sts.includes(cstat(c))).sort((a, b) => ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(a)] - ({ active: 0, wait: 1, pause: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
-  const stCls = { active: 'ok', wait: 'warn', pause: '', inactive: '' }, todoN = pgvTasks().filter(x => !PGV.done.has(`${x.cid}|${x.k}|${x.ref}`)).length;
+  const list = base.filter(c => !sts.length || sts.includes(cstat(c))).sort((a, b) => ({ active: 0, single: 1, wait: 2, pause: 3, inactive: 4 })[cstat(a)] - ({ active: 0, single: 1, wait: 2, pause: 3, inactive: 4 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
+  const stCls = { active: 'ok', single: 'warn', wait: '', pause: '', inactive: '' }, todoN = pgvTasks().filter(x => !PGV.done.has(`${x.cid}|${x.k}|${x.ref}`)).length;
   main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="sp"></span>
     <div class="chips" style="margin:0"><button class="on" data-act="pgmode" data-m="clients">Клиенти</button><button data-act="pgmode" data-m="tasks">Задачи · ${todoN}</button><button data-act="wcmode" data-m="wc">Предизвикателство</button></div></div>
     <div class="row" style="margin-bottom:10px;flex-wrap:wrap"><input id="pgq" placeholder="Търси клиент…" value="${esc(D.pgq || '')}" style="flex:1;min-width:200px">
-    <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, locName(l)])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     <div class="chips" style="margin-bottom:8px"><button class="${sts.length ? '' : 'on'}" data-act="pgst" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${sts.includes(k) ? 'on' : ''}" data-act="pgst" data-k="${k}">${l} · ${base.filter(c => cstat(c) === k).length}</button>`).join('')}</div>
     <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Последно тегло</th><th>Чек-ин</th><th>Тестове</th></tr></thead><tbody>
     ${list.slice(0, 400).map(c => { const r = by[c.id], k = cstat(c); return `<tr class="click" data-act="pgopen" data-id="${c.id}"><td><b>${esc(c.name)}</b></td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${r && r.last_weight ? fmt(r.last_weight) : '<span class="mute">—</span>'}</td><td>${r && r.last_checkin ? fmt(r.last_checkin) : '<span class="mute">—</span>'}</td><td>${r ? (r.tests_done || []).length + '/3' : '<span class="mute">—</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="mute">Няма клиенти.</td></tr>'}
@@ -2387,7 +2395,7 @@ function pgvRender() {
   const todo = shown.filter(x => !isDone(x)).sort((a, b) => a.pr - b.pr || a.name.localeCompare(b.name, 'bg')), dn = shown.filter(isDone);
   const row = x => `<div class="bk ptask"><label style="display:flex;align-items:center;gap:10px;flex:1;min-width:240px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px" data-act="ptoggle" data-c="${x.cid}" data-k="${x.k}" data-r="${esc(x.ref)}" ${isDone(x) ? 'checked' : ''}><span><b>${esc(x.name)}</b> <span class="mute">· ${esc(x.loc)}</span><br>${esc(x.what)} <span class="mute">— ${esc(x.sub)}</span></span></label><button class="sm" data-act="pgopen" data-id="${x.cid}">Отвори прогреса</button></div>`;
   main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="mute">${PGV.data.length} клиента с включен модул</span><span class="sp"></span><div class="chips" style="margin:0"><button data-act="pgmode" data-m="clients">Клиенти</button><button class="on" data-act="pgmode" data-m="tasks">Задачи</button><button data-act="wcmode" data-m="wc">Предизвикателство</button></div><span class="sp"></span>
-    <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, locName(l)])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     ${PGV.ok ? '' : '<div class="card" style="margin-bottom:12px;border-color:var(--bad)">Отмятането още не е включено (липсва таблицата за задачи). Списъкът се вижда, но отметките няма да се запазват.</div>'}
     <div class="chips">${PGK.map(([k, l]) => `<button class="${D.pgk === k ? 'on' : ''}" data-act="pgkind" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
     <div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 6px">За вършене · ${todo.length}</h3>${todo.map(row).join('') || '<div class="mute">Всичко е свършено. 🎉</div>'}</div>
@@ -2434,8 +2442,8 @@ function tskRender() {
   const shown = all.filter(x => D.tkk === 'all' || x.k === D.tkk);
   const todo = shown.filter(x => !isDone(x)).sort((a, b) => a.pr - b.pr || a.name.localeCompare(b.name, 'bg')), dn = shown.filter(isDone);
   const row = x => `<div class="bk ptask"><label style="display:flex;align-items:center;gap:10px;flex:1;min-width:240px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px" data-act="ptoggle" data-c="${x.cid}" data-k="${x.k}" data-r="${esc(x.ref)}" ${isDone(x) ? 'checked' : ''}><span><b>${esc(x.name)}</b> <span class="mute">· ${esc(x.loc)}${x.phone ? ' · ' + esc(x.phone) : ''}</span><br>${esc(x.what)} <span class="mute">— ${esc(x.sub)}</span></span></label><button class="sm" data-act="client" data-id="${x.cid}">Отвори</button></div>`;
-  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Задачи</b><span class="mute">кого да потърсим днес</span><span class="sp"></span>
-    <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.tkl === k ? 'on' : ''}" data-act="tkloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+  main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Проследяване</b><span class="mute">кого да потърсим днес</span><span class="sp"></span>
+    <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, locName(l)])].map(([k, l]) => `<button class="${D.tkl === k ? 'on' : ''}" data-act="tkloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     ${PGV.ok ? '' : '<div class="card" style="margin-bottom:12px;border-color:var(--bad)">Отметките не се запазват (липсва таблицата за задачи).</div>'}
     <div class="chips">${TSKK.map(([k, l]) => `<button class="${D.tkk === k ? 'on' : ''}" data-act="tkkind" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
     <div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 6px">За вършене · ${todo.length}</h3>${todo.slice(0, 150).map(row).join('') || '<div class="mute">Всичко е свършено.</div>'}</div>
@@ -2528,6 +2536,7 @@ function reportsRender() {
       <div class="row" style="margin-top:12px;flex-wrap:wrap">
         ${PAY.status === 'draft' ? '<button class="pri" data-act="pmstat" data-s="approved">Одобри месеца</button>' : ''}${PAY.status === 'approved' ? '<button class="pri" data-act="pmstat" data-s="paid">Маркирай като платен</button><button data-act="pmstat" data-s="draft">Върни в чернова</button>' : ''}${PAY.status === 'paid' ? '<button data-act="pmstat" data-s="approved">Върни към одобрен</button>' : ''}
         <button data-act="pcsv">Копирай за счетоводителя</button></div></div>`;
+  kpiSub();
   $('#pay-m').onchange = e => { D.pm = e.target.value; reportsView(); };
   main.querySelectorAll('input[data-act=padj]').forEach(i => i.onchange = async () => {
     const amount = Number(i.value || 0), { error } = await sb.from('payroll_adjust').upsert({ month: PAY.from, staff_id: i.dataset.s, amount }, { onConflict: 'month,staff_id' });
@@ -2976,42 +2985,43 @@ async function clientApp() {
   const me = S.me.row, t = today(), to = ymd(addDays(new Date(), 28));
   const wq = sb.from('weight_log').select('day,weight_kg').eq('client_id', me.id).order('day');
   const mq = sb.from('massage_bookings').select('*').eq('client_id', me.id).gte('date', t).order('date').order('start_time');
-  const [pk, bk, cl, set, mm, wl] = await Promise.all([
+  const safe = p => Promise.resolve(p).then(r => r, () => ({ data: null, error: true }));
+  const c3 = since3m();
+  const [pk, bk, cl, set, mm, wl, ch, py, dv, hvv, rv, pq, bq, iq, nq, rvc] = await Promise.all([
     sb.from('package_status').select('*').eq('client_id', me.id).order('end_date', { ascending: false }),
     sb.from('bookings').select('id,status,late,session_id,created_at,sessions!inner(id,date,start_time,duration_min,kind,title,location,cancelled)').eq('client_id', me.id).gte('sessions.date', t).order('date', { foreignTable: 'sessions' }),
     sb.from('sessions').select('id,date,start_time,title,location,capacity,kind,cancelled').eq('kind', 'group').eq('cancelled', false).gte('date', t).lte('date', to).order('date').order('start_time'),
     sb.from('settings').select('*'),
-    mq, wq
+    mq, wq,
+    safe(sb.from('charges').select('date,amount,note').eq('client_id', me.id)), safe(sb.from('payments').select('date,amount,method,note').eq('client_id', me.id)),
+    safe(sb.from('bookings').select('sessions!inner(date,kind)').eq('client_id', me.id).eq('status', 'done')), safe(sb.from('hist_visits').select('date,status,title').eq('client_id', me.id).limit(1000)),
+    safe(sb.from('bookings').select('status,late,sessions!inner(date,start_time,title,location,kind)').eq('client_id', me.id).gte('sessions.date', c3).lte('sessions.date', t)),
+    safe(sb.from('progress_profile').select('start_weight,target_weight').eq('client_id', me.id).limit(1)),
+    safe(sb.from('bonuses').select('*').eq('client_id', me.id).order('created_at', { ascending: false })),
+    me.invoice_company ? safe(sb.from('invoice_requests').select('id,company,status,created_at,handled_at').eq('client_id', me.id).order('created_at', { ascending: false }).limit(12)) : Promise.resolve({ data: [] }),
+    safe(sb.from('nutrition_plans').select('id,title,body,file_path,file_name,created_at').eq('client_id', me.id).eq('visible', true).order('created_at', { ascending: false })),
+    safe(sb.from('review_invites').select('*').eq('client_id', me.id).limit(1))
   ]);
+  C.rvi = rvc.error ? false : ((rvc.data || [])[0] || null);
   try {
-    const [ch, py, dv, hvv] = await Promise.all([sb.from('charges').select('date,amount,note').eq('client_id', me.id), sb.from('payments').select('date,amount,method,note').eq('client_id', me.id), sb.from('bookings').select('sessions!inner(date,kind)').eq('client_id', me.id).eq('status', 'done'), sb.from('hist_visits').select('date,status,title').eq('client_id', me.id).limit(1000)]);
     C.chs = ch.data || []; C.pays = py.data || []; C.done = (dv.data || []).filter(x => x.sessions).map(x => ({ date: x.sessions.date, kind: x.sessions.kind }));
     (hvv.data || []).filter(h => !/cancel|no.?show|late/i.test(h.status || '')).forEach(h => C.done.push({ date: h.date }));
-    const c3 = since3m();
-    const rv = await sb.from('bookings').select('status,late,sessions!inner(date,start_time,title,location,kind)').eq('client_id', me.id).gte('sessions.date', c3).lte('sessions.date', t);
     C.recent = (rv.data || []).filter(b => b.sessions && (b.status === 'done' || (b.status === 'cancelled' && b.late))).map(b => ({ date: b.sessions.date, time: hm(b.sessions.start_time), title: b.sessions.title || (b.sessions.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'), loc: b.sessions.location || '', kind: b.sessions.kind, late: b.status === 'cancelled' }))
       .concat((hvv.data || []).filter(h => h.date >= c3 && h.date <= t && !/cancel|no.?show/i.test(h.status || '') && !(rv.data || []).some(b => b.sessions?.date === h.date && (b.status === 'done' || b.late))).map(h => ({ date: h.date, time: '', title: h.title || 'Тренировка', loc: '', late: /late/i.test(h.status || '') })))
       .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   } catch (e) { C.chs = []; C.pays = []; C.done = []; C.recent = []; }
   C.massages = (mm && mm.data) || []; C.weights = (wl && wl.data) || [];
-  try { const pq = await sb.from('progress_profile').select('start_weight,target_weight').eq('client_id', me.id).limit(1); C.wprof = (pq.data || [])[0] || null; } catch (e) { C.wprof = null; }
-  try { const bq = await sb.from('bonuses').select('*').eq('client_id', me.id).order('created_at', { ascending: false }); C.bons = bq.error ? null : bq.data || []; } catch (e) { C.bons = null; }
-  try { const iq = me.invoice_company ? await sb.from('invoice_requests').select('id,company,status,created_at,handled_at').eq('client_id', me.id).order('created_at', { ascending: false }).limit(12) : { data: [] }; C.inv = iq.error ? null : iq.data || []; } catch (e) { C.inv = null; }
-  try { const nq = await sb.from('nutrition_plans').select('id,title,body,file_path,file_name,created_at').eq('client_id', me.id).eq('visible', true).order('created_at', { ascending: false }); C.nutr = nq.error ? [] : nq.data || []; } catch (e) { C.nutr = []; }
+  C.wprof = (pq.data || [])[0] || null; C.bons = bq.error ? null : bq.data || []; C.inv = iq.error ? null : iq.data || []; C.nutr = nq.error ? [] : nq.data || [];
   C.pkgs = pk.data || []; C.bookings = (bk.data || []).filter(b => b.sessions && b.status === 'booked').sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
   C.policy = (set.data || []).find(s => s.key === 'policy')?.value || {}; C.wcCfg = (set.data || []).find(s => s.key === 'challenge')?.value || null; C.cv = (set.data || []).find(s => s.key === 'client')?.value || {}; C.bcfg = (set.data || []).find(s => s.key === 'bonus')?.value || {};
   const ids = (cl.data || []).map(s => s.id);
-  const sp = ids.length ? await sb.from('session_spaces').select('*').in('session_id', ids) : { data: [] };
+  const [sp, g] = await Promise.all([ids.length ? sb.from('session_spaces').select('*').in('session_id', ids) : { data: [] }, S.previewClient ? Promise.resolve({ data: [1] }) : sb.from('client_consents').select('id').eq('client_id', me.id).eq('version', CONSENT_V).limit(1)]);
   const free = Object.fromEntries((sp.data || []).map(r => [r.session_id, r]));
   const mine = new Set(C.bookings.map(b => b.session_id));
   const minH = C.cv.bookMinHours ?? 1, limit = new Date(Date.now() + minH * 3600e3);
   C.classes = (cl.data || []).filter(s => new Date(`${s.date}T${hm(s.start_time)}:00`) > limit).filter(s => !me.location || s.location === me.location).map(s => ({ ...s, free: free[s.id]?.free, taken: free[s.id]?.taken, mine: mine.has(s.id) }));
-  try {
-    const [rv, lv, cc, db] = await Promise.all([sb.rpc('reward_visits', { p_client: me.id }), sb.from('reward_levels').select('*').eq('active', true).order('visits'), sb.from('reward_claims').select('*').eq('client_id', me.id), sb.from('bookings').select('sessions!inner(date)').eq('client_id', me.id).eq('status', 'done').limit(400)]);
-    C.rw = (rv.error || lv.error) ? null : { visits: rv.data || 0, levels: lv.data || [], claims: cc.data || [], dates: (db.data || []).map(x => x.sessions.date) };
-  } catch (e) { C.rw = null; }
+  C.rw = null;
   if (!S.previewClient) {
-    const g = await sb.from('client_consents').select('id').eq('client_id', me.id).eq('version', CONSENT_V).limit(1);
     if (!g.error && !(g.data && g.data.length)) return consentGate();
     if ((me.phone || '').replace(/\D/g, '').length < 9) return phoneGate();
   }
@@ -3195,6 +3205,25 @@ async function bonusReviewClaim() {
   const { error } = await sb.rpc('claim_review_bonus'); if (error) return fail(error, 'Не се записа');
   toast('Благодарим! Ще проверим ревюто.'); clientApp();
 }
+/* ── Покана за ревю в Google (след 10-ото посещение; „По-късно“ = пак след 30 дни) ── */
+const REVIEW_PLACE = { 'Лерин': 'ChIJuU-P7SaFqkARxch53fm9qYk', 'Боян Петров': 'ChIJdRay5-6FqkARlJTme3lbhBU' };
+function reviewLoc() { const me = S.me.row; if (REVIEW_PLACE[me.location]) return me.location; const r = (C.recent || []).find(x => REVIEW_PLACE[x.loc]); return r ? r.loc : 'Лерин'; }
+function reviewCard() {
+  if (C.rvi === false) return '';
+  const n = (C.done || []).length; if (n < 10) return '';
+  const r = C.rvi; if (r && r.clicked_at) return ''; if (r && r.dismissed_at && Date.now() - new Date(r.dismissed_at).getTime() < 30 * 864e5) return '';
+  const loc = reviewLoc();
+  return `<section class="c-card" id="rvcard"><div class="c-k">${n} тренировки с NLT 💪</div>
+    <div style="font:700 17px/1.3 Roboto,sans-serif;margin:4px 0 6px">Ще ни оставиш ли ревю в Google?</div>
+    <div class="c-note">Отнема 30 секунди и помага на повече хора да ни намерят. Благодарим ти!</div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><a class="c-btn solid" data-act="rvgo" target="_blank" rel="noopener" href="https://search.google.com/local/writereview?placeid=${REVIEW_PLACE[loc]}">★ Остави ревю</a><button class="c-btn plain" data-act="rvlater">По-късно</button></div></section>`;
+}
+async function reviewMark(field) {
+  const me = S.me.row; if (S.previewClient) { $('#rvcard')?.remove(); return; }
+  const row = { client_id: me.id, location: reviewLoc(), [field]: new Date().toISOString() };
+  const q = C.rvi ? sb.from('review_invites').update({ [field]: row[field] }).eq('client_id', me.id) : sb.from('review_invites').insert(row);
+  await q; C.rvi = { ...(C.rvi || {}), ...row }; $('#rvcard')?.remove();
+}
 function massageCard(t) {
   const m = (C.massages || []).filter(x => x.status === 'booked' && x.date >= t)[0];
   if (!m) return '';
@@ -3238,6 +3267,7 @@ function clientHome(me, t, act) {
     </section>` : `<section class="c-hero empty"><div class="c-hero-d" style="font-size:22px;line-height:1.15">Няма записан час</div>
       <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
   ${massageCard(t)}
+  ${reviewCard()}
   ${warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
   ${main ? `<section class="c-card c-sum" data-act="cnav" data-t="pkg">${rings(main, 132)}
       <div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.total - main.left} от ${main.total}</b><span>изразходени посещения · остават ${main.left}</span></div></div>
@@ -3289,7 +3319,7 @@ async function cWeekLoad(me) {
 }
 function cWeekHtml(me, t, hasGroup) {
   const loc = cWeekLoc(me), head = `<h2 class="c-title">Запиши се</h2>${cModeSeg()}
-    ${me.location && LOCS.includes(me.location) ? '' : `<div class="c-seg" style="margin:0 0 10px">${LOCS.map((l, i) => `<button class="${l === loc ? 'on' : ''}" data-act="cwkloc" data-l="${esc(l)}">${esc(l)}</button>`).join('')}<i style="transform:translateX(${LOCS.indexOf(loc) * 100}%)"></i></div>`}`;
+    ${me.location && LOCS.includes(me.location) ? '' : `<div class="c-seg" style="margin:0 0 10px">${LOCS.map((l, i) => `<button class="${l === loc ? 'on' : ''}" data-act="cwkloc" data-l="${esc(l)}">${esc(locName(l))}</button>`).join('')}<i style="transform:translateX(${LOCS.indexOf(loc) * 100}%)"></i></div>`}`;
   const mon = addDays(parse(t), -((parse(t).getDay() + 6) % 7) + 7 * (C.wkOff || 0)), from = ymd(mon);
   if (!C.wk || C.wk.key !== loc + from || C.wk.loading) { cWeekLoad(me); return head + '<div class="c-empty">Зареждане…</div>'; }
   const L = C.wk.list, mine = new Set(C.bookings.map(b => b.session_id));
@@ -3979,7 +4009,7 @@ async function wcStaff() {
   const row = x => { const e = byId[x.ex_id]; return `<tr><td>${fmt(x.day)}</td><td><b>${esc(cname(x.client_id))}</b></td><td>${esc(e?.name || '')}<div class="mute" style="font-size:12px">${esc(e?.location || '')} · ${WC_DAYS[e?.weekday] || ''}</div></td><td>${esc(wcVal(e, x.value))}${x.variant ? '<div class="mute" style="font-size:12px">' + esc(x.variant) + '</div>' : ''}</td><td><b>${+x.points}</b>${x.pr ? ' 🏆' : ''}</td>`; };
   main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">${esc(WC.cfg?.name || 'Предизвикателство')}</b><span class="mute">${WC.cfg ? fmt(WC.cfg.start) + ' – ' + fmt(wcEnd()) : ''}</span><span class="sp"></span>
     <div class="chips" style="margin:0"><button data-act="wcmode" data-m="clients">Клиенти</button><button data-act="wcmode" data-m="tasks">Задачи</button><button class="on" data-act="wcmode" data-m="wc">Предизвикателство${pend.length ? ' · ' + pend.length : ''}</button></div></div>
-    <div class="row" style="margin-bottom:10px"><div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, l])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="wcloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="row" style="margin-bottom:10px"><div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, locName(l)])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="wcloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     <div class="card" style="margin-bottom:12px"><h3 style="margin:0 0 8px">Чакат одобрение · ${pend.length}</h3>
       ${pend.length ? `<div class="tw"><table><thead><tr><th>Дата</th><th>Клиент</th><th>Упражнение</th><th>Резултат</th><th>Точки</th><th></th></tr></thead><tbody>${pend.map(x => row(x) + `<td style="white-space:nowrap"><button class="sm pri" data-act="wcok" data-id="${x.id}">Одобри</button> <button class="sm" data-act="wcno" data-id="${x.id}">Отхвърли</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="mute">Няма нови резултати.</div>'}</div>
     <div class="card" style="margin-bottom:12px"><h3 style="margin:0 0 8px">Въведи резултат</h3>
@@ -4456,6 +4486,9 @@ document.addEventListener('click', async e => {
       case 'codemode': S.otpEmail = ($('#em')?.value || '').trim(); loginView('', 'code'); break;
       case 'skippw': boot(); break;
       case 'othermail': S.otpEmail = ''; loginView('', 'code'); break;
+      case 'ksub': D.ksub = el.dataset.k; { const m = $('#main'); if (m) { m.innerHTML = ''; m.dataset.ld = '1'; } } kpiView(); break;
+      case 'rvgo': reviewMark('clicked_at'); break;
+      case 'rvlater': reviewMark('dismissed_at'); break;
       case 'cnav': C.tab = el.dataset.t; renderClient(); window.scrollTo(0, 0); break;
       case 'cinvreq': await clientInvoiceReq(); break;
       case 'invdone': case 'invno': await invoiceAct(act, el); break;
