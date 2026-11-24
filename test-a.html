@@ -735,7 +735,7 @@ async function staffApp() {
   S.clients = c.data; S.packages = p.data; S.staff = s.data;
   /* таксуването върви на сървъра всяка минута (cron) — тук само опресняваме графика */
   if (!window.__chargeT) window.__chargeT = setInterval(() => { try { if ($('#grid')) drawGrid(); } catch (e) { } }, 60000);
-  sb.rpc('single_clients', { p_days: 60 }).then(r => { if (r.error) return; S.singles = new Set((r.data || []).map(x => typeof x === 'string' ? x : x.single_clients)); if (S.tab === 'clients' && $('#main')) clientsView(); }, () => {});
+  sb.rpc('single_clients', { p_days: 60 }).then(r => { if (r.error) return; S.singles = new Set((r.data || []).map(x => typeof x === 'string' ? x : x.single_clients)); if (S.tab === 'clients' && $('#main')) clientsView(); if ($('#wbtn')) $('#wbtn').innerHTML = waitHtml(); }, () => {});
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
   S.waitCfg = { add: [], hide: [], ...((q.data || []).find(x => x.key === 'waitlist')?.value || {}) };
