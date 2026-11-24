@@ -2083,7 +2083,55 @@ async function addPackage() {
   const { data: ins, error } = await sb.from('client_packages').insert({ client_id: cid(), package_id: p.id, kind: p.kind, start_date: start, end_date: pkgEnd(start, p), total: p.sessions || p.classes, price }).select('id').single();
   if (error) return fail(error, 'Не се добави');
   if (bon) { const r = await sb.from('bonuses').update({ status: 'used', used_pkg: ins.id, used_at: new Date().toISOString(), handled_by: S.me.row.id }).eq('id', bon); if (r.error) toast('Пакетът е добавен, но бонусът не се отбеляза'); }
-  toast(bon ? `Пакетът е добавен с −10% (${money(price)})` : 'Пакетът е добавен'); afterClient();
+  toast(bon ? `Пакетът е добавен с −10% (${money(price)})` : 'Пакетът е добавен'); await afterClient(); await freqCheck(cid(), p.kind, p.sessions || p.classes);
+}
+
+/* ── Смяна на честотата (напр. 8 ↔ 12 посещения = 2 ↔ 3 пъти седмично): кои повтарящи се часове да се махнат / добавят ── */
+const WDF = ['понеделник', 'вторник', 'сряда', 'четвъртък', 'петък', 'събота', 'неделя'];
+async function freqCheck(cid2, kind, total) {
+  const f = total / 4; if (!Number.isInteger(f) || f < 1) return;
+  const t = today();
+  const { data: mem } = await sb.from('series_members').select('series_id').eq('client_id', cid2);
+  const ids = (mem || []).map(m => m.series_id); if (!ids.length && f < 1) return;
+  const { data: sers } = ids.length ? await sb.from('series').select('id,weekday,start_time,title,location,kind,ends_on').in('id', ids) : { data: [] };
+  const mine = (sers || []).filter(x => x.kind === kind && (!x.ends_on || x.ends_on >= t)).sort((a, b) => a.weekday - b.weekday || (a.start_time < b.start_time ? -1 : 1));
+  if (mine.length === f) return;
+  const lbl = x => `${WDF[x.weekday]} ${hm(x.start_time)}${x.title ? ' · ' + esc(x.title) : ''} <span class="mute">(${esc(x.location)})</span>`;
+  const nm = esc(cname(cid2)), word = n => n === 1 ? '1 път' : n + ' пъти';
+  if (mine.length > f) {
+    modal.show(`<div id="frq" data-cid="${cid2}" data-mode="rm"><h2>Смяна на честотата · ${nm}</h2>
+      <p>Новият абонамент е <b>${total} посещения (${word(f)} седмично)</b>, а клиентът е записан постоянно в <b>${mine.length}</b> повтарящи се часа седмично. Избери от кой ден да се махне (${mine.length - f}), за да не се таксува повече:</p>
+      ${mine.map(x => `<label class="f" style="flex-direction:row;gap:10px;align-items:center"><input type="checkbox" value="${x.id}" style="width:auto"> ${lbl(x)}</label>`).join('')}
+      <p class="mute" style="font-size:13px">Махат се само бъдещите часове от днес нататък. Вече проведените не се пипат.</p>
+      <div class="row" style="margin-top:10px"><button class="pri" data-act="frqgo">Махни от избраните</button><button data-act="frqskip">Остави така</button></div></div>`);
+  } else {
+    const { data: all } = await sb.from('series').select('id,weekday,start_time,title,location,kind,ends_on').eq('kind', kind).eq('location', (S.clients.find(c => c.id === cid2) || {}).location || S.loc);
+    const cand = (all || []).filter(x => (!x.ends_on || x.ends_on >= t) && !ids.includes(x.id)).sort((a, b) => a.weekday - b.weekday || (a.start_time < b.start_time ? -1 : 1));
+    modal.show(`<div id="frq" data-cid="${cid2}" data-mode="add"><h2>Смяна на честотата · ${nm}</h2>
+      <p>Новият абонамент е <b>${total} посещения (${word(f)} седмично)</b>, а клиентът е записан постоянно в <b>${mine.length}</b> повтарящи се часа седмично${mine.length ? ': ' + mine.map(lbl).join(', ') : ''}. Избери в кой ден да се добави (${f - mine.length}):</p>
+      <div style="max-height:50vh;overflow:auto">${cand.map(x => `<label class="f" style="flex-direction:row;gap:10px;align-items:center"><input type="checkbox" value="${x.id}" style="width:auto"> ${lbl(x)}</label>`).join('') || '<div class="mute">Няма други повтарящи се часове в този обект.</div>'}</div>
+      <p class="mute" style="font-size:13px">Записва се във всички бъдещи часове от избраната серия (от днес нататък).</p>
+      <div class="row" style="margin-top:10px"><button class="pri" data-act="frqgo">Добави в избраните</button><button data-act="frqskip">Остави така</button></div></div>`);
+  }
+}
+async function freqApply() {
+  const box = $('#frq'); if (!box) return; const cid2 = box.dataset.cid, mode = box.dataset.mode, t = today();
+  const pick = [...box.querySelectorAll('input[type=checkbox]:checked')].map(x => x.value); if (!pick.length) return toast('Избери поне един ден.');
+  let n = 0;
+  for (const sid of pick) {
+    const { data: fut } = await sb.from('sessions').select('id,kind').eq('series_id', sid).gte('date', t).eq('cancelled', false);
+    if (mode === 'rm') {
+      const fids = (fut || []).map(x => x.id);
+      const { data: bks } = fids.length ? await sb.from('bookings').select('id').eq('client_id', cid2).in('session_id', fids.slice(0, 300)).neq('status', 'cancelled').neq('status', 'done') : { data: [] };
+      for (const b of bks || []) { const { error } = await sb.rpc('unbook', { p_booking: b.id }); if (!error) n++; }
+      await sb.from('series_members').delete().match({ series_id: sid, client_id: cid2 }).then(() => { }, () => { });
+    } else {
+      for (const f of fut || []) if (await bookClient(f.id, cid2, true, true)) n++;
+      await seriesJoin(sid, cid2, (fut && fut[0] && fut[0].kind) || 'group');
+    }
+  }
+  logEvent('change', `${cname(cid2)}: ${mode === 'rm' ? 'махнат от' : 'добавен в'} ${pick.length} повтарящ(и) се час(а) седмично (${n} бъдещи часа)`);
+  modal.close(); toast(`${cname(cid2)}: ${mode === 'rm' ? 'махнат(а) от' : 'добавен(а) в'} ${n} бъдещи часа`); if (S.tab === 'week' && typeof weekView === 'function') weekView();
 }
 function newClientDialog() {
   modal.show(`<h2>Нов клиент</h2><div class="grid2">
@@ -4729,13 +4777,15 @@ document.addEventListener('click', async e => {
         else if (S.owner) { const x = (ty === 'pay' ? E.pays : E.chs).find(r => r.id === id); if (!x) break;
           modal.show(`<div id="te" data-ty="${ty}" data-id="${id}"><h2>${ty === 'pay' ? 'Редакция на плащане' : 'Редакция на такса'}</h2><label class="f">Сума<input id="te-a" type="number" step="0.01" value="${x.amount}"></label>${ty === 'pay' ? `<label class="f">Начин<select id="te-m"><option ${x.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${x.method === 'Банков път' ? 'selected' : ''}>Банков път</option>${x.method && !['В брой', 'Банков път'].includes(x.method) ? `<option selected>${esc(x.method)}</option>` : ''}</select></label>` : ''}<label class="f">Дата<input id="te-d" type="date" value="${x.date}"></label><label class="f">Бележка<input id="te-n" value="${esc(x.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="tlsave">Запази</button></div></div>`); }
         break; }
+      case 'frqgo': await freqApply(); break;
+      case 'frqskip': modal.close(); break;
       case 'tlsave': {
-        const E = D.ecl, box = $('#te'), ty = box.dataset.ty, id = box.dataset.id; let r;
+        const E = D.ecl, box = $('#te'), ty = box.dataset.ty, id = box.dataset.id; let r; const newTot = ty === 'pkg' ? +$('#te-t').value : 0;
         if (ty === 'pkg') { const row = { start_date: $('#te-s').value, end_date: $('#te-e').value, total: +$('#te-t').value }; const old = E.pk.find(q => q.id === id); if ($('#te-pk') && $('#te-pk').value) row.package_id = $('#te-pk').value; if (old && $('#te-sh') && $('#te-sh').checked && row.start_date !== old.start_date && row.end_date === old.end_date) row.end_date = ymd(addDays(parse(old.end_date), Math.round((parse(row.start_date) - parse(old.start_date)) / 864e5))); if (!old || row.start_date !== old.start_date) row.counted_from = null; /* „брои от“ се пази, ако началото не е сменено */ if (!row.start_date || !row.end_date || row.end_date < row.start_date || !(row.total > 0)) return toast('Провери датите и броя посещения.'); if (canPrice() && $('#te-p')) row.price = $('#te-p').value === '' ? null : +$('#te-p').value; r = await sb.from('client_packages').update(row).eq('id', id); }
         else { const a = Math.round(+$('#te-a').value * 100) / 100; if (!(a > 0)) return toast('Въведи сума.'); const row = { amount: a, date: $('#te-d').value, note: $('#te-n').value.trim() || null }; if (ty === 'pay') row.method = $('#te-m').value; r = await sb.from(ty === 'pay' ? 'payments' : 'charges').update(row).eq('id', id); }
         if (r.error) return fail(r.error, 'Не се запази');
         modal.close(); logEvent(ty === 'pkg' ? 'change' : 'paid', `Коригиран ${ty === 'pkg' ? 'абонамент' : ty === 'pay' ? 'плащане' : 'такса'}: ${cname(E.id)}`);
-        S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(E.id, 'pkgs'); toast('Запазено.'); break; }
+        S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(E.id, 'pkgs'); toast('Запазено.'); if (ty === 'pkg') { const o2 = E.pk.find(q => q.id === id); if (o2 && Number(o2.total) !== newTot && o2.end_date >= today()) await freqCheck(E.id, o2.kind, newTot); } break; }
       case 'hdel': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p || !confirm(`Изтриване на плащане ${money(p.amount)} от ${p.date} (${cname(p.client_id)})?`)) break; const { error, count } = await sb.from('payments').delete({ count: 'exact' }).eq('id', p.id); if (error) return fail(error, 'Не се изтри'); if (!count) { toast('Нямаш права да изтриеш това плащане.'); break; } toast('Плащането е изтрито'); logEvent('paid', `Изтрито плащане ${money(p.amount)} (${p.date}): ${cname(p.client_id)}`); await refreshBal(); loadPayHist(); break; }
       case 'hedit': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p) break; modal.show(`<div id="he" data-id="${p.id}"><h2>Корекция · ${esc(cname(p.client_id))}</h2><label class="f">Сума<input id="he-a" type="number" step="0.01" value="${p.amount}"></label><label class="f">Начин<select id="he-m"><option ${p.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${p.method === 'Банков път' ? 'selected' : ''}>Банков път</option></select></label><label class="f">Дата<input id="he-d" type="date" value="${p.date}"></label><label class="f">Бележка<input id="he-n" value="${esc(p.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="hsave">Запази корекцията</button></div></div>`); break; }
       case 'hsave': { const id = $('#he').dataset.id, p = (D.phist || []).find(x => x.id === id), a = Math.round(+$('#he-a').value * 100) / 100; if (!(a > 0)) return toast('Въведи сума.'); const { error } = await sb.from('payments').update({ amount: a, method: $('#he-m').value, date: $('#he-d').value, note: $('#he-n').value.trim() || null }).eq('id', id); if (error) return fail(error, 'Не се запази'); modal.close(); logEvent('paid', `Коригирано плащане: ${cname(p.client_id)} ${money(p.amount)} → ${money(a)}`); await refreshBal(); loadPayHist(); toast('Коригирано.'); break; }
