@@ -735,10 +735,11 @@ async function staffApp() {
   S.clients = c.data; S.packages = p.data; S.staff = s.data;
   /* таксуването върви на сървъра всяка минута (cron) — тук само опресняваме графика */
   if (!window.__chargeT) window.__chargeT = setInterval(() => { try { if ($('#grid')) drawGrid(); } catch (e) { } }, 60000);
-  sb.rpc('single_clients', { p_days: 60 }).then(r => { if (r.error) return; S.singles = new Set((r.data || []).map(x => typeof x === 'string' ? x : x.single_clients)); if (S.tab === 'clients' && $('#main')) clientsView(); }, () => {});
+  sb.rpc('single_clients', { p_days: 60 }).then(r => { if (r.error) return; S.singles = new Set((r.data || []).map(x => typeof x === 'string' ? x : x.single_clients)); if (S.tab === 'clients' && $('#main')) clientsView(); if ($('#wbtn')) $('#wbtn').innerHTML = waitHtml(); }, () => {});
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
   S.waitCfg = { add: [], hide: [], ...((q.data || []).find(x => x.key === 'waitlist')?.value || {}) };
+  S.ctype = { ...((q.data || []).find(x => x.key === 'ctype')?.value || {}) }; /* ръчно зададен профил: wait / single */
   renderStaff();
   /* таксуване и авто-подновяване: на сървъра (cron), не при отваряне — приложението се отваря по-бързо */
 }
@@ -1791,7 +1792,7 @@ async function loadPstat() {
 }
 const CST = { active: 'Активни', single: 'Еднократни', wait: 'Чакащи', pause: 'Пауза', inactive: 'Неактивни' };
 /* „Еднократни“ = без абонамент, но с единично посещение през последните 60 дни */
-function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 'Inactive') return 'inactive'; if (curPkg(c.id)) return 'active'; const t = today(); if ((S.pstat || []).some(p => p.client_id === c.id && p.start_date > t)) return 'active'; return S.singles && S.singles.has(c.id) ? 'single' : 'wait'; }
+function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 'Inactive') return 'inactive'; if (curPkg(c.id)) return 'active'; const t = today(); if ((S.pstat || []).some(p => p.client_id === c.id && p.start_date > t)) return 'active'; const mt = S.ctype && S.ctype[c.id]; if (mt === 'wait' || mt === 'single') return mt; return S.singles && S.singles.has(c.id) ? 'single' : 'wait'; }
 function curPkg(cid) {
   const t = today();
   const list = (S.pstat || []).filter(p => p.client_id === cid);
@@ -1886,7 +1887,7 @@ async function openClient(id, tab) {
       <label class="f">Локация<select id="c-loc">${LOCS.map(l => `<option ${l === x.location ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="f">Препоръчан от<select id="c-ref"><option value="">— никой —</option>${S.clients.filter(c => c.id !== x.id).slice().sort((a, b) => a.name.localeCompare(b.name, 'bg')).map(c => `<option value="${c.id}" ${c.id === x.referred_by ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
       <label class="f">Откъде идва<select id="c-src">${['Уебсайт', 'Препоръка', 'Instagram', 'Facebook', 'Google', 'Друго'].map(v => `<option ${v === (x.source || 'Уебсайт') ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-      <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент, иначе Чакащ)'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => `<option value="${v}" ${v === (x.status === 'Lead' ? 'Active' : x.status) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент)'], ['Wait', 'Чакащ'], ['Single', 'Еднократни посещения'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => { const cur = x.status === 'Paused' || x.status === 'Inactive' ? x.status : ({ wait: 'Wait', single: 'Single' })[(S.ctype || {})[x.id]] || 'Active'; return `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`; }).join('')}</select></label>
     </div>
     <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
     ${S.owner ? `<label class="f" style="margin-top:8px">Фирма за фактура<input id="c-inv" value="${esc(x.invoice_company || '')}" placeholder="празно = клиентът няма бутон „Заяви фактура“"></label>` : ''}
@@ -2049,11 +2050,14 @@ async function inviteAll() {
   if (modal.open() && $('#modal h2')?.textContent.startsWith('Без профил')) noProfView();
 }
 async function saveClient() {
-  const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: $('#c-st').value, source: $('#c-src') ? $('#c-src').value : undefined, referred_by: $('#c-ref') ? ($('#c-ref').value || null) : undefined, notes: $('#c-notes').value.trim() || null, invoice_company: $('#c-inv') ? ($('#c-inv').value.trim() || null) : undefined };
+  const p = { name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim() || null, email: $('#c-email').value.trim() || null, location: $('#c-loc').value, status: ['Wait', 'Single'].includes($('#c-st').value) ? 'Active' : $('#c-st').value, source: $('#c-src') ? $('#c-src').value : undefined, referred_by: $('#c-ref') ? ($('#c-ref').value || null) : undefined, notes: $('#c-notes').value.trim() || null, invoice_company: $('#c-inv') ? ($('#c-inv').value.trim() || null) : undefined };
   if (!p.name) return toast('Името е задължително.');
   const { error } = await sb.from('clients').update(p).eq('id', cid());
   if (error) return fail(error, 'Не се записа');
   const cc = S.clients.find(c => c.id === cid()), prevEmail = (cc.email || '').trim().toLowerCase(), prevSt = cc.status;
+  { const sv = $('#c-st').value, mt = sv === 'Wait' ? 'wait' : sv === 'Single' ? 'single' : null, T = S.ctype = S.ctype || {};
+    if ((T[cid()] || null) !== mt) { if (mt) T[cid()] = mt; else delete T[cid()];
+      const u = await sb.from('settings').update({ value: T }).eq('key', 'ctype').select(); const r = u.error ? u : (u.data && u.data.length ? u : await sb.from('settings').insert({ key: 'ctype', value: T })); if (r.error) fail(r.error, 'Профилът не се записа'); } }
   Object.assign(cc, p); toast('Записано'); if (S.tab === 'clients') drawClients();
   /* нов имейл или току-що активиран клиент без профил → веднага получава имейла за активация */
   if (p.email && !cc.user_id && (p.email.trim().toLowerCase() !== prevEmail || (p.status === 'Active' && prevSt !== 'Active'))) sendInvite(p.email);
@@ -2875,14 +2879,14 @@ function waitHtml() {
   if (!S.pstat) return '<div class="card wcard"><b>Чакащи</b><div class="mute" style="margin-top:6px">Зареждане…</div></div>';
   const q = (S.wq || '').toLowerCase();
   const W = S.waitCfg || { add: [], hide: [] }, isFb = c => /футбол|football/i.test(c.name || '');
-  const all = S.clients.filter(c => c.status !== 'Inactive' && !W.hide.includes(c.id) && (c.location === S.loc || !c.location || W.add.includes(c.id)) && (cstat(c) === 'wait' || isFb(c) || W.add.includes(c.id)));
-  const list = (q ? all.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)) : all).sort((a, b) => a.name.localeCompare(b.name, 'bg'));
+  const all = S.clients.filter(c => c.status !== 'Inactive' && !W.hide.includes(c.id) && (c.location === S.loc || !c.location || W.add.includes(c.id)) && (cstat(c) === 'wait' || cstat(c) === 'single' || isFb(c) || W.add.includes(c.id)));
+  const list = (q ? all.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)) : all).sort((a, b) => (cstat(a) === 'single') - (cstat(b) === 'single') || a.name.localeCompare(b.name, 'bg'));
   const pc = S.waitPick && S.clients.find(c => c.id === S.waitPick);
-  return `<div class="card wcard"><div class="row" style="margin-bottom:6px"><b>Чакащи (${all.length})</b><span class="mute" style="font-size:12px">${esc(S.loc)}</span><span class="sp"></span><button class="sm" data-act="wtoggle" title="Скрий">✕</button></div>
+  return `<div class="card wcard"><div class="row" style="margin-bottom:6px"><b>Чакащи и еднократни (${all.length})</b><span class="mute" style="font-size:12px">${esc(S.loc)}</span><span class="sp"></span><button class="sm" data-act="wtoggle" title="Скрий">✕</button></div>
     <input id="wq" placeholder="Търси…" value="${esc(S.wq || '')}" style="width:100%;margin-bottom:6px">
     ${isAdm() ? `<div class="row" style="gap:6px;margin-bottom:6px"><button class="sm" data-act="wedit">${S.waitEdit ? '✓ Готово' : '✎ Редактирай списъка'}</button>${W.hide.length ? `<button class="sm" data-act="whidden">Скрити (${W.hide.length})</button>` : ''}</div>` : ''}
     ${S.waitEdit ? `<input id="wadd" placeholder="+ Добави клиент в списъка…" autocomplete="off" style="width:100%;margin-bottom:6px"><div id="wadd-res" class="res hide"></div>` : ''}
-    <div class="wait">${list.map(c => `<div class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="${S.waitEdit ? 'false' : 'true'}" data-act="${S.waitEdit ? '' : 'wpick'}" data-id="${c.id}" title="${esc(c.name)}" style="${S.waitEdit ? 'flex-direction:row;align-items:center;gap:6px' : ''}"><span class="wn" style="flex:1">${esc(c.name)}</span>${S.waitEdit ? `<button class="sm danger" data-act="whide" data-id="${c.id}" title="Махни от списъка">✕</button>` : ''}</div>`).join('') || '<span class="mute">Няма чакащи (клиенти без абонамент) в този обект.</span>'}</div>
+    <div class="wait">${list.map((c, i) => `${cstat(c) === 'single' && (i === 0 || cstat(list[i - 1]) !== 'single') ? '<div class="mute" style="font-size:11px;font-weight:700;letter-spacing:.04em;margin:8px 0 2px;width:100%">ЕДНОКРАТНИ ПОСЕЩЕНИЯ</div>' : ''}<div class="wi ${S.waitPick === c.id ? 'on' : ''}" draggable="${S.waitEdit ? 'false' : 'true'}" data-act="${S.waitEdit ? '' : 'wpick'}" data-id="${c.id}" title="${esc(c.name)}" style="${S.waitEdit ? 'flex-direction:row;align-items:center;gap:6px' : ''}"><span class="wn" style="flex:1">${esc(c.name)}</span>${S.waitEdit ? `<button class="sm danger" data-act="whide" data-id="${c.id}" title="Махни от списъка">✕</button>` : ''}</div>`).join('') || '<span class="mute">Няма чакащи или еднократни клиенти в този обект.</span>'}</div>
     ${pc ? `<div style="margin-top:6px;font-size:13px">Избран: <b>${esc(pc.name)}</b>. Натисни час или го завлачи върху графика. <button class="sm" data-act="wclear">Откажи</button></div>` : '<div class="mute" style="margin-top:6px;font-size:12px">Избери клиент и натисни час (записва се при Аксел), или го завлачи върху графика. Работи и за вечерните часове.</div>'}</div>`;
 }
 async function quickBook(cid, date, time) {
