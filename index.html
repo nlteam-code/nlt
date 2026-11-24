@@ -1740,7 +1740,7 @@ async function setBookingStatus(bid, st) {
 }
 async function createSession(f) {
   /* консултация = персонален час без такса и без отчитане от абонамент */
-  const consult = f.kind === 'consult'; if (consult) { f = { ...f, kind: 'solo', title: f.title || 'Консултация', repeat: false }; }
+  const consult = f.kind === 'consult'; if (consult) { f = { ...f, kind: 'solo', title: f.title || 'Консултация', repeat: false, dur: 30 }; } /* всяка консултация е 30 мин */
   const { data: t } = { data: S.staff.find(x => x.id === f.trainer) };
   const cl = (f.clients || []).filter(Boolean);
   const row = { kind: f.kind, trainer_id: f.trainer, location: S.loc, title: f.title || null, capacity: f.kind === 'solo' ? Math.max(1, cl.length) : (f.cap || null), green: f.kind === 'solo', duration_min: f.dur, free: consult };
@@ -4838,7 +4838,7 @@ document.addEventListener('change', e => { if (e.target.id !== 'te-pk') return; 
   if (!sel.value) { if (info) info.textContent = ''; return; }
   const n = +o.dataset.n || 0; if ($('#te-t')) $('#te-t').value = n; if ($('#te-p') && o.dataset.pr !== '') $('#te-p').value = o.dataset.pr;
   if (info) info.textContent = `Изразходвани ${used} → остават ${Math.max(0, n - used)} от ${n}${used > n ? ' (внимание: изразходвани са повече от новия пакет)' : ''}`; });
-document.addEventListener('change', e => { if (e.target.id === 'n-kind') { const w = $('#n-capw'); if (w) w.style.display = e.target.value === 'solo' ? 'none' : ''; } });
+document.addEventListener('change', e => { if (e.target.id === 'n-kind') { const w = $('#n-capw'); if (w) w.style.display = e.target.value === 'solo' || e.target.value === 'consult' ? 'none' : ''; const d = $('#n-dur'); if (d) d.value = e.target.value === 'consult' ? 30 : (+d.value === 30 ? 60 : d.value); } });
 document.addEventListener('input', e => {
   if (e.target.id !== 'add-q') return;
   const q = e.target.value.trim().toLowerCase(), box = $('#add-res');
