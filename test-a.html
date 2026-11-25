@@ -2192,16 +2192,18 @@ async function addCombo(start) {
 /* Абонамент със старт в миналото: вече проведените еднократни посещения от началото до днес (и бъдещите записани в периода) се отчитат към абонамента, а таксите им се махат */
 async function pastToPkg(cid2, kind, start, end, total) {
   const t = today(); if (!start || !kind) return 0;
-  const { data } = await sb.from('bookings').select('id,status,late,use_plan,price,sessions!inner(date,start_time,kind,free)').eq('client_id', cid2).eq('use_plan', false).gte('sessions.date', start).lte('sessions.date', end).limit(500);
-  const list = (data || []).filter(b => b.sessions.kind === kind && !b.sessions.free && Number(b.price || 0) > 0 && (b.status === 'done' || b.status === 'booked' || (b.status === 'cancelled' && b.late)))
-    .sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
-  const past = list.filter(b => b.sessions.date <= t), fut = list.filter(b => b.sessions.date > t || b.status === 'booked');
-  const { data: used } = await sb.from('bookings').select('id,status,late,sessions!inner(date,kind)').eq('client_id', cid2).eq('use_plan', true).gte('sessions.date', start).lte('sessions.date', end).limit(500);
-  const already = (used || []).filter(b => b.sessions.kind === kind && (b.status === 'done' || b.status === 'booked' || (b.status === 'cancelled' && b.late))).length;
+  const { data } = await sb.from('bookings').select('id,status,late,use_plan,sessions!inner(date,start_time,kind,free)').eq('client_id', cid2).gte('sessions.date', start).lte('sessions.date', end).limit(500);
+  const cnt = b => b.sessions.kind === kind && !b.sessions.free && (b.status === 'done' || b.status === 'booked' || (b.status === 'cancelled' && b.late));
+  const all = (data || []).filter(cnt).sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
+  const already = all.filter(b => b.use_plan && (b.sessions.date <= t || b.status === 'booked')).length;
+  const cand = all.filter(b => !b.use_plan);
+  const { data: ch } = cand.length ? await sb.from('charges').select('booking_id').in('booking_id', cand.map(b => b.id)) : { data: [] };
+  const charged = new Set((ch || []).map(c => c.booking_id));
+  const past = cand.filter(b => b.status !== 'booked' && charged.has(b.id)), fut = cand.filter(b => b.status === 'booked');
   const cap = Number(total) > 0 ? Math.max(0, Number(total) - already) : Infinity; let n = 0, m = 0;
   for (const b of past) { if (n >= cap) break; await sb.rpc('remove_visit_charge', { p_booking: b.id }); const { error } = await sb.from('bookings').update({ use_plan: true, price: null }).eq('id', b.id); if (!error) n++; }
-  for (const b of fut) { if (past.includes(b) || n + m >= cap) continue; const { error } = await sb.from('bookings').update({ use_plan: true, price: null }).eq('id', b.id); if (!error) m++; }
-  if (n || m) logEvent('change', `${cname(cid2)}: ${n} вече проведени еднократни посещения от ${fmt(start)} отчетени към новия абонамент (таксите махнати)${m ? `, ${m} бъдещи часа минават по абонамента` : ''}`);
+  for (const b of fut) { if (n + m >= cap) break; const { error } = await sb.from('bookings').update({ use_plan: true, price: null }).eq('id', b.id); if (!error) m++; }
+  if (n || m) logEvent('change', `${cname(cid2)}: ${n} вече проведени еднократни посещения от ${fmt(start)} отчетени към новия абонамент (таксите махнати)${m ? `, ${m} записани часа минават по абонамента` : ''}`);
   return n;
 }
 async function addPackage() {
