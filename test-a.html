@@ -1233,7 +1233,7 @@ async function kpiOwner() {
   const chartTabs = `<div class="row" style="margin-bottom:8px;gap:6px">${[['visits', 'Посещения'], ['hours', 'Часове'], ['revenue', 'Приход']].map(([k, l]) => `<button class="sm ${D.kchart === k ? 'pri' : ''}" data-act="kchart" data-k="${k}">${l}</button>`).join('')}<span class="sp"></span>${D.kchart !== 'revenue' ? [['month', 'Месеци'], ['week', 'Седмици']].map(([k, l]) => `<button class="sm ${D.ktr === k ? 'pri' : ''}" data-act="ktr" data-u="${k}">${l}</button>`).join('') : ''}</div>`;
   const chart = D.kchart === 'revenue' ? revenueCard2(rvr) : stackChart(trD, locs, D.kchart === 'hours' ? 'hours' : 'visits', D.ktr);
   const charts = `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 8px">Тенденция <span class="mute" style="font-weight:400">· от юни до днес</span></h3>${chartTabs}${chart}${D.kchart === 'revenue' || D.ktr === 'week' ? '' : weekLines(trW.data, locs)}</div>`;
-  const why = await whyBlock(kc, trW.data, locs);
+  const whyB = await whyBlock(kc, trW.data, locs);
   // треньори
   const sidLoc = id => (S.staff.find(x => x.id === id) || {}).locations || [];
   const trn = (st.data || []).filter(r => !loc || sidLoc(r.staff_id).includes(loc)).filter(r => r.sessions > 0 || r.hours > 0);
@@ -1252,7 +1252,7 @@ async function kpiOwner() {
   const more = `<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:600">Още показатели · най-заети часове, честота, източник</summary>${heatGrid(ht.data || [])}${freqBlock(kc, locs)}${sourcesBlock(sr.data)}</details>`;
   $('#main').innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">KPI</b><span class="sp"></span>
     <div class="seg">${KLOCS.map(([k, l]) => `<button class="${L === k ? 'on' : ''}" data-act="kloc" data-l="${k}">${l}</button>`).join('')}</div></div>
-    ${brief}${top}${crack}${charts}${why}${list}${trainers}${more}`;
+    ${brief}${top}${crack}${charts}${whyB}${list}${trainers}${more}`;
   kpiSub();
 }
 
