@@ -1877,6 +1877,7 @@ function cstat(c) {
   if (c.status === 'Paused') return 'check';
   const t = today(), pk = curPkg(c.id), fpk = (S.pstat || []).find(p => p.client_id === c.id && p.start_date > t), vi = (S.vinfo || {})[c.id] || {};
   if (!pk && !fpk && !vi.next) return S.singles && S.singles.has(c.id) ? 'single' : 'check';
+  if (pk && !Number(pk.total)) return 'active'; /* Open Gym — без записвания */
   if (!S.vinfo) return 'active';
   const ref = [vi.last, pk && pk.start_date <= t ? pk.start_date : null].filter(Boolean).sort().pop();
   if (!ref) return fpk || vi.next ? 'active' : 'check';
