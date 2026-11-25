@@ -2186,7 +2186,25 @@ async function addCombo(start) {
   const { error } = await sb.from('client_packages').insert(rows);
   if (error) return fail(error, 'Не се добави');
   logEvent('change', `Комбиниран абонамент: ${cname(cid())} · ${g} групови + ${so} персонални · ${money(price)}`);
-  toast(`Добавен: ${g} групови + ${so} персонални · ${money(price)}`); afterClient();
+  let moved = 0; if (start < today()) { if (g) moved += await pastToPkg(cid(), 'group', start, end, g); if (so) moved += await pastToPkg(cid(), 'solo', start, end, so); }
+  toast(`Добавен: ${g} групови + ${so} персонални · ${money(price)}` + (moved ? ` · ${moved} вече проведени посещения са отчетени към него` : '')); afterClient();
+}
+/* Абонамент със старт в миналото: вече проведените еднократни посещения от началото до днес (и бъдещите записани в периода) се отчитат към абонамента, а таксите им се махат */
+async function pastToPkg(cid2, kind, start, end, total) {
+  const t = today(); if (!start || !kind) return 0;
+  const { data } = await sb.from('bookings').select('id,status,late,use_plan,sessions!inner(date,start_time,kind,free)').eq('client_id', cid2).gte('sessions.date', start).lte('sessions.date', end).limit(500);
+  const cnt = b => b.sessions.kind === kind && !b.sessions.free && (b.status === 'done' || b.status === 'booked' || (b.status === 'cancelled' && b.late));
+  const all = (data || []).filter(cnt).sort((a, b) => (a.sessions.date + a.sessions.start_time).localeCompare(b.sessions.date + b.sessions.start_time));
+  const already = all.filter(b => b.use_plan && (b.sessions.date <= t || b.status === 'booked')).length;
+  const cand = all.filter(b => !b.use_plan);
+  const { data: ch } = cand.length ? await sb.from('charges').select('booking_id').in('booking_id', cand.map(b => b.id)) : { data: [] };
+  const charged = new Set((ch || []).map(c => c.booking_id));
+  const past = cand.filter(b => b.status !== 'booked' && charged.has(b.id)), fut = cand.filter(b => b.status === 'booked');
+  const cap = Number(total) > 0 ? Math.max(0, Number(total) - already) : Infinity; let n = 0, m = 0;
+  for (const b of past) { if (n >= cap) break; await sb.rpc('remove_visit_charge', { p_booking: b.id }); const { error } = await sb.from('bookings').update({ use_plan: true, price: null }).eq('id', b.id); if (!error) n++; }
+  for (const b of fut) { if (n + m >= cap) break; const { error } = await sb.from('bookings').update({ use_plan: true, price: null }).eq('id', b.id); if (!error) m++; }
+  if (n || m) logEvent('change', `${cname(cid2)}: ${n} вече проведени еднократни посещения от ${fmt(start)} отчетени към новия абонамент (таксите махнати)${m ? `, ${m} записани часа минават по абонамента` : ''}`);
+  return n;
 }
 async function addPackage() {
   if ($('#np-sel').value === '__combo') { if ($('#np-start').value) await addCombo($('#np-start').value); return; }
@@ -2196,7 +2214,8 @@ async function addPackage() {
   const { data: ins, error } = await sb.from('client_packages').insert({ client_id: cid(), package_id: p.id, kind: p.kind, start_date: start, end_date: pkgEnd(start, p), total: p.sessions || p.classes, price }).select('id').single();
   if (error) return fail(error, 'Не се добави');
   if (bon) { const r = await sb.from('bonuses').update({ status: 'used', used_pkg: ins.id, used_at: new Date().toISOString(), handled_by: S.me.row.id }).eq('id', bon); if (r.error) toast('Пакетът е добавен, но бонусът не се отбеляза'); }
-  toast(bon ? `Пакетът е добавен с −10% (${money(price)})` : 'Пакетът е добавен'); await afterClient(); await freqCheck(cid(), p.kind, p.sessions || p.classes);
+  const moved = start < today() ? await pastToPkg(cid(), p.kind, start, pkgEnd(start, p), p.sessions || p.classes) : 0;
+  toast((bon ? `Пакетът е добавен с −10% (${money(price)})` : 'Пакетът е добавен') + (moved ? ` · ${moved} вече проведени посещения са отчетени към него` : '')); await afterClient(); await freqCheck(cid(), p.kind, p.sessions || p.classes);
 }
 
 /* ── Смяна на честотата (напр. 8 ↔ 12 посещения = 2 ↔ 3 пъти седмично): кои повтарящи се часове да се махнат / добавят ── */
@@ -4959,7 +4978,9 @@ document.addEventListener('click', async e => {
         else { const a = Math.round(+$('#te-a').value * 100) / 100; if (!(a > 0)) return toast('Въведи сума.'); const row = { amount: a, date: $('#te-d').value, note: $('#te-n').value.trim() || null }; if (ty === 'pay') row.method = $('#te-m').value; r = await sb.from(ty === 'pay' ? 'payments' : 'charges').update(row).eq('id', id); }
         if (r.error) return fail(r.error, 'Не се запази');
         modal.close(); logEvent(ty === 'pkg' ? 'change' : 'paid', `Коригиран ${ty === 'pkg' ? 'абонамент' : ty === 'pay' ? 'плащане' : 'такса'}: ${cname(E.id)}`);
-        S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(E.id, 'pkgs'); toast('Запазено.'); if (ty === 'pkg') { const o2 = E.pk.find(q => q.id === id); if (o2 && Number(o2.total) !== newTot && o2.end_date >= today()) await freqCheck(E.id, o2.kind, newTot); } break; }
+        S.pstat = await loadPstat(); if (S.tab === 'clients') drawClients(); await openClient(E.id, 'pkgs'); toast('Запазено.'); if (ty === 'pkg') { const o2 = E.pk.find(q => q.id === id); if (o2 && Number(o2.total) !== newTot && o2.end_date >= today()) await freqCheck(E.id, o2.kind, newTot);
+          const { data: np2 } = await sb.from('client_packages').select('kind,start_date,end_date,total').eq('id', id).maybeSingle();
+          if (o2 && np2 && np2.start_date < o2.start_date && np2.start_date < today()) { const mv = await pastToPkg(E.id, np2.kind, np2.start_date, np2.end_date, np2.total); if (mv) { toast(`${mv} вече проведени посещения са отчетени към абонамента`); S.pstat = await loadPstat(); await openClient(E.id, 'pkgs'); } } } break; }
       case 'hdel': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p || !confirm(`Изтриване на плащане ${money(p.amount)} от ${p.date} (${cname(p.client_id)})?`)) break; const { error, count } = await sb.from('payments').delete({ count: 'exact' }).eq('id', p.id); if (error) return fail(error, 'Не се изтри'); if (!count) { toast('Нямаш права да изтриеш това плащане.'); break; } toast('Плащането е изтрито'); logEvent('paid', `Изтрито плащане ${money(p.amount)} (${p.date}): ${cname(p.client_id)}`); await refreshBal(); loadPayHist(); break; }
       case 'hedit': { const p = (D.phist || []).find(x => x.id === el.dataset.id); if (!p) break; modal.show(`<div id="he" data-id="${p.id}"><h2>Корекция · ${esc(cname(p.client_id))}</h2><label class="f">Сума<input id="he-a" type="number" step="0.01" value="${p.amount}"></label><label class="f">Начин<select id="he-m"><option ${p.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${p.method === 'Банков път' ? 'selected' : ''}>Банков път</option></select></label><label class="f">Дата<input id="he-d" type="date" value="${p.date}"></label><label class="f">Бележка<input id="he-n" value="${esc(p.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="hsave">Запази корекцията</button></div></div>`); break; }
       case 'hsave': { const id = $('#he').dataset.id, p = (D.phist || []).find(x => x.id === id), a = Math.round(+$('#he-a').value * 100) / 100; if (!(a > 0)) return toast('Въведи сума.'); const { error } = await sb.from('payments').update({ amount: a, method: $('#he-m').value, date: $('#he-d').value, note: $('#he-n').value.trim() || null }).eq('id', id); if (error) return fail(error, 'Не се запази'); modal.close(); logEvent('paid', `Коригирано плащане: ${cname(p.client_id)} ${money(p.amount)} → ${money(a)}`); await refreshBal(); loadPayHist(); toast('Коригирано.'); break; }
