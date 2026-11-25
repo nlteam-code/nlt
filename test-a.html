@@ -1281,39 +1281,41 @@ function weekLines(rows, locs, n = 14) {
 }
 /* ── Защо се промени посещаемостта: последните 4 седмици срещу предишните 4 ── */
 async function whyBlock(kc, trW, locs) {
-  const t = new Date(), a0 = ymd(addDays(t, -27)), p0 = ymd(addDays(t, -55)), p1 = ymd(addDays(t, -28)), tt = ymd(t);
-  const [cb, cs] = await Promise.all([
-    sb.from('bookings').select('status,late,sessions!inner(date,location)').eq('status', 'cancelled').gte('sessions.date', p0).lte('sessions.date', tt).limit(5000),
-    sb.from('sessions').select('date,location,cancelled').eq('cancelled', true).gte('date', p0).lte('date', tt).limit(5000)]);
   const wk = [...new Set((trW || []).map(r => r.period))].sort(), full = wk.slice(0, -1), w4 = full.slice(-4), q4 = full.slice(-8, -4);
-  const sw = (ps, l, k) => (trW || []).filter(r => ps.includes(r.period) && r.location === l).reduce((s, r) => s + (r[k] || 0), 0);
-  const names = a => a.slice(0, 4).map(c => esc(c.name.replace(/ - (Лерин|Боян Петров)$/, ''))).join(', ') + (a.length > 4 ? ` и още ${a.length - 4}` : '');
-  const sgnp = n => n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0';
+  if (w4.length < 4 || q4.length < 4) return '';
+  const from = q4[0], mid = w4[0], to = ymd(addDays(parse(w4[3]), 6)), tt = today();
+  let bk = [];
+  for (let i = 0; i < 20; i++) { const { data, error } = await sb.from('bookings').select('client_id,status,late,sessions!inner(date,location)').gte('sessions.date', from).lte('sessions.date', to).range(i * 1000, i * 1000 + 999); if (error || !data) break; bk = bk.concat(data); if (data.length < 1000) break; }
+  const { data: cs } = await sb.from('sessions').select('date,location').eq('cancelled', true).gte('date', from).lte('date', to).limit(5000);
+  const kcm = Object.fromEntries(kc.map(c => [c.client_id, c]));
+  const nm = id => (kcm[id] || {}).name || cname(id) || '?';
+  const names = a => a.slice(0, 4).map(x => esc(String(nm(x.id)).replace(/ - (Лерин|Боян Петров)$/, ''))).join(', ') + (a.length > 4 ? ` и още ${a.length - 4}` : '');
+  const fmtW = p => { const d = parse(p); return `${d.getDate()}.${d.getMonth() + 1}`; };
   const out = locs.map(l => {
-    const cl = kc.filter(c => c.location === l);
-    const lost = cl.filter(c => c.done_prev_28 > 0 && c.done_28 === 0).sort((a, b) => b.done_prev_28 - a.done_prev_28);
-    const lostNoPkg = lost.filter(c => !c.pkg_end || c.pkg_end < tt), lostPaused = lost.filter(c => c.status === 'Paused'), lostLeft = lost.filter(c => c.status === 'Inactive');
-    const less = cl.filter(c => c.done_28 > 0 && c.done_28 < c.done_prev_28).sort((a, b) => (b.done_prev_28 - b.done_28) - (a.done_prev_28 - a.done_28));
-    const more = cl.filter(c => c.done_prev_28 > 0 && c.done_28 > c.done_prev_28), fresh = cl.filter(c => c.done_prev_28 === 0 && c.done_28 > 0);
-    const sum = (a, f) => a.reduce((s, c) => s + f(c), 0);
-    const vLost = sum(lost, c => c.done_prev_28), vLess = sum(less, c => c.done_prev_28 - c.done_28), vMore = sum(more, c => c.done_28 - c.done_prev_28), vNew = sum(fresh, c => c.done_28);
-    const cA = (cb.data || []).filter(b => b.sessions.location === l && b.sessions.date >= a0), cP = (cb.data || []).filter(b => b.sessions.location === l && b.sessions.date >= p0 && b.sessions.date < p1);
-    const sA = (cs.data || []).filter(x => x.location === l && x.date >= a0).length, sP = (cs.data || []).filter(x => x.location === l && x.date >= p0 && x.date < p1).length;
-    const now = sw(w4, l, 'visits'), prev = sw(q4, l, 'visits'), dS = sw(w4, l, 'solo') - sw(q4, l, 'solo'), dG = sw(w4, l, 'grp') - sw(q4, l, 'grp');
+    const per = {}, cA = [0, 0], cL = [0, 0];
+    bk.filter(b => b.sessions.location === l).forEach(b => { const now = b.sessions.date >= mid ? 1 : 0, vis = b.status === 'done' || (b.status === 'cancelled' && b.late);
+      if (vis) { const o = per[b.client_id] = per[b.client_id] || { id: b.client_id, n: 0, p: 0 }; if (now) o.n++; else o.p++; }
+      if (b.status === 'cancelled') { cA[now]++; if (b.late) cL[now]++; } });
+    const cl = Object.values(per), sum = (a, f) => a.reduce((s, c) => s + f(c), 0);
+    const nowT = sum(cl, c => c.n), prevT = sum(cl, c => c.p);
+    const lost = cl.filter(c => c.p > 0 && c.n === 0).sort((a, b) => b.p - a.p);
+    const lostNoPkg = lost.filter(c => { const k = kcm[c.id]; return !k || !k.pkg_end || k.pkg_end < tt; }), lostLeft = lost.filter(c => (kcm[c.id] || {}).status === 'Inactive' || (S.left || {})[c.id]), lostPaused = lost.filter(c => (kcm[c.id] || {}).status === 'Paused');
+    const less = cl.filter(c => c.n > 0 && c.n < c.p).sort((a, b) => (b.p - b.n) - (a.p - a.n)), more = cl.filter(c => c.p > 0 && c.n > c.p).sort((a, b) => (b.n - b.p) - (a.n - a.p)), fresh = cl.filter(c => c.p === 0 && c.n > 0).sort((a, b) => b.n - a.n);
+    const vLost = sum(lost, c => c.p), vLess = sum(less, c => c.p - c.n), vMore = sum(more, c => c.n - c.p), vNew = sum(fresh, c => c.n);
+    const sA = (cs || []).filter(x => x.location === l && x.date >= mid).length, sP = (cs || []).filter(x => x.location === l && x.date < mid).length;
     const R = [];
-    if (vLost) R.push({ v: -vLost, t: `${lost.length} клиенти спряха да идват (${vLost} посещения по-малко)`, d: [lostNoPkg.length ? `${lostNoPkg.length} без подновен абонамент` : '', lostLeft.length ? `${lostLeft.length} отбелязани като напуснали` : '', lostPaused.length ? `${lostPaused.length} в пауза` : ''].filter(Boolean).join(' · ') + (lost.length ? ` — ${names(lost)}` : '') });
-    if (vLess) R.push({ v: -vLess, t: `${less.length} клиенти идват по-рядко (${vLess} посещения по-малко)`, d: names(less) });
-    if (cA.length - cP.length > 2) R.push({ v: -(cA.length - cP.length), t: `Повече отказани записвания: ${cA.length} срещу ${cP.length}`, d: `${cA.filter(b => b.late).length} от тях са късни откази` });
+    if (vLost) R.push({ v: -vLost, t: `${lost.length} клиенти спряха да идват (−${vLost} посещения)`, d: [lostNoPkg.length ? `${lostNoPkg.length} без подновен абонамент` : '', lostLeft.length ? `${lostLeft.length} отбелязани като напуснали` : '', lostPaused.length ? `${lostPaused.length} в пауза` : ''].filter(Boolean).join(' · ') + ' — ' + names(lost) });
+    if (vLess) R.push({ v: -vLess, t: `${less.length} клиенти идват по-рядко (−${vLess} посещения)`, d: names(less) });
+    if (cA[0] > 0 && cA[1] - cA[0] > 2) R.push({ v: -(cA[1] - cA[0]), t: `Повече отказани записвания: ${cA[1]} срещу ${cA[0]}`, d: `${cL[1]} от тях са късни откази (броят се като посещение)` });
     if (sA - sP > 1) R.push({ v: -(sA - sP), t: `Повече отменени часове от залата: ${sA} срещу ${sP}`, d: 'празници, болничен или отменени групи' });
     if (vNew) R.push({ v: vNew, t: `${fresh.length} нови или върнали се клиенти (+${vNew} посещения)`, d: names(fresh) });
     if (vMore) R.push({ v: vMore, t: `${more.length} клиенти идват по-често (+${vMore} посещения)`, d: names(more) });
     R.sort((a, b) => a.v - b.v);
-    const g = prev ? Math.round((now - prev) / prev * 100) : 0;
-    return `<div style="flex:1;min-width:280px"><div style="margin-bottom:6px"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]};margin-right:6px"></i><b>${l}</b>: ${now} посещения срещу ${prev} <b style="color:var(--${g >= 0 ? 'ok' : 'bad'})">${g > 0 ? '+' : g < 0 ? '−' : ''}${Math.abs(g)}%</b>
-      <div class="mute" style="font-size:13px">персонални ${sgnp(dS)} · групови ${sgnp(dG)}</div></div>
+    const g = prevT ? Math.round((nowT - prevT) / prevT * 100) : 0;
+    return `<div style="flex:1;min-width:280px"><div style="margin-bottom:6px"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]};margin-right:6px"></i><b>${l}</b>: ${nowT} посещения срещу ${prevT} <b style="color:var(--${g >= 0 ? 'ok' : 'bad'})">${g > 0 ? '+' : g < 0 ? '−' : ''}${Math.abs(g)}%</b> <span class="mute">(${nowT - prevT >= 0 ? '+' : '−'}${Math.abs(nowT - prevT)})</span></div>
       ${R.length ? R.map(r => `<div style="padding:7px 0;border-top:1px solid var(--line)"><b style="color:var(--${r.v < 0 ? 'bad' : 'ok'})">${r.v > 0 ? '▲' : '▼'}</b> ${r.t}${r.d ? `<div class="mute" style="font-size:13px">${r.d}</div>` : ''}</div>`).join('') : '<div class="mute">Няма съществена промяна.</div>'}</div>`;
   }).join('');
-  return `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 4px">Защо се промени посещаемостта</h3><div class="mute" style="margin-bottom:10px">Последните 4 пълни седмици срещу предишните 4 · подредено от най-голямата загуба</div><div class="row" style="gap:24px;align-items:flex-start;flex-wrap:wrap">${out}</div></div>`;
+  return `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 4px">Защо се промени посещаемостта</h3><div class="mute" style="margin-bottom:10px">Седмиците ${fmtW(w4[0])}–${fmtW(to)} срещу ${fmtW(q4[0])}–${fmtW(ymd(addDays(parse(q4[3]), 6)))} · минусите и плюсовете дават общата разлика · подредено от най-голямата загуба</div><div class="row" style="gap:24px;align-items:flex-start;flex-wrap:wrap">${out}</div></div>`;
 }
 function stackChart(rows, locs, key, unit) {
   const wk = unit === 'week', per = [...new Set(rows.map(r => r.period))].sort(), W = 720, H = 240, pl = 36, pb = 26, pt = 22, cw = (W - pl) / per.length, n = locs.length, bw = Math.max(5, Math.min(22, (cw - 8) / n));
