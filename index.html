@@ -735,6 +735,7 @@ async function staffApp() {
   S.clients = c.data; S.packages = p.data; S.staff = s.data;
   /* таксуването върви на сървъра всяка минута (cron) — тук само опресняваме графика */
   if (!window.__chargeT) window.__chargeT = setInterval(() => { try { if ($('#grid')) drawGrid(); } catch (e) { } }, 60000);
+  loadVinfo().then(() => { if (S.tab === 'clients' && $('#main')) drawClients(); if ($('#wbtn')) $('#wbtn').innerHTML = waitHtml(); }, () => {});
   sb.rpc('single_clients', { p_days: 60 }).then(r => { if (r.error) return; S.singles = new Set((r.data || []).map(x => typeof x === 'string' ? x : x.single_clients)); if (S.tab === 'clients' && $('#main')) clientsView(); if ($('#wbtn')) $('#wbtn').innerHTML = waitHtml(); }, () => {});
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
@@ -1867,9 +1868,41 @@ async function loadPstat() {
   if (error) { fail(error, 'Пакетите не се заредиха (изпълнен ли е 03_popravki.sql?)'); return []; }
   return data;
 }
-const CST = { active: 'Активни', single: 'Еднократни', wait: 'Чакащи', pause: 'Пауза', inactive: 'Неактивни' };
+const CST = { active: 'Активни', single: 'Еднократни', check: 'За проверка', inactive: 'Неактивни' };
 /* „Еднократни“ = без абонамент, но с единично посещение през последните 60 дни */
-function cstat(c) { if (c.status === 'Paused') return 'pause'; if (c.status === 'Inactive') return 'inactive'; if (curPkg(c.id)) return 'active'; const t = today(); if ((S.pstat || []).some(p => p.client_id === c.id && p.start_date > t)) return 'active'; const mt = S.ctype && S.ctype[c.id]; if (mt === 'wait' || mt === 'single') return mt; return S.singles && S.singles.has(c.id) ? 'single' : 'wait'; }
+/* Профили: Активен (абонамент / бъдещи часове и идва) · Еднократни · За проверка (не е идвал >7 дни, пауза, без абонамент и часове) · Неактивни */
+function cstat(c) {
+  if (c.status === 'Inactive') return 'inactive';
+  const mt = S.ctype && S.ctype[c.id]; if (mt === 'single') return 'single';
+  if (c.status === 'Paused') return 'check';
+  const t = today(), pk = curPkg(c.id), fpk = (S.pstat || []).find(p => p.client_id === c.id && p.start_date > t), vi = (S.vinfo || {})[c.id] || {};
+  if (!pk && !fpk && !vi.next) return S.singles && S.singles.has(c.id) ? 'single' : 'check';
+  if (pk && !Number(pk.total)) return 'active'; /* Open Gym — без записвания */
+  if (!S.vinfo) return 'active';
+  const ref = [vi.last, pk && pk.start_date <= t ? pk.start_date : null].filter(Boolean).sort().pop();
+  if (!ref) return fpk || vi.next ? 'active' : 'check';
+  return (parse(t) - parse(ref)) / 864e5 > 7 ? 'check' : 'active';
+}
+function creason(c) {
+  if (c.status === 'Paused') return 'в пауза';
+  const t = today(), pk = curPkg(c.id), fpk = (S.pstat || []).find(p => p.client_id === c.id && p.start_date > t), vi = (S.vinfo || {})[c.id] || {};
+  const d = vi.last ? Math.round((parse(t) - parse(vi.last)) / 864e5) : null;
+  const a = [d != null ? `не е идвал(а) ${d} дни` : 'няма посещение последните 5 седмици'];
+  if (!pk && !fpk) a.push('без активен абонамент'); else if (pk && pk.end_date <= ymd(addDays(parse(t), 3))) a.push(`абонаментът изтича ${fmt(pk.end_date)}`);
+  a.push(vi.next ? `следващ час ${fmt(vi.next)}` : 'няма записани часове');
+  return a.join(' · ');
+}
+/* последно посещение и следващ записан час за всеки клиент (за профилите) */
+async function loadVinfo(force) {
+  if (!force && S.vinfoAt && Date.now() - S.vinfoAt < 300e3) return S.vinfo;
+  const t = today(), a = ymd(addDays(parse(t), -35)), b = ymd(addDays(parse(t), 60)); let rows = [];
+  for (let i = 0; i < 15; i++) { const { data, error } = await sb.from('bookings').select('client_id,status,late,sessions!inner(date,start_time)').gte('sessions.date', a).lte('sessions.date', b).in('status', ['done', 'booked', 'cancelled']).range(i * 1000, i * 1000 + 999); if (error || !data) break; rows = rows.concat(data); if (data.length < 1000) break; }
+  const V = {};
+  rows.forEach(r => { const d = r.sessions.date, o = V[r.client_id] = V[r.client_id] || {};
+    if ((r.status === 'done' || (r.status === 'cancelled' && r.late)) && d <= t) { if (!o.last || d > o.last) o.last = d; }
+    if (r.status === 'booked' && d >= t) { if (!o.next || d < o.next) o.next = d; } });
+  S.vinfo = V; S.vinfoAt = Date.now(); return V;
+}
 function curPkg(cid) {
   const t = today();
   const list = (S.pstat || []).filter(p => p.client_id === cid);
@@ -1888,7 +1921,7 @@ function pkgChip(p) {
 }
 async function clientsView() {
   loadMain();
-  S.pstat = await loadPstat();
+  [S.pstat] = await Promise.all([loadPstat(), loadVinfo()]);
   drawClients();
 }
 function drawClients() {
@@ -1899,13 +1932,13 @@ function drawClients() {
     if (S.csts.length && !S.csts.includes(cstat(c))) return false;
     if (S.cfilter === 'exp') { const p = curPkg(c.id); if (!p) return false; const left = p.total - p.used, days = (parse(p.end_date) - parse(today())) / 864e5; return left <= 1 || days <= 3; }
     return true;
-  }).sort((a, b) => ({ active: 0, single: 1, wait: 2, pause: 3, inactive: 4 })[cstat(a)] - ({ active: 0, single: 1, wait: 2, pause: 3, inactive: 4 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
-  if (S.csort) { const { k, d } = S.csort, SO = { active: 0, single: 1, wait: 2, pause: 3, inactive: 4 };
+  }).sort((a, b) => ({ active: 0, single: 1, check: 2, inactive: 3 })[cstat(a)] - ({ active: 0, single: 1, check: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
+  if (S.csort) { const { k, d } = S.csort, SO = { active: 0, single: 1, check: 2, inactive: 3 };
     const pv = c => { const p = curPkg(c.id); return p ? (p.total - p.used) * 1000 + Math.max(0, (parse(p.end_date) - parse(today())) / 864e5) : -1; };
     const key = { name: c => c.name, st: c => SO[cstat(c)], loc: c => c.location || '', ph: c => c.phone || '', pkg: pv, prof: c => c.user_id ? 0 : 1 }[k];
     list.sort((a, b) => { const x = key(a), y = key(b); return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'bg')) * d || a.name.localeCompare(b.name, 'bg'); }); }
   const th = (k, l, t) => `<th class="click" data-act="csort" data-k="${k}" style="cursor:pointer;user-select:none;white-space:nowrap"${t ? ` title="${t}"` : ''}>${l} ${S.csort && S.csort.k === k ? (S.csort.d > 0 ? '▲' : '▼') : '<span class="mute">↕</span>'}</th>`;
-  const stCls = { active: 'ok', single: 'warn', wait: '', pause: '', inactive: '' };
+  const stCls = { active: 'ok', single: '', check: 'warn', inactive: '' };
   S.clist = list;
   $('#main').innerHTML = `<div class="row" style="margin-bottom:10px;flex-wrap:wrap">
     <input id="cq" placeholder="Търси име, телефон, имейл…" value="${esc(S.q)}" style="flex:1;min-width:200px">
@@ -1915,7 +1948,7 @@ function drawClients() {
     <div class="chips" style="margin-bottom:8px"><button class="${S.csts.length ? '' : 'on'}" data-act="cstat" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${S.csts.includes(k) ? 'on' : ''}" data-act="cstat" data-k="${k}">${l} · ${cnt(k)}</button>`).join('')}</div>
     <div class="mute" style="margin-bottom:6px">${list.length} клиента${S.csts.length ? ' · ' + S.csts.map(k => CST[k]).join(', ') : ''}${S.cloc !== 'all' ? ' · ' + esc(S.cloc) : ''}</div>
     <div class="tw"><table><thead><tr>${th('name', 'Име')}${th('st', 'Статус')}${th('loc', 'Обект')}${th('ph', 'Телефон')}${th('pkg', 'Пакет')}${th('prof', 'Профил', 'Активирал профила си в приложението')}</tr></thead><tbody>
-    ${list.slice(0, 400).map(c => { const k = cstat(c); return `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}</td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td><td>${c.user_id ? '<span class="chip ok" title="Активирал профила си">✓</span>' : ''}</td></tr>`; }).join('')}
+    ${list.slice(0, 400).map(c => { const k = cstat(c); return `<tr class="click" data-act="client" data-id="${c.id}"><td>${esc(c.name)}</td><td><span class="chip ${stCls[k]}">${CST[k]}</span>${k === 'check' ? `<div class="mute" style="font-size:11px;margin-top:2px">${esc(creason(c))}</div>` : ''}</td><td>${esc(c.location || '–')}</td><td>${esc(c.phone || '')}</td><td>${pkgChip(curPkg(c.id))}</td><td>${c.user_id ? '<span class="chip ok" title="Активирал профила си">✓</span>' : ''}</td></tr>`; }).join('')}
     </tbody></table></div>`;
   const qi = $('#cq'); qi.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; drawClients(); const n = $('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
   $('#cf').onchange = e => { S.cfilter = e.target.value; drawClients(); };
@@ -1964,7 +1997,7 @@ async function openClient(id, tab) {
       <label class="f">Локация<select id="c-loc">${LOCS.map(l => `<option ${l === x.location ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="f">Препоръчан от<select id="c-ref"><option value="">— никой —</option>${S.clients.filter(c => c.id !== x.id).slice().sort((a, b) => a.name.localeCompare(b.name, 'bg')).map(c => `<option value="${c.id}" ${c.id === x.referred_by ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
       <label class="f">Откъде идва<select id="c-src">${['Уебсайт', 'Препоръка', 'Instagram', 'Facebook', 'Google', 'Друго'].map(v => `<option ${v === (x.source || 'Уебсайт') ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-      <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен при абонамент)'], ['Wait', 'Чакащ'], ['Single', 'Еднократни посещения'], ['Paused', 'Пауза (за проверка)'], ['Inactive', 'Неактивен']].map(([v, l]) => { const cur = x.status === 'Paused' || x.status === 'Inactive' ? x.status : ({ wait: 'Wait', single: 'Single' })[(S.ctype || {})[x.id]] || 'Active'; return `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`; }).join('')}</select></label>
+      <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен / За проверка)'], ['Single', 'Еднократни посещения'], ['Paused', 'За проверка (ръчно, напр. пауза)'], ['Inactive', 'Неактивен']].map(([v, l]) => { const cur = x.status === 'Paused' || x.status === 'Inactive' ? x.status : ({ single: 'Single' })[(S.ctype || {})[x.id]] || 'Active'; return `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`; }).join('')}</select></label>
     </div>
     <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
     ${S.owner ? `<label class="f" style="margin-top:8px">Фирма за фактура<input id="c-inv" value="${esc(x.invoice_company || '')}" placeholder="празно = клиентът няма бутон „Заяви фактура“"></label>` : ''}
@@ -2420,13 +2453,14 @@ async function trainerDash() {
   S.pstat = S.pstat || await loadPstat();
   D.bal = bal.data.map(b => ({ c: S.clients.find(c => c.id === b.client_id), bal: Math.round(b.bal * 100) / 100 })).filter(r => r.c && (!S.view || (S.view.locations || []).includes(r.c.location)));
   $('#main').innerHTML = `
+    <div id="wkcard"></div>
     <div id="ttcard"></div>
     <div id="leadcard"></div>
     <div class="card" style="margin-bottom:12px">${soon}</div>
     ${actCardHtml(acts)}
     <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
     <div id="npcard">${noProfCard()}</div>`;
-  enrichMoves(); loadTeamTasks(); loadLeads();
+  enrichMoves(); loadTeamTasks(); loadLeads(); loadWeekCard();
 }
 async function loadCancelCard() {
   const el = document.getElementById('cancelcard'); if (!el) return;
@@ -2504,15 +2538,15 @@ function pgvClients() {
   const main = $('#main'); if (!main) return;
   const q = (D.pgq || '').toLowerCase(), sts = D.pgs || [], by = Object.fromEntries(PGV.data.map(r => [r.client_id, r]));
   const base = S.clients.filter(c => !c.massage_only && (D.pgl === 'all' || c.location === D.pgl) && (!q || c.name.toLowerCase().includes(q)));
-  const list = base.filter(c => !sts.length || sts.includes(cstat(c))).sort((a, b) => ({ active: 0, single: 1, wait: 2, pause: 3, inactive: 4 })[cstat(a)] - ({ active: 0, single: 1, wait: 2, pause: 3, inactive: 4 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
-  const stCls = { active: 'ok', single: 'warn', wait: '', pause: '', inactive: '' }, todoN = pgvTasks().filter(x => !PGV.done.has(`${x.cid}|${x.k}|${x.ref}`)).length;
+  const list = base.filter(c => !sts.length || sts.includes(cstat(c))).sort((a, b) => ({ active: 0, single: 1, check: 2, inactive: 3 })[cstat(a)] - ({ active: 0, single: 1, check: 2, inactive: 3 })[cstat(b)] || a.name.localeCompare(b.name, 'bg'));
+  const stCls = { active: 'ok', single: '', check: 'warn', inactive: '' }, todoN = pgvTasks().filter(x => !PGV.done.has(`${x.cid}|${x.k}|${x.ref}`)).length;
   main.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">Прогрес на клиентите</b><span class="sp"></span>
     <div class="chips" style="margin:0"><button class="on" data-act="pgmode" data-m="clients">Клиенти</button><button data-act="pgmode" data-m="tasks">Задачи · ${todoN}</button><button data-act="wcmode" data-m="wc">Предизвикателство</button></div></div>
     <div class="row" style="margin-bottom:10px;flex-wrap:wrap"><input id="pgq" placeholder="Търси клиент…" value="${esc(D.pgq || '')}" style="flex:1;min-width:200px">
     <div class="seg">${[['all', 'Двата обекта'], ...LOCS.map(l => [l, locName(l)])].map(([k, l]) => `<button class="${D.pgl === k ? 'on' : ''}" data-act="pgloc" data-l="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     <div class="chips" style="margin-bottom:8px"><button class="${sts.length ? '' : 'on'}" data-act="pgst" data-k="all">Всички · ${base.length}</button>${Object.entries(CST).map(([k, l]) => `<button class="${sts.includes(k) ? 'on' : ''}" data-act="pgst" data-k="${k}">${l} · ${base.filter(c => cstat(c) === k).length}</button>`).join('')}</div>
     <div class="tw"><table><thead><tr><th>Име</th><th>Статус</th><th>Обект</th><th>Последно тегло</th><th>Чек-ин</th><th>Тестове</th></tr></thead><tbody>
-    ${list.slice(0, 400).map(c => { const r = by[c.id], k = cstat(c); return `<tr class="click" data-act="pgopen" data-id="${c.id}"><td><b>${esc(c.name)}</b></td><td><span class="chip ${stCls[k]}">${CST[k]}</span></td><td>${esc(c.location || '–')}</td><td>${r && r.last_weight ? fmt(r.last_weight) : '<span class="mute">—</span>'}</td><td>${r && r.last_checkin ? fmt(r.last_checkin) : '<span class="mute">—</span>'}</td><td>${r ? (r.tests_done || []).length + '/3' : '<span class="mute">—</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="mute">Няма клиенти.</td></tr>'}
+    ${list.slice(0, 400).map(c => { const r = by[c.id], k = cstat(c); return `<tr class="click" data-act="pgopen" data-id="${c.id}"><td><b>${esc(c.name)}</b></td><td><span class="chip ${stCls[k]}">${CST[k]}</span>${k === 'check' ? `<div class="mute" style="font-size:11px;margin-top:2px">${esc(creason(c))}</div>` : ''}</td><td>${esc(c.location || '–')}</td><td>${r && r.last_weight ? fmt(r.last_weight) : '<span class="mute">—</span>'}</td><td>${r && r.last_checkin ? fmt(r.last_checkin) : '<span class="mute">—</span>'}</td><td>${r ? (r.tests_done || []).length + '/3' : '<span class="mute">—</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="mute">Няма клиенти.</td></tr>'}
     </tbody></table></div><div class="mute" style="margin-top:8px">Натисни клиент, за да видиш диаграмите, мерките и отговорите му.</div>`;
   const qi = $('#pgq'); qi.oninput = e => { D.pgq = e.target.value; const pos = e.target.selectionStart; pgvClients(); const n = $('#pgq'); n.focus(); n.setSelectionRange(pos, pos); };
 }
@@ -2769,6 +2803,7 @@ async function dashView() {
   const trows = tr.data.map(r => ({ ...r, t: S.staff.find(x => x.id === r.trainer_id) })).filter(r => r.t).sort((a, z) => a.t.name.localeCompare(z.t.name, 'bg'));
   $('#main').innerHTML = `
     <div class="kpis">${kpi('Приход', eur(cr.pay), 'получени плащания този месец', spark(cm.slice(-7).map(x => +row(x).pay)))}${kpi('Прогнозен приход', eur(cr.proj), `реализиран ${eur(cr.done)} · ${cr.n_done}/${cr.n} посещения`)}${kpi('Средна цена', eur(cr.n ? cr.proj / cr.n : 0), 'на посещение този месец')}${kpi('Часове', cr.n, 'посещения този месец', spark(cm.slice(-7).map(x => +row(x).n)))}<div id="kpidue" style="display:contents">${dueKpi()}</div>${kpi('Активни клиенти', S.clients.filter(c => c.status === 'Active' && inPayLoc(c)).length, payLoc() === 'all' ? '' : payLoc())}${kpi('Очакване', S.clients.filter(c => c.status === 'Lead').length, 'клиенти')}</div>
+    <div id="wkcard"></div>
     <div id="ttcard"></div>
     <div id="leadcard"></div>
     <div id="dupcard"></div>
@@ -2788,7 +2823,7 @@ async function dashView() {
       <div class="tw"><table><thead><tr><th>Треньор</th><th>Часове</th><th>Посещения</th><th>Проведени</th><th>Клиенти на час</th><th>Отказани</th><th>Уникални клиенти</th><th>Приход</th><th>Приход на час</th></tr></thead><tbody>
       ${trows.map(r => `<tr><td><b>${esc(r.t.name)}</b></td><td>${r.slots}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.slots ? Math.round(r.visits / r.slots * 10) / 10 : 0}</td><td>${r.canc} (${r.canc + r.visits ? Math.round(r.canc / (r.canc + r.visits) * 100) : 0}%)</td><td>${r.clients}</td><td>${eur(r.rev)}</td><td>${eur(r.slots ? r.rev / r.slots : 0)}</td></tr>`).join('') || '<tr><td colspan="9" class="mute">Няма данни.</td></tr>'}</tbody></table></div></div>
     <div id="npcard" style="margin-top:12px">${noProfCard()}</div>`;
-  loadInvCard(); loadCashCard(); loadDupCard(); loadChkCard(); loadTeamTasks(); loadLeads(); enrichMoves();
+  loadInvCard(); loadCashCard(); loadDupCard(); loadChkCard(); loadTeamTasks(); loadLeads(); enrichMoves(); loadWeekCard();
 }
 
 /* Абонаменти за месеца: нови клиенти (първи абонамент или връщане след прекъсване) и спрели (абонаментът е свършил и не е подновен) */
@@ -3007,7 +3042,7 @@ function waitHtml() {
   if (!S.pstat) return '<div class="card wcard"><b>Чакащи</b><div class="mute" style="margin-top:6px">Зареждане…</div></div>';
   const q = (S.wq || '').toLowerCase();
   const W = S.waitCfg || { add: [], hide: [] }, isFb = c => /футбол|football/i.test(c.name || '');
-  const all = S.clients.filter(c => c.status !== 'Inactive' && !W.hide.includes(c.id) && (c.location === S.loc || !c.location || W.add.includes(c.id)) && (cstat(c) === 'wait' || cstat(c) === 'single' || isFb(c) || W.add.includes(c.id)));
+  const all = S.clients.filter(c => c.status !== 'Inactive' && !W.hide.includes(c.id) && (c.location === S.loc || !c.location || W.add.includes(c.id)) && ((cstat(c) === 'check' && !curPkg(c.id) && !((S.vinfo || {})[c.id] || {}).next) || cstat(c) === 'single' || isFb(c) || W.add.includes(c.id)));
   const list = (q ? all.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)) : all).sort((a, b) => (cstat(a) === 'single') - (cstat(b) === 'single') || a.name.localeCompare(b.name, 'bg'));
   const pc = S.waitPick && S.clients.find(c => c.id === S.waitPick);
   return `<div class="card wcard"><div class="row" style="margin-bottom:6px"><b>Чакащи и еднократни (${all.length})</b><span class="mute" style="font-size:12px">${esc(S.loc)}</span><span class="sp"></span><button class="sm" data-act="wtoggle" title="Скрий">✕</button></div>
@@ -3794,6 +3829,32 @@ async function ttAct(act, el) {
   }
 }
 /* автоматични проверки (само показват, нищо не променят) */
+/* ── Седмичен преглед в Обобщение: посещения тази седмица и кой е „За проверка“ ── */
+async function loadWeekCard() {
+  const el = document.getElementById('wkcard'); if (!el) return;
+  el.innerHTML = '<div class="card" style="margin-bottom:12px"><h2>Седмичен преглед</h2><div class="mute">Зареждане…</div></div>';
+  const myL = S.owner ? null : actLocs(S.me.row), inL = loc => !myL || myL.includes(loc);
+  const t = today(), td = parse(t), mon = addDays(td, -((td.getDay() + 6) % 7)), pmon = addDays(mon, -7), dow = Math.round((td - mon) / 864e5);
+  const [, , wb] = await Promise.all([loadVinfo(true), (async () => { S.pstat = await loadPstat(); })(),
+    sb.from('bookings').select('client_id,status,late,sessions!inner(date,location,title)').gte('sessions.date', ymd(pmon)).lte('sessions.date', t).in('status', ['done', 'cancelled']).limit(5000)]);
+  if (!document.getElementById('wkcard')) return;
+  const vis = (wb.data || []).filter(b => (b.status === 'done' || b.late) && !isPil(b.sessions.title) && inL(b.sessions.location));
+  const locs = (myL || LOCS).filter(l => LOCS.includes(l));
+  const cnt = (l, a, z) => vis.filter(b => b.sessions.location === l && b.sessions.date >= a && b.sessions.date <= z).length;
+  const thisW = l => cnt(l, ymd(mon), t), lastW = l => cnt(l, ymd(pmon), ymd(addDays(pmon, dow)));
+  const cl = S.clients.filter(c => !c.massage_only && inL(c.location));
+  const by = k => cl.filter(c => cstat(c) === k);
+  const chk = by('check').map(c => { const vi = (S.vinfo || {})[c.id] || {}; return { c, d: vi.last ? Math.round((td - parse(vi.last)) / 864e5) : 99 }; }).sort((a, b) => a.d - b.d);
+  const fresh = chk.filter(x => x.d >= 8 && x.d <= 14);
+  const g = (a, b) => { const p = b ? Math.round((a - b) / b * 100) : 0; return `<b style="color:var(--${p >= 0 ? 'ok' : 'bad'})">${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p)}%</b>`; };
+  const kp = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
+  const row = x => `<tr class="click" data-act="client" data-id="${x.c.id}"><td><b>${esc(x.c.name)}</b></td><td>${esc(x.c.location || '')}</td><td>${esc(creason(x.c))}</td><td>${esc(x.c.phone || '')}</td></tr>`;
+  el.innerHTML = `<div class="card" style="margin-bottom:12px"><div class="row" style="margin-bottom:8px"><h2 style="margin:0">Седмичен преглед</h2><span class="mute">седмица от ${fmt(ymd(mon))} · сравнено със същите дни миналата седмица · без пилатес</span></div>
+    <div class="kpis">${locs.map(l => kp(`Посещения · ${l}`, thisW(l), `${lastW(l)} миналата седмица ${g(thisW(l), lastW(l))}`)).join('')}${kp('Активни', by('active').length, 'идват и имат абонамент / часове')}${kp('Еднократни', by('single').length, '')}${kp('За проверка', chk.length, `${fresh.length} нови тази седмица`)}</div>
+    ${chk.length ? `<h3 style="margin:12px 0 6px">За проверка <span class="mute" style="font-weight:400">· не са идвали над 7 дни, без абонамент и записани часове, или в пауза · най-скорошните най-отгоре</span></h3>
+    <div style="overflow:auto"><table><thead><tr><th>Клиент</th><th>Обект</th><th>Причина</th><th>Телефон</th></tr></thead><tbody>${chk.slice(0, 25).map(row).join('')}</tbody></table></div>
+    ${chk.length > 25 ? `<div style="margin-top:8px"><button class="sm" data-act="wkall">Всички ${chk.length} за проверка →</button></div>` : ''}` : '<div class="mute">Няма клиенти за проверка.</div>'}</div>`;
+}
 async function loadChkCard() {
   const el = document.getElementById('chkcard'); if (!el || !S.owner) return;
   const { data, error } = await sb.rpc('data_checks');
@@ -4648,6 +4709,7 @@ document.addEventListener('click', async e => {
       case 'trsched': S.trf = el.dataset.id; S.tab = 'week'; renderStaff(); break;
       case 'kper': D.kper = el.dataset.p; kpiView(); break;
       case 'ktr': D.ktr = el.dataset.u; kpiView(); break;
+      case 'wkall': S.csts = ['check']; S.cloc = 'all'; S.tab = 'clients'; renderStaff(); break;
       case 'cstat': { const k = el.dataset.k; if (k === 'all') S.csts = []; else S.csts = S.csts.includes(k) ? S.csts.filter(x => x !== k) : [...S.csts, k]; drawClients(); break; }
       case 'qpsave': quickPaySave(); break;
       case 'ptoggle': pgvToggle(el); break;
