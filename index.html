@@ -3738,7 +3738,37 @@ async function loadDupCard() {
   if (error || !data || !data.length) { el.innerHTML = ''; return; }
   el.innerHTML = `<div class="card" style="margin-bottom:12px;border:1px solid var(--bad,#eb4c51)"><h2>⚠ Дублирани часове <span class="mute">· ${data.length} клиента</span></h2>
     <div class="mute" style="margin-bottom:6px">Клиенти, записани в повече от един час в един и същи ден (от миналата седмица нататък).</div>
-    ${data.map(r => `<div class="fe"><span style="min-width:0"><a data-act="client" data-id="${r.client_id}"><b>${esc(r.name)}</b></a> <span class="mute">· ${r.days} ${r.days === 1 ? 'ден' : 'дни'} · от ${fmt(r.first_date)}${r.last_date !== r.first_date ? ' до ' + fmt(r.last_date) : ''}</span><div class="mute" style="font-size:12px">${esc(r.pattern)}</div></span></div>`).join('')}</div>`;
+    ${data.map(r => `<div class="fe"><span style="min-width:0"><a data-act="client" data-id="${r.client_id}"><b>${esc(r.name)}</b></a> <span class="mute">· ${r.days} ${r.days === 1 ? 'ден' : 'дни'} · от ${fmt(r.first_date)}${r.last_date !== r.first_date ? ' до ' + fmt(r.last_date) : ''}</span><div class="mute" style="font-size:12px">${esc(r.pattern)}</div></span><button class="sm pri" style="margin-left:auto;align-self:center" data-act="dupfix" data-id="${r.client_id}">Коригирай</button></div>`).join('')}</div>`;
+}
+/* корекция на дублирани часове: избираш кой от двата да се махне (всички негови повторения) */
+async function dupFix(cid2) {
+  const t = today(), from = ymd(addDays(parse(t), -((parse(t).getDay() + 6) % 7) - 7));
+  const { data, error } = await sb.from('bookings').select('id,status,session_id,sessions!inner(date,start_time,title,trainer_id,series_id,location)').eq('client_id', cid2).eq('status', 'booked').gte('sessions.date', from).limit(2000);
+  if (error) return fail(error, 'Не се зареди');
+  const byDay = {}; (data || []).forEach(b => (byDay[b.sessions.date] = byDay[b.sessions.date] || []).push(b));
+  const dups = Object.values(byDay).filter(a => a.length > 1).flat();
+  if (!dups.length) { toast('Вече няма дублирани часове.'); loadDupCard(); return; }
+  const tr = id => ((S.staff || []).find(x => x.id === id) || {}).name || '—', WD = ['нд', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+  const G = {}; dups.forEach(b => { const s2 = b.sessions, k = s2.series_id || `${parse(s2.date).getDay()}|${s2.start_time}|${s2.title}|${s2.trainer_id}`; (G[k] = G[k] || { k, series: s2.series_id, s: s2, list: [] }).list.push(b); });
+  const gs = Object.values(G).sort((a, b) => (a.s.start_time + a.s.title).localeCompare(b.s.start_time + b.s.title));
+  D.dupG = { cid: cid2, gs };
+  modal.show(`<div id="dupx"><h2>Дублирани часове · ${esc(cname(cid2))}</h2>
+    <p>Клиентът е записан в два часа в един и същи ден. Избери кой да се махне — махат се всички негови дублирани дати.</p>
+    ${gs.map((g, i) => { const ds = g.list.map(b => b.sessions.date).sort(); return `<label class="f" style="flex-direction:row;gap:10px;align-items:flex-start;border-top:1px solid var(--line);padding-top:8px"><input type="checkbox" value="${i}" style="width:auto;margin-top:3px">
+      <span><b>${WD[parse(g.s.date).getDay()]} ${hm(g.s.start_time)} · ${esc(g.s.title || 'Час')}</b> (${esc(tr(g.s.trainer_id))}) <span class="mute">· ${esc(g.s.location || '')}</span>
+      <div class="mute" style="font-size:12px">${ds.length} ${ds.length === 1 ? 'дата' : 'дати'}: ${ds.slice(0, 6).map(fmt).join(', ')}${ds.length > 6 ? ' …' : ''}</div></span></label>`; }).join('')}
+    <label class="f" style="flex-direction:row;gap:8px;align-items:center;margin-top:8px"><input id="dupx-ser" type="checkbox" checked style="width:auto"> Спри и постоянното записване в избрания повтарящ се час (за да не се дублира пак)</label>
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="dupgo">Махни избраните</button><button data-act="frqskip">Затвори</button></div></div>`);
+}
+async function dupApply() {
+  const G = D.dupG; if (!G) return; const pick = [...document.querySelectorAll('#dupx input[type=checkbox][value]:checked')].map(x => G.gs[+x.value]);
+  if (!pick.length) return toast('Избери кой час да се махне.');
+  if (pick.length === G.gs.length && !confirm('Избра всички часове — клиентът ще бъде махнат и от двата. Продължаваме ли?')) return;
+  const ser = $('#dupx-ser').checked; let n = 0;
+  for (const g of pick) { for (const b of g.list) { const { error } = await sb.rpc('unbook', { p_booking: b.id }); if (!error) n++; }
+    if (ser && g.series) await sb.from('series_members').delete().match({ series_id: g.series, client_id: G.cid }).then(() => { }, () => { }); }
+  logEvent('removed', `Дублирани часове: ${cname(G.cid)} — махнат от ${pick.map(g => `${hm(g.s.start_time)} ${g.s.title || ''} (${((S.staff || []).find(x => x.id === g.s.trainer_id) || {}).name || ''})`).join(', ')} · ${n} дати`);
+  modal.close(); toast(`Махнати ${n} дублирани часа`); loadDupCard(); if (S.tab === 'week' && typeof weekView === 'function') weekView();
 }
 /* ── Запитвания за консултация от сайта (отговорникът на обекта ги вижда) ── */
 const LEAD_ST = { contacted: ['Писахме във Viber', ''], scheduled: ['Насрочена консултация', 'ok'], client: ['Стана клиент', 'ok'], lost: ['Отказ / не отговаря', 'bad'] };
@@ -4920,6 +4950,8 @@ document.addEventListener('click', async e => {
           modal.show(`<div id="te" data-ty="${ty}" data-id="${id}"><h2>${ty === 'pay' ? 'Редакция на плащане' : 'Редакция на такса'}</h2><label class="f">Сума<input id="te-a" type="number" step="0.01" value="${x.amount}"></label>${ty === 'pay' ? `<label class="f">Начин<select id="te-m"><option ${x.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${x.method === 'Банков път' ? 'selected' : ''}>Банков път</option>${x.method && !['В брой', 'Банков път'].includes(x.method) ? `<option selected>${esc(x.method)}</option>` : ''}</select></label>` : ''}<label class="f">Дата<input id="te-d" type="date" value="${x.date}"></label><label class="f">Бележка<input id="te-n" value="${esc(x.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="tlsave">Запази</button></div></div>`); }
         break; }
       case 'frqgo': await freqApply(); break;
+      case 'dupfix': await dupFix(el.dataset.id); break;
+      case 'dupgo': await dupApply(); break;
       case 'frqskip': modal.close(); break;
       case 'tlsave': {
         const E = D.ecl, box = $('#te'), ty = box.dataset.ty, id = box.dataset.id; let r; const newTot = ty === 'pkg' ? +$('#te-t').value : 0;
