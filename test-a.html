@@ -1277,7 +1277,7 @@ async function kpiOwner() {
 const isPil = t => /pilat|пилат/i.test(t || '');
 async function kpiNoPilates(trW, trM) {
   let rows = [];
-  for (let i = 0; i < 10; i++) { const { data, error } = await sb.from('bookings').select('status,late,sessions!inner(date,location,title)').ilike('sessions.title', '%ilat%').gte('sessions.date', '2026-06-01').range(i * 1000, i * 1000 + 999); if (error || !data) break; rows = rows.concat(data); if (data.length < 1000) break; }
+  for (let i = 0; i < 10; i++) { const { data, error } = await sb.from('bookings').select('id,status,late,sessions!inner(date,location,title)').ilike('sessions.title', '%ilat%').gte('sessions.date', '2026-06-01').order('id').range(i * 1000, i * 1000 + 999); if (error || !data) break; rows = rows.concat(data); if (data.length < 1000) break; }
   const vis = rows.filter(b => (b.status === 'done' || (b.status === 'cancelled' && b.late)) && isPil(b.sessions.title));
   const fix = (tr, unit) => { if (!tr || !tr.data) return; const m = {};
     vis.forEach(b => { const d = parse(b.sessions.date), p = unit === 'week' ? ymd(addDays(d, -((d.getDay() + 6) % 7))) : ymd(new Date(d.getFullYear(), d.getMonth(), 1)), k = p + '|' + b.sessions.location; m[k] = (m[k] || 0) + 1; });
@@ -1329,7 +1329,7 @@ async function whyBlock(kc, trW, locs) {
   if (w4.length < 4 || q4.length < 4) return '';
   const from = q4[0], mid = w4[0], to = ymd(addDays(parse(w4[3]), 6)), tt = today();
   let bk = [];
-  for (let i = 0; i < 20; i++) { const { data, error } = await sb.from('bookings').select('client_id,status,late,sessions!inner(date,location,title)').gte('sessions.date', from).lte('sessions.date', to).range(i * 1000, i * 1000 + 999); if (error || !data) break; bk = bk.concat(data.filter(b => !isPil(b.sessions.title))); if (data.length < 1000) break; }
+  for (let i = 0; i < 20; i++) { const { data, error } = await sb.from('bookings').select('id,client_id,status,late,sessions!inner(date,location,title)').gte('sessions.date', from).lte('sessions.date', to).order('id').range(i * 1000, i * 1000 + 999); if (error || !data) break; bk = bk.concat(data.filter(b => !isPil(b.sessions.title))); if (data.length < 1000) break; }
   const { data: cs0 } = await sb.from('sessions').select('date,location,title').eq('cancelled', true).gte('date', from).lte('date', to).limit(5000); const cs = (cs0 || []).filter(x => !isPil(x.title));
   const kcm = Object.fromEntries(kc.map(c => [c.client_id, c]));
   const nm = id => (kcm[id] || {}).name || cname(id) || '?';
@@ -1927,7 +1927,7 @@ function creason(c) {
 async function loadVinfo(force) {
   if (!force && S.vinfoAt && Date.now() - S.vinfoAt < 300e3) return S.vinfo;
   const t = today(), a = ymd(addDays(parse(t), -35)), b = ymd(addDays(parse(t), 60)); let rows = [];
-  for (let i = 0; i < 15; i++) { const { data, error } = await sb.from('bookings').select('client_id,status,late,sessions!inner(date,start_time)').gte('sessions.date', a).lte('sessions.date', b).in('status', ['done', 'booked', 'cancelled']).range(i * 1000, i * 1000 + 999); if (error || !data) break; rows = rows.concat(data); if (data.length < 1000) break; }
+  for (let i = 0; i < 15; i++) { const { data, error } = await sb.from('bookings').select('id,client_id,status,late,sessions!inner(date,start_time)').gte('sessions.date', a).lte('sessions.date', b).in('status', ['done', 'booked', 'cancelled']).order('id').range(i * 1000, i * 1000 + 999); if (error || !data) break; rows = rows.concat(data); if (data.length < 1000) break; }
   const V = {};
   rows.forEach(r => { const d = r.sessions.date, o = V[r.client_id] = V[r.client_id] || {};
     if ((r.status === 'done' || (r.status === 'cancelled' && r.late)) && d <= t) { if (!o.last || d > o.last) o.last = d; }
@@ -2893,7 +2893,7 @@ async function loadSubsFlow() {
   const el = document.getElementById('sfcard'); if (!el) return;
   const m = D.month, me = ymd(addDays(addMonthsD(parse(m), 1), -1)), t = today(), GAP = 14, GONE = 28, endM = me < t ? me : t;
   const from = ymd(addDays(parse(m), -120)); let rows = [];
-  for (let i = 0; i < 30; i++) { const { data, error } = await sb.from('bookings').select('client_id,status,late,sessions!inner(date,title)').gte('sessions.date', from).lte('sessions.date', t).in('status', ['done', 'cancelled']).range(i * 1000, i * 1000 + 999); if (error || !data) break; rows = rows.concat(data); if (data.length < 1000) break; }
+  for (let i = 0; i < 30; i++) { const { data, error } = await sb.from('bookings').select('id,client_id,status,late,sessions!inner(date,title)').gte('sessions.date', from).lte('sessions.date', t).in('status', ['done', 'cancelled']).order('id').range(i * 1000, i * 1000 + 999); if (error || !data) break; rows = rows.concat(data); if (data.length < 1000) break; }
   await loadVinfo();
   if (!document.getElementById('sfcard') || D.month !== m) return;
   const V = {}; rows.filter(b => (b.status === 'done' || b.late) && !isPil(b.sessions.title)).forEach(b => (V[b.client_id] = V[b.client_id] || []).push(b.sessions.date));
