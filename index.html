@@ -3983,6 +3983,28 @@ async function ttAct(act, el) {
 }
 /* автоматични проверки (само показват, нищо не променят) */
 /* ── Седмичен преглед в Обобщение: посещения тази седмица и кой е „За проверка“ ── */
+/* Седмичен отчет (петък): кратък текст за двата обекта и масажите — ползва се от седмичната автоматична задача */
+async function weeklyReport() {
+  const t = today(), td = parse(t), mon = addDays(td, -((td.getDay() + 6) % 7)), pmon = addDays(mon, -7), dow = Math.round((td - mon) / 864e5), sun = ymd(addDays(mon, 6));
+  S.pstat = await loadPstat(); await loadVinfo(true);
+  const { data: wb } = await sb.from('bookings').select('id,client_id,status,late,sessions!inner(date,location,title)').gte('sessions.date', ymd(pmon)).lte('sessions.date', sun).limit(5000);
+  const vis = (wb || []).filter(b => (b.status === 'done' || b.late) && !isPil(b.sessions.title)), bkd = (wb || []).filter(b => b.status === 'booked' && b.sessions.date >= t && !isPil(b.sessions.title));
+  const n = (l, a, z) => vis.filter(b => b.sessions.location === l && b.sessions.date >= a && b.sessions.date <= z).length;
+  const { data: mb } = await sb.from('massage_bookings').select('date').eq('status', 'booked').gte('date', ymd(pmon)).lte('date', sun);
+  const mN = (a, z) => (mb || []).filter(x => x.date >= a && x.date <= z).length;
+  const { data: py } = await sb.from('payments').select('amount,date').gte('date', ymd(mon)).lte('date', t);
+  const pay = (py || []).reduce((a, x) => a + Number(x.amount || 0), 0);
+  const E = await (D.earnAt = 0, loadEarned()), mS = ymd(new Date(td.getFullYear(), td.getMonth(), 1));
+  const cl = S.clients.filter(c => !c.massage_only && !/пробен/i.test(c.name)), chk = cl.filter(c => cstat(c) === 'check');
+  const firsts = {}; vis.forEach(b => { if (!firsts[b.client_id] || b.sessions.date < firsts[b.client_id]) firsts[b.client_id] = b.sessions.date; });
+  const g = (a, b) => b ? `${a >= b ? '+' : '−'}${Math.abs(Math.round((a - b) / b * 100))}%` : '';
+  const L = LOCS.map(l => { const a = n(l, ymd(mon), t), b = n(l, ymd(pmon), ymd(addDays(pmon, dow))), plan = bkd.filter(x => x.sessions.location === l).length;
+    return `${l}: ${a} посещения (${g(a, b)} срещу същите дни миналата седмица), очаквани до неделя ~${a + plan}; изработено този месец ${eur((E[l] || {})[mS] || 0)}`; });
+  return [`NLT · седмичен отчет · ${fmt(ymd(mon))}–${fmt(sun)}`, ...L,
+    `Масажи: ${mN(ymd(mon), t)} (миналата седмица ${mN(ymd(pmon), ymd(addDays(pmon, 6)))}), записани до неделя ${mN(ymd(addDays(td, 1)), sun)}`,
+    `Плащания тази седмица: ${eur(pay)}`,
+    `За проверка: ${chk.length} клиенти${chk.length ? ' — ' + chk.slice(0, 6).map(c => c.name).join(', ') + (chk.length > 6 ? ' и още ' + (chk.length - 6) : '') : ''}`].join('\n');
+}
 /* клиент с текущ или бъдещ абонамент, който още е „потенциален“ → става „Активен“ */
 async function fixLeads() {
   const t = today(), has = new Set((S.pstat || []).filter(p => p.end_date >= t).map(p => p.client_id));
