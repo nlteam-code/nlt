@@ -1403,7 +1403,8 @@ async function loadEarned() {
 }
 function revenueCard2(rows, earn, locs) {
   if (!rows.length) return '';
-  const ev = m => earn ? (locs || Object.keys(earn)).reduce((s, l) => s + ((earn[l] || {})[m] || 0), 0) : 0;
+  /* абонаментите в приложението са от 2.11 — „изработено“ се смята от ноември нататък */
+  const ev = m => earn && m >= '2026-11-01' ? (locs || Object.keys(earn)).reduce((s, l) => s + ((earn[l] || {})[m] || 0), 0) : 0;
   const W = 720, H = 230, pl = 44, pb = 26, pt = 18, cw = (W - pl) / rows.length, bw = Math.min(30, (cw - 16) / 2), mn = ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'];
   const mx = Math.max(1000, Math.ceil(Math.max(...rows.map(r => Math.max(+r.amount, +r.projected || 0, ev(r.month)))) / 4000) * 4000), ticks = [0, .5, 1].map(f => Math.round(mx * f));
   const k = v => v >= 1000 ? (Math.round(v / 100) / 10) + 'k' : Math.round(v);
