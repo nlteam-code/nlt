@@ -565,6 +565,18 @@ const sb = supabase.createClient(CFG.url, CFG.key);
 const VISIT_PRICE = 37; // еднократно 1:1
 const GROUP_VISIT_PRICE = 33; // еднократно посещение в група
 const visitPrice = kind => kind === 'group' ? GROUP_VISIT_PRICE : VISIT_PRICE;
+const discOf = id => Number((S.disc || {})[id] || 0);
+const discPrice = (id, price) => price == null ? price : Math.round(Number(price) * (100 - discOf(id))) / 100;
+const cVisitPrice = (id, kind) => discPrice(id, visitPrice(kind));
+/* абонаменти на клиенти с постоянна отстъпка (вкл. автоматично подновените) — цената се сваля, ако е на пълната цена от ценоразписа */
+async function syncDiscounts() {
+  if (!S.owner || !S.disc) return; const t = today(); let n = 0;
+  for (const [id, d] of Object.entries(S.disc)) { if (!(d > 0)) continue;
+    for (const p of (S.pstat || []).filter(x => x.client_id === id && x.start_date >= t && x.package_id)) {
+      const L = (S.packages.find(q => q.id === p.package_id) || {}).price; if (L == null) continue;
+      const want = discPrice(id, L); if (Math.abs(Number(p.price) - Number(L)) < 0.01 && Math.abs(Number(p.price) - want) > 0.01) { const { error } = await sb.from('client_packages').update({ price: want }).eq('id', p.id); if (!error) { p.price = want; n++; logEvent('change', `${cname(id)}: абонамент от ${fmt(p.start_date)} с отстъпка ${d}% → ${money(want)}`); } } } }
+  return n;
+}
 /* ПРАВИЛО №1: финансите се виждат само от собственика (прилага се и в базата данни, тук само се скрива интерфейсът) */
 const OWNER_EMAIL = 'axlrustem@gmail.com';
 const BUILD = '20261123-1300';
@@ -740,6 +752,7 @@ async function staffApp() {
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
   S.cv = { ...CV_DEF, ...((q.data || []).find(x => x.key === 'client')?.value || {}) };
   S.waitCfg = { add: [], hide: [], ...((q.data || []).find(x => x.key === 'waitlist')?.value || {}) };
+  S.disc = { ...((q.data || []).find(x => x.key === 'disc')?.value || {}) }; /* постоянна отстъпка: id → % (100 = без такса) */
   S.ctype = { ...((q.data || []).find(x => x.key === 'ctype')?.value || {}) }; /* ръчно зададен профил: wait / single */
   S.left = { ...((q.data || []).find(x => x.key === 'left')?.value || {}) }; /* напуснали: id → дата, когато е маркиран като неактивен */
   renderStaff();
@@ -2015,6 +2028,7 @@ async function openClient(id, tab) {
       <label class="f">Откъде идва<select id="c-src">${['Уебсайт', 'Препоръка', 'Instagram', 'Facebook', 'Google', 'Друго'].map(v => `<option ${v === (x.source || 'Уебсайт') ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="f">Статус<select id="c-st">${[['Active', 'Автоматично (Активен / За проверка)'], ['Single', 'Еднократни посещения'], ['Paused', 'За проверка (ръчно, напр. пауза)'], ['Inactive', 'Неактивен']].map(([v, l]) => { const cur = x.status === 'Paused' || x.status === 'Inactive' ? x.status : ({ single: 'Single' })[(S.ctype || {})[x.id]] || 'Active'; return `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`; }).join('')}</select></label>
     </div>
+    ${S.owner ? `<label class="f" style="margin-top:8px;max-width:260px">Постоянна отстъпка (%)<input id="c-disc" type="number" min="0" max="100" step="5" value="${discOf(x.id) || ''}" placeholder="0 · 100 = без такса"></label>` : ''}
     <label class="f" style="margin-top:8px">Бележки<textarea id="c-notes" rows="2">${esc(x.notes || '')}</textarea></label>
     ${S.owner ? `<label class="f" style="margin-top:8px">Фирма за фактура<input id="c-inv" value="${esc(x.invoice_company || '')}" placeholder="празно = клиентът няма бутон „Заяви фактура“"></label>` : ''}
     <div class="row" style="margin-top:8px"><button class="pri" data-act="csave">Запази данните</button>${x.user_id || x.email ? `<button class="sm" data-act="cpw" data-cid="${x.id}" data-nm="${esc(x.name)}" title="${x.user_id ? 'Смени паролата на клиента' : 'Създава профил с имейла и тази парола'}">${x.user_id ? 'Нова парола' : 'Задай парола'}</button>` : ''}<button class="sm" style="margin-left:auto;color:var(--bad);border-color:var(--bad)" data-act="cdel">Изтрий клиента</button></div>
@@ -2187,6 +2201,13 @@ async function saveClient() {
     { const Lf = S.left = S.left || {}, was = !!Lf[cid()], now = sv === 'Inactive';
       if (was !== now) { if (now) Lf[cid()] = today(); else delete Lf[cid()];
         const u = await sb.from('settings').update({ value: Lf }).eq('key', 'left').select(); if (!u.error && !(u.data && u.data.length)) await sb.from('settings').insert({ key: 'left', value: Lf }); } } }
+    if ($('#c-disc')) { const v = Math.max(0, Math.min(100, +$('#c-disc').value || 0)), Dd = S.disc = S.disc || {}, was = Number(Dd[cid()] || 0);
+      if (v !== was) { if (v) Dd[cid()] = v; else delete Dd[cid()];
+        const u = await sb.from('settings').update({ value: Dd }).eq('key', 'disc').select(); if (!u.error && !(u.data && u.data.length)) await sb.from('settings').insert({ key: 'disc', value: Dd });
+        logEvent('change', `${cname(cid())}: постоянна отстъпка ${v ? v + '%' : 'премахната'}`);
+        const { data: fb } = await sb.from('bookings').select('id,sessions!inner(date,kind)').eq('client_id', cid()).eq('use_plan', false).eq('status', 'booked').gte('sessions.date', today()).limit(500);
+        for (const b of fb || []) await sb.from('bookings').update({ price: cVisitPrice(cid(), b.sessions.kind) }).eq('id', b.id);
+        S.pstat = await loadPstat(); await syncDiscounts(); } }
   Object.assign(cc, p); toast('Записано'); if (S.tab === 'clients') drawClients();
   /* нов имейл или току-що активиран клиент без профил → веднага получава имейла за активация */
   if (p.email && !cc.user_id && (p.email.trim().toLowerCase() !== prevEmail || (p.status === 'Active' && prevSt !== 'Active'))) sendInvite(p.email);
@@ -2226,7 +2247,7 @@ async function addPackage() {
   if ($('#np-sel').value === '__combo') { if ($('#np-start').value) await addCombo($('#np-start').value); return; }
   const p = S.packages.find(x => x.id === $('#np-sel').value), start = $('#np-start').value;
   if (!p || !start) return;
-  const bon = $('#np-bon')?.checked ? +$('#np-bon').value : null, price = bon ? Math.round(p.price * 90) / 100 : p.price;
+  const bon = $('#np-bon')?.checked ? +$('#np-bon').value : null, price = discPrice(cid(), bon ? Math.round(p.price * 90) / 100 : p.price);
   const { data: ins, error } = await sb.from('client_packages').insert({ client_id: cid(), package_id: p.id, kind: p.kind, start_date: start, end_date: pkgEnd(start, p), total: p.sessions || p.classes, price }).select('id').single();
   if (error) return fail(error, 'Не се добави');
   if (bon) { const r = await sb.from('bonuses').update({ status: 'used', used_pkg: ins.id, used_at: new Date().toISOString(), handled_by: S.me.row.id }).eq('id', bon); if (r.error) toast('Пакетът е добавен, но бонусът не се отбеляза'); }
@@ -3122,7 +3143,7 @@ async function dropOnGrid(e) {
 /* има ли клиентът активен абонамент от този вид (днес или напред) */
 async function planFor(cid2, kind) { const { data } = await sb.from('package_status').select('id').eq('client_id', cid2).eq('kind', kind).gte('end_date', today()).limit(1); return !!(data && data.length); }
 /* постоянно записване в серия: и следващите автоматично създадени часове ще са с клиента (по абонамент или еднократно) */
-async function seriesJoin(seriesId, cid2, kind) { const single = (await planFor(cid2, kind)) ? null : visitPrice(kind); await sb.from('series_members').upsert({ series_id: seriesId, client_id: cid2, single_price: single }).then(() => { }, () => { }); return single; }
+async function seriesJoin(seriesId, cid2, kind) { const single = (await planFor(cid2, kind)) ? null : cVisitPrice(cid2, kind); await sb.from('series_members').upsert({ series_id: seriesId, client_id: cid2, single_price: single }).then(() => { }, () => { }); return single; }
 async function bookClient(sid, cid2, auto, seriesMode) {
   const { data: s } = await sb.from('sessions').select('*,bookings(id,status,client_id)').eq('id', sid).single();
   const ex = s.bookings.find(b => b.client_id === cid2);
@@ -3139,9 +3160,9 @@ async function bookClient(sid, cid2, auto, seriesMode) {
   else if (!hasPlan) {
     if (!auto && !seriesMode) {
       const why = (ps || []).length ? 'пакетът му е изчерпан' : 'няма ' + (s.kind === 'solo' ? 'пакет с персонални тренировки' : 'пакет с групови класове') + ' за тази дата';
-      if (!confirm(`${cname(cid2)}: ${why}.\n\nOK = добави като еднократно посещение (${money(visitPrice(s.kind))}).\nОтказ = не добавяй.`)) return false;
+      if (!confirm(`${cname(cid2)}: ${why}.\n\nOK = добави като еднократно посещение (${money(cVisitPrice(cid2, s.kind))}).\nОтказ = не добавяй.`)) return false;
     }
-    use_plan = false; price = visitPrice(s.kind);
+    use_plan = false; price = cVisitPrice(cid2, s.kind);
   }
   let bid;
   if (ex) { const r = await sb.from('bookings').update({ status: 'booked', late: false, use_plan, price }).eq('id', ex.id).select('id').single(); if (r.error) { fail(r.error, 'Не се добави'); return false; } bid = r.data.id; }
@@ -3900,7 +3921,7 @@ async function loadWeekCard() {
   el.innerHTML = '<div class="card" style="margin-bottom:12px"><h2>Седмичен преглед</h2><div class="mute">Зареждане…</div></div>';
   const myL = S.owner ? null : actLocs(S.me.row), inL = loc => !myL || myL.includes(loc);
   const t = today(), td = parse(t), mon = addDays(td, -((td.getDay() + 6) % 7)), pmon = addDays(mon, -7), dow = Math.round((td - mon) / 864e5);
-  const [, , wb] = await Promise.all([loadVinfo(true), (async () => { S.pstat = await loadPstat(); })(),
+  const [, , wb] = await Promise.all([loadVinfo(true), (async () => { S.pstat = await loadPstat(); await syncDiscounts(); })(),
     sb.from('bookings').select('client_id,status,late,sessions!inner(date,location,title)').gte('sessions.date', ymd(pmon)).lte('sessions.date', t).in('status', ['done', 'cancelled']).limit(5000)]);
   if (!document.getElementById('wkcard')) return;
   const vis = (wb.data || []).filter(b => (b.status === 'done' || b.late) && !isPil(b.sessions.title) && inL(b.sessions.location));
@@ -4868,7 +4889,7 @@ document.addEventListener('click', async e => {
         const { error } = await sb.from('sessions').update({ location: v }).eq('id', s.id); if (error) return fail(error, 'Локацията не се смени');
         logEvent('change', `Час ${fmt(s.date)} ${hm(s.start_time)} преместен в ${v}${await sesWho(s.id)}`, v); toast(`Часът е преместен в ${v}`); weekView(); break; }
       case 'bpay': { const s = D.scs, bid = el.dataset.bid, m = el.dataset.m, b = s && s.bookings.find(x => x.id === bid); if (!b) break;
-        const upd = m === 'plan' ? { use_plan: true, price: null } : m === 'free' ? { use_plan: false, price: 0 } : { use_plan: false, price: visitPrice(s.kind) };
+        const upd = m === 'plan' ? { use_plan: true, price: null } : m === 'free' ? { use_plan: false, price: 0 } : { use_plan: false, price: cVisitPrice(b.client_id, s.kind) };
         await sb.rpc('remove_visit_charge', { p_booking: bid });
         const { error } = await sb.from('bookings').update(upd).eq('id', bid); if (error) return fail(error, 'Не се промени');
         const started = new Date(s.date + 'T' + s.start_time) <= new Date();
