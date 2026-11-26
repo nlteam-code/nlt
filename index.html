@@ -1191,7 +1191,7 @@ async function kpiView() {
   if (S.tab === 'kpi' && S.owner && $('#main') && !document.getElementById('cancelcard')) { $('#main').insertAdjacentHTML('beforeend', '<div class="card" id="cancelcard" style="margin-top:12px"><h2>Отказани часове</h2><div class="mute">Зареждане…</div></div>'); loadCancelCard(); }
 }
 async function kpiOwner() {
-  D.kloc = D.kloc || 'all'; D.kchart = D.kchart || 'visits'; D.ktr = D.ktr || 'month'; D.klist = D.klist || 'lost';
+  D.kloc = D.kloc || store.get('nlt-view', 'all'); D.kchart = D.kchart || 'visits'; D.ktr = D.ktr || 'month'; D.klist = D.klist || 'lost';
   const L = D.kloc, loc = L === 'all' ? null : L, locs = L === 'all' ? ['Боян Петров', 'Лерин'] : [L];
   loadMain();
   const [from, to] = [ymd(addDays(new Date(), -27)), ymd(new Date())];
@@ -1211,7 +1211,9 @@ async function kpiOwner() {
   const act = kc.filter(c => c.status === 'Active');
   const active = act.filter(c => c.done_28 > 0), prevActive = act.filter(c => c.done_prev_28 > 0);
   const lc = ymd(addDays(new Date(), -56)), LF = S.left || {};
-  const lost = kc.filter(c => (c.status === 'Active' && c.done_prev_28 > 0 && c.done_28 === 0) || (LF[c.client_id] && LF[c.client_id] >= lc)).sort((a, b) => (LF[b.client_id] ? 1 : 0) - (LF[a.client_id] ? 1 : 0) || b.done_prev_28 - a.done_prev_28);
+  /* спрели = идвали последните 28 дни, а сега са неактивни или нямат нито абонамент, нито записани часове (без еднократните) */
+  const stopRule = c => c.done_28 > 0 && (c.status === 'Inactive' || ((!c.pkg_end || c.pkg_end < today()) && !c.next_visit)) && (S.ctype || {})[c.client_id] !== 'single' && !(S.singles && S.singles.has(c.client_id) && !c.pkg_end && c.status !== 'Inactive');
+  const lost = kc.filter(stopRule).sort((a, b) => (LF[b.client_id] ? 1 : 0) - (LF[a.client_id] ? 1 : 0) || b.done_prev_28 - a.done_prev_28);
   const back = act.filter(c => c.done_28 > 0 && c.done_prev_28 === 0);
   const risk = act.filter(c => c.at_risk).sort((a, b) => (b.days_since || 0) - (a.days_since || 0));
   const noPkg = act.filter(c => c.done_28 > 0 && !c.pkg_end).sort((a, b) => b.done_28 - a.done_28);
@@ -1229,7 +1231,7 @@ async function kpiOwner() {
   const lvl = (v, bad, warn) => v >= bad ? 'bad' : v >= warn ? 'warn' : 'ok';
   const cards = [
     { l: vPct <= -10 ? 'bad' : vPct < -3 ? 'warn' : 'ok', t: 'Посещенията', v: sgn(vPct) + '%', d: `${v4} срещу ${vp} (последни 4 седмици срещу предишните 4). Групови ${sgn(dGrp)}, индивидуални ${sgn(dSolo)}.`, a: vPct < -3 ? 'Виж слабите часове и клиентите в риск по-долу.' : 'Продължавай така; следи отказващите се.' },
-    { l: lvl(churnPct, 15, 8), t: 'Отказали се клиенти', v: lost.length, d: `${churnPct}% от ходилите преди. ${L === 'all' ? `Боян Петров ${lostBy('Боян Петров')}, Лерин ${lostBy('Лерин')}. ` : ''}Ходили са миналите 4 седмици, сега — нито веднъж.`, a: 'Обади се на първите от списъка долу (най-редовните преди).' },
+    { l: lvl(churnPct, 15, 8), t: 'Спрели клиенти', v: lost.length, d: `${L === 'all' ? `Боян Петров ${lostBy('Боян Петров')}, Лерин ${lostBy('Лерин')}. ` : ''}Идвали последните 28 дни, сега са неактивни или без абонамент и без записани часове.`, a: 'Обади се на първите от списъка долу (най-редовните преди).' },
     { l: lvl(risk.length, 25, 10), t: 'В риск', v: risk.length, d: 'Без посещение от 14+ дни и без записан час напред.', a: 'Пиши им преди да станат „отказали се“.' },
     { l: lvl(noPkg.length, 15, 5), t: 'Идват без активен абонамент', v: noPkg.length, d: 'Ходили са последния месец, но абонаментът им е изтекъл или липсва.', a: 'Предложи им подновяване — тук се губят приходи.' },
     { l: weak.length >= 3 ? 'warn' : 'ok', t: 'Слаби групови часове', v: weak.length, d: weak.length ? weak.map(r => `${dn[r.dow]} ${hh(r.hr)} (${r.a.toFixed(1)} души)`).join(' · ') : 'Няма часове с трайно ниска посещаемост.', a: weak.length ? 'Обедини, премести или промотирай тези часове.' : '' },
@@ -1247,7 +1249,9 @@ async function kpiOwner() {
   const earnM = locs.reduce((a, l) => a + ((EA[l] || {})[mStart] || 0), 0);
   const sold = (S.pstat || []).filter(p => p.start_date >= mStart && p.start_date <= today() && locs.includes((S.clients.find(c => c.id === p.client_id) || {}).location));
   const soldM = sold.reduce((a, p) => a + Number(p.price || 0), 0), soldN = sold.length;
-  const top = `<div class="kpis">${kpiB('Посещения', v4, `${sgn(vPct)}% · 4 седмици`)}${kpiB('Активни клиенти', active.length, `${sgn(active.length - prevActive.length)} срещу предишните 4 седм.`)}${kpiB('Отказали се', lost.length, `${churnPct}% от ходилите`)}${kpiB('Приход от посещения', eur(earnM), 'изработено този месец')}${kpiB('Приход от абонаменти', eur(soldM), soldN + ' продадени този месец')}</div>`;
+  const kpiT = (l, v, sub, tip) => `<div class="kpi" title="${esc(tip)}"><div class="kl">${l} <span class="mute" style="font-size:11px">ⓘ</span></div><div class="kv">${v}</div><div class="ks">${sub}</div></div>`;
+  const payM = rc && rc.month === mStart ? Number(rc.amount || 0) : 0;
+  const top = `<div class="kpis">${kpiB('Посещения', v4, `${sgn(vPct)}% · 4 седмици`)}${kpiB('Активни клиенти', active.length, `${sgn(active.length - prevActive.length)} срещу предишните 4 седм.`)}${kpiB('Спрели', lost.length, `${churnPct}% от ходилите`)}${kpiT('Плащания', eur(payM), 'влезли пари този месец', 'Всички плащания от клиенти през месеца (в брой, карта, банка).')}${kpiT('Абонаменти', eur(soldM), soldN + ' започнали този месец' + (mStart === '2026-11-01' ? ' · преходен месец' : ''), 'Сумата на абонаментите, започнали през месеца (нови и подновени).' + (mStart === '2026-11-01' ? ' Ноември е преходен: тук влизат и всички абонаменти, прехвърлени при старта на приложението на 2.11.' : ''))}${kpiT('Изработено', eur(earnM), 'проведени тренировки този месец', 'Стойността на проведените тренировки: по абонамент = цена ÷ брой посещения; еднократно = таксата; Open Gym = цената, разпределена по дни.')}</div>`;
   const crack = `<h3>Къде се пропукваме</h3><div class="cracks">${cards.map(c => `<div class="crack ${c.l}"><div class="ct">${c.t}</div><div class="cv">${c.v}</div><div class="cd">${c.d}</div>${c.a ? `<div class="ca">→ ${c.a}</div>` : ''}</div>`).join('')}</div>`;
   // графика
   const trD = D.ktr === 'week' ? trW.data : trM.data;
@@ -1265,7 +1269,7 @@ async function kpiOwner() {
   const trainers = `<div class="card" style="margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 8px">Треньори <span class="mute" style="font-weight:400">· последните 4 седмици, средно на работен ден</span></h3><table><thead><tr><th>Треньор</th><th>Работни дни</th><th>Часа на ден</th><th>Посещения на ден</th><th>Общо часове</th><th>Общо посещения</th></tr></thead><tbody>
     ${trn.map(r => { const dd = (dayset[r.staff_id] || new Set()).size || 0; return `<tr><td><b>${esc(r.name)}</b></td><td>${dd}</td><td>${dd ? f1(r.hours / dd) : '–'}</td><td>${dd ? f1(r.visits / dd) : '–'}</td><td>${r.hours}</td><td>${r.visits}</td></tr>`; }).join('') || '<tr><td colspan="6" class="mute">Няма данни.</td></tr>'}</tbody></table></div>`;
   // клиенти за действие
-  const lists = { lost: ['Отказали се', lost], back: ['Започнали / върнали се', back.sort((x, y) => y.done_28 - x.done_28)], risk: ['В риск', risk], nopkg: ['Без абонамент', noPkg] }, cur = lists[D.klist] || lists.lost;
+  const lists = { lost: ['Спрели', lost], back: ['Започнали / върнали се', back.sort((x, y) => y.done_28 - x.done_28)], risk: ['В риск', risk], nopkg: ['Без абонамент', noPkg] }, cur = lists[D.klist] || lists.lost;
   const list = `<div class="card" style="margin-bottom:14px;overflow:auto"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Клиенти за действие</h3><span class="sp"></span><select id="klist-sel" style="font-weight:600">${Object.entries(lists).map(([k, [l, a]]) => `<option value="${k}" ${D.klist === k ? 'selected' : ''}>${l} · ${a.length}</option>`).join('')}</select></div>
     <table><thead><tr><th>Клиент</th><th>Обект</th><th>Преди (4 седм.)</th><th>Сега (4 седм.)</th><th>Последно</th><th>Абонамент</th></tr></thead><tbody>
     ${cur[1].slice(0, 40).map(c => `<tr class="click" data-act="client" data-id="${c.client_id}"><td><b>${esc(c.name)}</b>${cur === lists.lost && (S.left || {})[c.client_id] ? ` <span class="mute" style="font-size:12px">· напуснал(а) ${fmt(S.left[c.client_id])}</span>` : ''}</td><td>${esc(c.location || '')}</td><td>${c.done_prev_28}</td><td>${c.done_28}</td><td>${c.last_visit ? fmt(c.last_visit) + ` <span class="mute">· ${c.days_since} дни</span>` : '–'}</td><td>${c.pkg_end ? 'до ' + fmt(c.pkg_end) + ` · ${c.pkg_left} ост.` : '<span class="chip warn">няма</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="mute">Няма клиенти в този списък.</td></tr>'}</tbody></table>
@@ -2003,7 +2007,7 @@ async function clientsView() {
   drawClients();
 }
 function drawClients() {
-  const q = S.q.toLowerCase(); S.csts = S.csts || []; if (S.cloc === undefined) S.cloc = S.loc;
+  const q = S.q.toLowerCase(); S.csts = S.csts || []; if (S.cloc === undefined) S.cloc = store.get('nlt-view', S.loc);
   const base = S.clients.filter(c => (S.cfilter === 'mo' ? c.massage_only : !c.massage_only) && (!q || (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q)) && (S.cloc === 'all' || c.location === S.cloc));
   const cnt = k => base.filter(c => cstat(c) === k).length;
   const list = base.filter(c => {
@@ -2899,7 +2903,7 @@ async function dashView() {
   svg += '</svg>';
   // дневна активност
   const FEEDS = { cancel: 'Отказан', change: 'Сменен', move: 'Смяна', paid: 'Платен', attended: 'Проведен', new: 'Записан', removed: 'Изтрит', activated: 'Нов профил' };
-  D.aloc = D.aloc || 'all';
+  D.aloc = D.aloc || store.get('nlt-view', 'all');
   const acts = (act.data || []).filter(e => D.aloc === 'all' || e.location === D.aloc), cnt = t => acts.filter(e => e.type === t).length;
   const alocBtns = `<div class="seg" style="margin-bottom:8px;flex-wrap:wrap">${['all', ...LOCS].map(l => { const who = l === 'all' ? '' : S.staff.filter(t => t.active !== false && t.role !== 'admin' && actLocs(t).includes(l)).map(t => t.name.split(' ')[0]).join(', '); return `<button class="${D.aloc === l ? 'on' : ''}" data-act="aloc" data-v="${esc(l)}">${l === 'all' ? 'Всички' : esc(l)}${who ? ` <span class="mute" style="font-weight:400">· ${esc(who)}</span>` : ''}</button>`; }).join('')}</div>`;
   const shownActs = acts.filter(e => D.filter === 'all' || e.type === D.filter);
@@ -2943,7 +2947,7 @@ async function loadSubsFlow() {
   for (let i = 0; i < 30; i++) { const { data, error } = await sb.from('bookings').select('id,client_id,status,late,sessions!inner(date,title)').gte('sessions.date', from).lte('sessions.date', t).in('status', ['done', 'cancelled']).order('id').range(i * 1000, i * 1000 + 999); if (error || !data) break; rows = rows.concat(data); if (data.length < 1000) break; }
   await loadVinfo();
   if (!document.getElementById('sfcard') || D.month !== m) return;
-  const V = {}; rows.filter(b => (b.status === 'done' || b.late) && !isPil(b.sessions.title)).forEach(b => (V[b.client_id] = V[b.client_id] || []).push(b.sessions.date));
+  const V = {}; rows.filter(b => (b.status === 'done' || b.late)).forEach(b => (V[b.client_id] = V[b.client_id] || []).push(b.sessions.date));
   Object.values(V).forEach(a => a.sort());
   const ok = c => c && !c.massage_only && !/пробен/i.test(c.name);
   const P = S.pstat || [], byP = {}; P.forEach(p => (byP[p.client_id] = byP[p.client_id] || []).push(p));
@@ -2960,17 +2964,15 @@ async function loadSubsFlow() {
   S.clients.filter(c => ok(c) && !c.legacy_id && c.source !== 'pt-minder' && c.status !== 'Inactive' && c.created_at && ymd(new Date(c.created_at)) >= m && ymd(new Date(c.created_at)) <= me && !neu.some(x => x.c.id === c.id) && lastPk(c.id))
     .forEach(c => neu.push({ c, d: ymd(new Date(c.created_at)), why: 'нов клиент · още без посещение', p: lastPk(c.id) }));
   neu.sort((a, b) => b.d.localeCompare(a.d));
-  /* спрели */
-  const stop = [], seen = new Set();
-  Object.entries(V).forEach(([id, ds]) => { const c = S.clients.find(x => x.id === id); if (!ok(c)) return;
-    const L = ds[ds.length - 1], sd = ymd(addDays(parse(L), GAP)); const nx = ((S.vinfo || {})[id] || {}).next;
-    const inact = c.status === 'Inactive' && L >= m && L <= me;
-    if ((inact || (sd >= m && sd <= endM && !nx)) && cstat(c) !== 'single') { const p = lastPk(id); stop.push({ c, d: L, why: `последно ${fmt(L)}${c.status === 'Inactive' ? ' · неактивен' : p && p.end_date >= t ? ` · абонамент до ${fmt(p.end_date)}` : ' · без абонамент'}` }); seen.add(id); } });
-  Object.entries(S.left || {}).forEach(([id, d]) => { const c = S.clients.find(x => x.id === id); if (ok(c) && !seen.has(id) && d >= m && d <= me) { const L = (V[id] || []).slice(-1)[0]; stop.push({ c, d: L || d, why: `отбелязан като напуснал${L ? ' · последно ' + fmt(L) : ''}` }); seen.add(id); } });
-  P.forEach(p => { const c = S.clients.find(x => x.id === p.client_id); if (!ok(c) || seen.has(c.id) || !(p.end_date >= m && p.end_date <= endM && p.end_date < t)) return;
-    const L = byP[c.id] || []; if (L.some(q => q !== p && q.start_date > p.start_date && q.start_date <= ymd(addDays(parse(p.end_date), GAP)))) return;
-    if (L.some(q => q !== p && q.end_date > p.end_date)) return; const nx = ((S.vinfo || {})[c.id] || {}).next; if (nx) return;
-    stop.push({ c, d: p.end_date, why: `абонаментът свърши ${fmt(p.end_date)} и не е подновен` }); seen.add(c.id); });
+  /* спрели = имали посещение в последните 28 дни (до края на месеца) и сега са неактивни или нямат абонамент и записани часове; еднократните не се броят */
+  const stop = [], ref = endM, w0 = ymd(addDays(parse(ref), -27)), sing = c => cstat(c) === 'single';
+  Object.entries(V).forEach(([id, ds]) => { const c = S.clients.find(x => x.id === id); if (!ok(c) || sing(c)) return;
+    const recent = ds.filter(d => d >= w0 && d <= ref); if (!recent.length) return;
+    const L = ds[ds.length - 1]; if (L > ref) return; /* идвал е и след края на месеца */
+    const pk = (byP[id] || []).find(p => p.start_date <= ref && p.end_date >= ref) || (byP[id] || []).find(p => p.start_date > ref && p.start_date <= t);
+    const nx = ref === t ? ((S.vinfo || {})[id] || {}).next : null;
+    if (c.status === 'Inactive') stop.push({ c, d: L, why: `неактивен · последно ${fmt(L)}` });
+    else if (!pk && !nx) stop.push({ c, d: L, why: `без абонамент и без записани часове · последно ${fmt(L)}` }); });
   stop.sort((a, b) => b.d.localeCompare(a.d));
   const line = (x, right, sub) => `<div class="sf-r"><div style="min-width:0;flex:1"><a data-act="client" data-id="${x.c.id}">${esc(x.c.name)}</a> <span class="mute" style="font-size:11px">${esc(x.c.location || '')}</span><div class="mute">${sub}</div></div><span class="mute" style="white-space:nowrap">${right}</span></div>`;
   const col = (h, n, cl, arr, f) => `<div class="sf-c"><div class="sf-h"><b style="font-size:26px;color:${cl}">${n}</b><span>${h}</span></div><div class="sf-l">${arr.length ? arr.map(f).join('') : '<div class="mute" style="padding:8px 0">Няма.</div>'}</div></div>`;
@@ -3981,12 +3983,17 @@ async function ttAct(act, el) {
 }
 /* автоматични проверки (само показват, нищо не променят) */
 /* ── Седмичен преглед в Обобщение: посещения тази седмица и кой е „За проверка“ ── */
+/* клиент с текущ или бъдещ абонамент, който още е „потенциален“ → става „Активен“ */
+async function fixLeads() {
+  const t = today(), has = new Set((S.pstat || []).filter(p => p.end_date >= t).map(p => p.client_id));
+  for (const c of S.clients.filter(c => c.status === 'Lead' && has.has(c.id))) { const { error } = await sb.from('clients').update({ status: 'Active' }).eq('id', c.id); if (!error) { c.status = 'Active'; logEvent('change', `${c.name}: „потенциален“ → „Активен“ (има абонамент)`); } }
+}
 async function loadWeekCard() {
   const el = document.getElementById('wkcard'); if (!el) return;
   el.innerHTML = '<div class="card" style="margin-bottom:12px"><h2>Седмичен преглед</h2><div class="mute">Зареждане…</div></div>';
   const myL = S.owner ? null : actLocs(S.me.row), inL = loc => !myL || myL.includes(loc);
   const t = today(), td = parse(t), mon = addDays(td, -((td.getDay() + 6) % 7)), pmon = addDays(mon, -7), dow = Math.round((td - mon) / 864e5);
-  const [, , wb] = await Promise.all([loadVinfo(true), (async () => { S.pstat = await loadPstat(); await syncDiscounts(); })(),
+  const [, , wb] = await Promise.all([loadVinfo(true), (async () => { S.pstat = await loadPstat(); await syncDiscounts(); await fixLeads(); })(),
     sb.from('bookings').select('client_id,status,late,sessions!inner(date,location,title)').gte('sessions.date', ymd(pmon)).lte('sessions.date', t).in('status', ['done', 'cancelled']).limit(5000)]);
   if (!document.getElementById('wkcard')) return;
   const vis = (wb.data || []).filter(b => (b.status === 'done' || b.late) && !isPil(b.sessions.title) && inL(b.sessions.location));
@@ -4855,7 +4862,7 @@ document.addEventListener('click', async e => {
       case 'logout': if (S.previewClient) { closeSheet(); exitPreview(); break; } closeSheet(); await sb.auth.signOut(); S.me = null; S.view = null; loginView(); break;
       case 'tab': S.tab = el.dataset.t; renderStaff(); break;
       case 'hloc': { S.loc = el.dataset.l; S.cloc = S.loc; store.set('nlt-loc', S.loc); D.ploc = null; document.querySelectorAll('#loc button').forEach(b => b.classList.toggle('on', b.dataset.l === S.loc)); renderTab(); break; }
-      case 'clloc': S.cloc = el.dataset.l; drawClients(); break;
+      case 'clloc': S.cloc = D.kloc = D.aloc = el.dataset.l; store.set('nlt-view', el.dataset.l); drawClients(); break;
       case 'csort': { const k = el.dataset.k; S.csort = S.csort && S.csort.k === k ? { k, d: -S.csort.d } : { k, d: 1 }; drawClients(); break; }
       case 'trsched': S.trf = el.dataset.id; S.tab = 'week'; renderStaff(); break;
       case 'kper': D.kper = el.dataset.p; kpiView(); break;
@@ -4896,7 +4903,7 @@ document.addEventListener('click', async e => {
       case 'pgloc': D.pgl = el.dataset.l; pgvRender(); break;
       case 'pgkind': D.pgk = el.dataset.k; pgvRender(); break;
       case 'kheat': D.kheat = el.dataset.l || null; kpiView(); break;
-      case 'kloc': D.kloc = el.dataset.l; kpiView(); break;
+      case 'kloc': D.kloc = D.aloc = S.cloc = el.dataset.l; store.set('nlt-view', el.dataset.l); kpiView(); break;
       case 'kchart': D.kchart = el.dataset.k; kpiView(); break;
       case 'klist': D.klist = el.dataset.k; kpiView(); break;
       case 'krisk': D.krisk = !D.krisk; drawKpiClients(); break;
@@ -5024,7 +5031,7 @@ document.addEventListener('click', async e => {
       case 'dmonth': D.month = shiftM(D.month, +el.dataset.d); dashView(); break;
       case 'aday': D.day = el.dataset.d === '0' ? today() : ymd(addDays(parse(D.day), +el.dataset.d)); S.owner ? dashView() : trainerDash(); break;
       case 'afilter': D.filter = el.dataset.v; S.owner ? dashView() : trainerDash(); break;
-      case 'aloc': D.aloc = el.dataset.v; dashView(); break;
+      case 'aloc': D.aloc = D.kloc = S.cloc = el.dataset.v; store.set('nlt-view', el.dataset.v); dashView(); break;
       case 'ptab': D.tab = el.dataset.v; if (D.tab === 'hist') { D.phist = null; D.phm = D.phm || today().slice(0, 7); loadPayHist(); } if (D.tab === 'audit') { D.audit = null; loadAudit().then(redrawPay); } redrawPay(); break;
       case 'hcsv': { const rows = (D.phist || []).filter(p => payLoc() === 'all' || (S.clients.find(c => c.id === p.client_id) || {}).location === payLoc()); const t = ['Дата\tКлиент\tОбект\tСума\tНачин\tБележка'].concat(rows.map(p => [p.date, cname(p.client_id), (S.clients.find(c => c.id === p.client_id) || {}).location || '', String(p.amount).replace('.', ','), p.method || '', p.note || ''].join('\t'))).join('\n'); try { await navigator.clipboard.writeText(t); toast('Копирано, постави в Excel'); } catch (e) { modal.show(`<h2>Копирай ръчно</h2><textarea style="width:100%;height:200px">${esc(t)}</textarea>`); } break; }
       case 'vedit': {
