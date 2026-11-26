@@ -1243,12 +1243,16 @@ async function kpiOwner() {
     ${L === 'all' ? `<br>По обекти: <b>Боян Петров</b> ${sgn(byLoc['Боян Петров'].p)}%, <b>Лерин</b> ${sgn(byLoc['Лерин'].p)}%.` : ''}
     <br>Отказват се <b>${lost.length}</b> клиента${L === 'all' ? ` (Боян Петров ${lostBy('Боян Петров')}, Лерин ${lostBy('Лерин')})` : ''}; ${back.length} са нови или върнали се. Нетно: <b style="color:var(--${back.length - lost.length >= 0 ? 'ok' : 'bad'})">${sgn(back.length - lost.length)}</b>.</div></div>`;
   const kpiB = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
-  const top = `<div class="kpis">${kpiB('Посещения', v4, `${sgn(vPct)}% · 4 седмици`)}${kpiB('Активни клиенти', active.length, `${sgn(active.length - prevActive.length)} срещу предишните 4 седм.`)}${kpiB('Отказали се', lost.length, `${churnPct}% от ходилите`)}${kpiB('Приход (месец)', eur(rc ? rc.projected : 0), 'прогноза')}</div>`;
+  const mStart = ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)), EA = await loadEarned();
+  const earnM = locs.reduce((a, l) => a + ((EA[l] || {})[mStart] || 0), 0);
+  const sold = (S.pstat || []).filter(p => p.start_date >= mStart && p.start_date <= today() && locs.includes((S.clients.find(c => c.id === p.client_id) || {}).location));
+  const soldM = sold.reduce((a, p) => a + Number(p.price || 0), 0), soldN = sold.length;
+  const top = `<div class="kpis">${kpiB('Посещения', v4, `${sgn(vPct)}% · 4 седмици`)}${kpiB('Активни клиенти', active.length, `${sgn(active.length - prevActive.length)} срещу предишните 4 седм.`)}${kpiB('Отказали се', lost.length, `${churnPct}% от ходилите`)}${kpiB('Приход от посещения', eur(earnM), 'изработено този месец')}${kpiB('Приход от абонаменти', eur(soldM), soldN + ' продадени този месец')}</div>`;
   const crack = `<h3>Къде се пропукваме</h3><div class="cracks">${cards.map(c => `<div class="crack ${c.l}"><div class="ct">${c.t}</div><div class="cv">${c.v}</div><div class="cd">${c.d}</div>${c.a ? `<div class="ca">→ ${c.a}</div>` : ''}</div>`).join('')}</div>`;
   // графика
   const trD = D.ktr === 'week' ? trW.data : trM.data;
   const chartTabs = `<div class="row" style="margin-bottom:8px;gap:6px">${[['visits', 'Посещения'], ['hours', 'Часове'], ['revenue', 'Приход']].map(([k, l]) => `<button class="sm ${D.kchart === k ? 'pri' : ''}" data-act="kchart" data-k="${k}">${l}</button>`).join('')}<span class="sp"></span>${D.kchart !== 'revenue' ? [['month', 'Месеци'], ['week', 'Седмици']].map(([k, l]) => `<button class="sm ${D.ktr === k ? 'pri' : ''}" data-act="ktr" data-u="${k}">${l}</button>`).join('') : ''}</div>`;
-  const chart = D.kchart === 'revenue' ? revenueCard2(rvr, await loadEarned(), locs) : stackChart(trD, locs, D.kchart === 'hours' ? 'hours' : 'visits', D.ktr);
+  const chart = D.kchart === 'revenue' ? revenueCard2(rvr, await loadEarned(), locs) : D.kchart === 'visits' && D.ktr !== 'week' ? await threeMinis(trM.data) : stackChart(trD, locs, D.kchart === 'hours' ? 'hours' : 'visits', D.ktr);
   const charts = `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 8px">Тенденция</h3>${chartTabs}${chart}${D.kchart === 'revenue' || D.ktr === 'week' ? '' : weekLines(trW.data, locs, 14, await weekPlan())}</div>`;
   const whyB = await whyBlock(kc, trW.data, locs);
   // треньори
@@ -1269,7 +1273,7 @@ async function kpiOwner() {
   const more = `<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:600">Още показатели · най-заети часове, честота, източник</summary>${heatGrid(ht.data || [])}${freqBlock(kc, locs)}${sourcesBlock(sr.data)}</details>`;
   $('#main').innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><b style="font-size:18px">KPI</b><span class="sp"></span>
     <div class="seg">${KLOCS.map(([k, l]) => `<button class="${L === k ? 'on' : ''}" data-act="kloc" data-l="${k}">${l}</button>`).join('')}</div></div>
-    ${brief}${top}${crack}${charts}${whyB}${list}${trainers}${more}`;
+    ${top}${crack}${charts}${whyB}${list}${trainers}${more}`;
   kpiSub();
 }
 
@@ -1400,6 +1404,23 @@ async function loadEarned() {
     const days = Math.max(1, Math.round((parse(p.end_date) - parse(p.start_date)) / 864e5) + 1), per = Number(p.price) / days;
     for (let d = parse(p.start_date); ymd(d) <= p.end_date && ymd(d) <= t; d = addDays(d, 1)) add(c.location, ymd(d), per); });
   D.earn = E; D.earnAt = Date.now(); return E;
+}
+/* три диаграми една до друга: Боян Петров, Лерин, Масажи — посещения по месеци с брой и % спрямо предходния месец */
+async function threeMinis(rows) {
+  const ms = [...new Set((rows || []).map(r => r.period))].sort();
+  const { data: mb } = await sb.from('massage_bookings').select('date').eq('status', 'booked').gte('date', ms[0] || '2026-06-01').lte('date', today()).limit(5000);
+  const mm = {}; (mb || []).forEach(x => { const k = x.date.slice(0, 7) + '-01'; mm[k] = (mm[k] || 0) + 1; });
+  const ser = l => ms.map(m => ({ m, v: l === 'Масажи' ? (mm[m] || 0) : ((rows.find(r => r.period === m && r.location === l) || {}).visits || 0) }));
+  const mn = ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'];
+  const one = l => { const d = ser(l), W = 340, H = 200, pb = 22, pt = 34, n = d.length, cw = W / n, bw = Math.min(30, cw - 12), mx = Math.max(1, ...d.map(x => x.v));
+    const bars = d.map((x, i) => { const h = x.v / mx * (H - pb - pt), X = i * cw + (cw - bw) / 2, Y = H - pb - h, last = i === n - 1, pv = i ? d[i - 1].v : 0, g = i && pv && !last ? Math.round((x.v - pv) / pv * 100) : null;
+      return `<rect x="${X}" y="${Y}" width="${bw}" height="${Math.max(h, 1)}" rx="4" fill="${TRC[l]}" opacity="${last ? .45 : 1}"><title>${mn[parse(x.m).getMonth()]}: ${x.v}${last ? ' (до днес)' : ''}</title></rect>
+        <text x="${X + bw / 2}" y="${Y - (g == null ? 5 : 17)}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">${x.v}</text>
+        ${g == null ? '' : `<text x="${X + bw / 2}" y="${Y - 4}" text-anchor="middle" font-size="10" font-weight="600" fill="var(--${g >= 0 ? 'ok' : 'bad'})">${g > 0 ? '+' : g < 0 ? '−' : ''}${Math.abs(g)}%</text>`}
+        <text x="${X + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--mute)">${mn[parse(x.m).getMonth()]}</text>`; }).join('');
+    return `<div style="flex:1;min-width:250px"><div class="mute" style="margin-bottom:2px"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]};margin-right:5px"></i><b style="color:var(--ink)">${l}</b></div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="${l}"><line x1="0" x2="${W}" y1="${H - pb}" y2="${H - pb}" stroke="var(--line)"/>${bars}</svg></div>`; };
+  return `<div class="row" style="gap:18px;align-items:flex-start;flex-wrap:wrap">${['Боян Петров', 'Лерин', 'Масажи'].map(one).join('')}</div>`;
 }
 function revenueCard2(rows, earn, locs) {
   if (!rows.length) return '';
