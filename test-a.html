@@ -2909,7 +2909,7 @@ async function loadSubsFlow() {
     if (prev && gap(prev, f) < GONE) return;
     const created = c.created_at && ymd(new Date(c.created_at)) >= ymd(addDays(parse(f), -GONE));
     neu.push({ c, d: f, why: prev ? `върна се след ${gap(prev, f)} дни` : created ? 'нов клиент' : 'първо посещение от над месец', p: lastPk(id) }); });
-  S.clients.filter(c => ok(c) && c.status !== 'Inactive' && c.created_at && ymd(new Date(c.created_at)) >= m && ymd(new Date(c.created_at)) <= me && !neu.some(x => x.c.id === c.id) && lastPk(c.id))
+  S.clients.filter(c => ok(c) && !c.legacy_id && c.source !== 'pt-minder' && c.status !== 'Inactive' && c.created_at && ymd(new Date(c.created_at)) >= m && ymd(new Date(c.created_at)) <= me && !neu.some(x => x.c.id === c.id) && lastPk(c.id))
     .forEach(c => neu.push({ c, d: ymd(new Date(c.created_at)), why: 'нов клиент · още без посещение', p: lastPk(c.id) }));
   neu.sort((a, b) => b.d.localeCompare(a.d));
   /* спрели */
