@@ -2898,7 +2898,7 @@ async function loadSubsFlow() {
   if (!document.getElementById('sfcard') || D.month !== m) return;
   const V = {}; rows.filter(b => (b.status === 'done' || b.late) && !isPil(b.sessions.title)).forEach(b => (V[b.client_id] = V[b.client_id] || []).push(b.sessions.date));
   Object.values(V).forEach(a => a.sort());
-  const ok = c => c && !c.massage_only;
+  const ok = c => c && !c.massage_only && !/пробен/i.test(c.name);
   const P = S.pstat || [], byP = {}; P.forEach(p => (byP[p.client_id] = byP[p.client_id] || []).push(p));
   const lastPk = id => (byP[id] || []).slice().sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
   const gap = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
@@ -2908,7 +2908,8 @@ async function loadSubsFlow() {
     const f = ds.find(d => d >= m && d <= me); if (!f) return; const prev = ds.filter(d => d < f).pop();
     if (prev && gap(prev, f) < GONE) return;
     const created = c.created_at && ymd(new Date(c.created_at)) >= ymd(addDays(parse(f), -GONE));
-    neu.push({ c, d: f, why: prev ? `върна се след ${gap(prev, f)} дни` : created ? 'нов клиент' : 'първо посещение от над месец', p: lastPk(id) }); });
+    const old = c.legacy_id || c.source === 'pt-minder';
+    neu.push({ c, d: f, why: prev ? `върна се след ${gap(prev, f)} дни` : old ? 'стар клиент · върна се' : created ? 'нов клиент' : 'първо посещение от над месец', p: lastPk(id) }); });
   S.clients.filter(c => ok(c) && !c.legacy_id && c.source !== 'pt-minder' && c.status !== 'Inactive' && c.created_at && ymd(new Date(c.created_at)) >= m && ymd(new Date(c.created_at)) <= me && !neu.some(x => x.c.id === c.id) && lastPk(c.id))
     .forEach(c => neu.push({ c, d: ymd(new Date(c.created_at)), why: 'нов клиент · още без посещение', p: lastPk(c.id) }));
   neu.sort((a, b) => b.d.localeCompare(a.d));
@@ -2916,14 +2917,15 @@ async function loadSubsFlow() {
   const stop = [], seen = new Set();
   Object.entries(V).forEach(([id, ds]) => { const c = S.clients.find(x => x.id === id); if (!ok(c)) return;
     const L = ds[ds.length - 1], sd = ymd(addDays(parse(L), GAP)); const nx = ((S.vinfo || {})[id] || {}).next;
-    if (sd >= m && sd <= endM && !nx && cstat(c) !== 'single') { const p = lastPk(id); stop.push({ c, d: L, why: `последно ${fmt(L)}${c.status === 'Inactive' ? ' · неактивен' : p && p.end_date >= t ? ` · абонамент до ${fmt(p.end_date)}` : ' · без абонамент'}` }); seen.add(id); } });
+    const inact = c.status === 'Inactive' && L >= m && L <= me;
+    if ((inact || (sd >= m && sd <= endM && !nx)) && cstat(c) !== 'single') { const p = lastPk(id); stop.push({ c, d: L, why: `последно ${fmt(L)}${c.status === 'Inactive' ? ' · неактивен' : p && p.end_date >= t ? ` · абонамент до ${fmt(p.end_date)}` : ' · без абонамент'}` }); seen.add(id); } });
   Object.entries(S.left || {}).forEach(([id, d]) => { const c = S.clients.find(x => x.id === id); if (ok(c) && !seen.has(id) && d >= m && d <= me) { const L = (V[id] || []).slice(-1)[0]; stop.push({ c, d: L || d, why: `отбелязан като напуснал${L ? ' · последно ' + fmt(L) : ''}` }); seen.add(id); } });
   P.forEach(p => { const c = S.clients.find(x => x.id === p.client_id); if (!ok(c) || seen.has(c.id) || !(p.end_date >= m && p.end_date <= endM && p.end_date < t)) return;
     const L = byP[c.id] || []; if (L.some(q => q !== p && q.start_date > p.start_date && q.start_date <= ymd(addDays(parse(p.end_date), GAP)))) return;
     if (L.some(q => q !== p && q.end_date > p.end_date)) return; const nx = ((S.vinfo || {})[c.id] || {}).next; if (nx) return;
     stop.push({ c, d: p.end_date, why: `абонаментът свърши ${fmt(p.end_date)} и не е подновен` }); seen.add(c.id); });
   stop.sort((a, b) => b.d.localeCompare(a.d));
-  const line = (x, right, sub) => `<div class="sf-r"><div style="min-width:0;flex:1"><a data-act="client" data-id="${x.c.id}">${esc(x.c.name)}</a><div class="mute">${sub}</div></div><span class="mute" style="white-space:nowrap">${right}</span></div>`;
+  const line = (x, right, sub) => `<div class="sf-r"><div style="min-width:0;flex:1"><a data-act="client" data-id="${x.c.id}">${esc(x.c.name)}</a> <span class="mute" style="font-size:11px">${esc(x.c.location || '')}</span><div class="mute">${sub}</div></div><span class="mute" style="white-space:nowrap">${right}</span></div>`;
   const col = (h, n, cl, arr, f) => `<div class="sf-c"><div class="sf-h"><b style="font-size:26px;color:${cl}">${n}</b><span>${h}</span></div><div class="sf-l">${arr.length ? arr.map(f).join('') : '<div class="mute" style="padding:8px 0">Няма.</div>'}</div></div>`;
   el.innerHTML = `<style>.sf-g{display:grid;grid-template-columns:1fr 1fr;gap:14px}.sf-h{display:flex;align-items:baseline;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}.sf-l{max-height:340px;overflow:auto}.sf-r{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}@media(max-width:700px){.sf-g{grid-template-columns:1fr}}</style>
     <div class="row" style="margin-bottom:10px"><h2 style="margin:0;flex:1">Клиенти · ${mLabel(m)}</h2><button class="sm" data-act="dmonth" data-d="-1">‹</button><button class="sm" data-act="dmonth" data-d="1">›</button></div>
