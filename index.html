@@ -549,7 +549,7 @@ table.fin td.fxln:hover{color:var(--acc)}
 .nt-sec+.nt-li{border-top:0}
 .nt-li:before{content:'';position:absolute;left:4px;top:15px;width:6px;height:6px;border-radius:50%;background:var(--c-coral,var(--acc))}
 .nt-p{font-size:14px;color:var(--c-mute,var(--mute));margin:6px 0}
-</style>
+.ld-dot{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--bad,#eb4c51);color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:4px}</style>
 </head>
 <body>
 <div id="app"></div>
@@ -749,6 +749,7 @@ async function staffApp() {
   S.clients = c.data; S.packages = p.data; S.staff = s.data;
   /* таксуването върви на сървъра всяка минута (cron) — тук само опресняваме графика */
   if (!window.__chargeT) window.__chargeT = setInterval(() => { try { if ($('#grid')) drawGrid(); } catch (e) { } }, 60000);
+  loadLeadsDue(); if (!window.__ldIv) window.__ldIv = setInterval(loadLeadsDue, 30 * 60e3);
   loadVinfo().then(() => { if (S.tab === 'clients' && $('#main')) drawClients(); if ($('#wbtn')) $('#wbtn').innerHTML = waitHtml(); }, () => {});
   sb.rpc('single_clients', { p_days: 60 }).then(r => { if (r.error) return; S.singles = new Set((r.data || []).map(x => typeof x === 'string' ? x : x.single_clients)); if (S.tab === 'clients' && $('#main')) clientsView(); if ($('#wbtn')) $('#wbtn').innerHTML = waitHtml(); }, () => {});
   S.policy = { ...POL_DEF, ...((q.data || []).find(x => x.key === 'policy')?.value || {}) };
@@ -777,7 +778,7 @@ function renderStaff() {
   $('#app').innerHTML = `
   <div class="bar"><span class="logo">NLT</span>
     <div class="tabs">
-      ${[['dash', 'Обобщение']].concat(S.owner ? [['kpi', 'KPI и отчети']] : []).concat([['week', 'График'], ['clients', 'Клиенти'], ['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Проследяване']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['fin', 'Финанси']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
+      ${[['dash', 'Обобщение']].concat(S.owner ? [['kpi', 'KPI и отчети']] : []).concat([['week', 'График'], ['clients', 'Клиенти']]).concat(leadsAllowed() ? [['leads', `Запитвания${S.leadsDue ? ` <span class="ld-dot">${S.leadsDue}</span>` : ''}`]] : []).concat([['progress', 'Прогрес']]).concat(S.owner ? [['tasks', 'Проследяване']] : []).concat([['packages', 'Пакети']]).concat(S.owner ? [['team', 'Служители']] : []).concat(S.owner ? [['fin', 'Финанси']] : []).concat(admin ? [['settings', 'Настройки']] : []).map(([t, l]) => `<button class="tab ${S.tab === t ? 'on' : ''}" data-act="tab" data-t="${t}">${l}</button>`).join('')}
     </div><span class="sp"></span>
     <span class="seg" id="loc">${LOCS.filter(l => S.owner || !(S.me.row.locations || []).length || S.me.row.locations.includes(l)).map(l => `<button class="${l === S.loc ? 'on' : ''}" data-act="hloc" data-l="${esc(l)}">${esc(locName(l))}</button>`).join('')}</span>
     ${S.realOwner ? `<select id="asel" title="Преглед като друг служител" style="${S.view ? 'border-color:var(--bad);font-weight:600' : ''}"><option value="">${esc(S.real.row.name)} (собственик)</option>${S.staff.filter(t => t.active && t.id !== S.real.row.id).map(t => `<option value="${t.id}" ${S.view?.id === t.id ? 'selected' : ''}>Като ${esc(t.name)}</option>`).join('')}<option value="__client">Като клиент…</option></select>` : `<select id="tsel" title="Виж приложението като клиент"><option value="">${esc(S.me.row.name)}</option><option value="${DEMO_CLIENT}">Като клиент: Пробен Пробен</option></select>`}<button class="sm" data-act="mypw" title="Смени своята парола">Парола</button><button class="sm" data-act="logout">Изход</button></div>
@@ -801,7 +802,7 @@ function renderTab() {
   if (['rewards', 'reports'].includes(S.tab)) { if (S.tab === 'reports') D.ksub = 'rep'; S.tab = S.owner ? 'kpi' : 'week'; }
   if (S.tab === 'kpi' && !S.owner) S.tab = 'week';
   const m = $('#main'); if (m && m.dataset.rt !== S.tab) { m.dataset.rt = S.tab; m.dataset.ld = '1'; }
-  ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, progress: progressView, tasks: tasksView, rewards: rewardsView, reports: reportsView, fin: finView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
+  ({ dash: S.owner ? dashView : trainerDash, kpi: kpiView, week: weekView, clients: clientsView, progress: progressView, tasks: tasksView, rewards: rewardsView, reports: reportsView, fin: finView, leads: leadsView, packages: packagesView, team: teamView, settings: settingsView })[S.tab]();
 }
 
 
@@ -3921,14 +3922,14 @@ async function loadLeads() {
   if (error) { el.innerHTML = ''; return; }
   const mine = l => S.owner || !S.me.row || !l.location || actLocs(S.me.row).includes(l.location);
   LEADS = (data || []).filter(mine);
-  const open = LEADS.filter(l => l.status === 'contacted' || l.status === 'scheduled'), done = LEADS.filter(l => !open.includes(l));
+  const open = LEADS.filter(ldOpen), done = LEADS.filter(l => !open.includes(l));
   if (!LEADS.length) { el.innerHTML = ''; return; }
   const dt = x => x ? new Date(x).toLocaleString('bg-BG', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
-  const row = l => { const st = LEAD_ST[l.status] || [l.status, ''];
+  const row = l => { const st = LEAD_ST2[l.status || 'new'] || [l.status, ''];
     return `<div class="ld-r"><div style="flex:1;min-width:0"><b>${esc(l.name)}</b> <span class="chip ${st[1]}">${esc(st[0])}</span>
       <div class="mute" style="font-size:12px">${l.phone ? `<a href="tel:${esc(l.phone)}">${esc(l.phone)}</a> · ` : ''}${esc(l.location || '')}${l.source_page ? ' · ' + esc(l.source_page) : ''}</div>
       <div class="mute" style="font-size:12px">запитване ${dt(l.received_at)}${l.contacted_at ? ` · писахме във ${esc(l.channel || 'Viber')} ${dt(l.contacted_at)}` : ''}${l.note ? ' · ' + esc(l.note) : ''}</div></div>
-      <div class="ld-b">${['scheduled', 'client', 'lost'].filter(k => k !== l.status).map(k => `<button class="sm" data-act="leadst" data-id="${l.id}" data-s="${k}">${esc(LEAD_ST[k][0])}</button>`).join('')}<button class="sm" data-act="leadnote" data-id="${l.id}" title="Бележка">✎</button></div></div>`; };
+      <div class="ld-b"><button class="sm pri" data-act="tab" data-t="leads">Отвори</button><button class="sm" data-act="leadnote" data-id="${l.id}" title="Бележка">✎</button></div></div>`; };
   el.innerHTML = `<style>.ld-r{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);flex-wrap:wrap}.ld-b{display:flex;gap:6px;flex-wrap:wrap}</style>
     <div class="card" style="margin-bottom:12px"><h2>Запитвания за консултация <span class="mute">· ${open.length} отворени</span></h2>
     <div class="mute" style="font-size:12px;margin-bottom:4px">От формата на сайта. Вече сме им писали във Viber да изберат удобно време. Отбележете какво е станало.</div>
@@ -3940,6 +3941,102 @@ async function leadAct(act, el) {
   if (act === 'leadst') { const { error } = await sb.from('leads').update({ status: el.dataset.s, updated_at: new Date().toISOString(), updated_by: who }).eq('id', id); if (error) return fail(error, 'Не се промени'); }
   else { const l = LEADS.find(x => x.id === id); const n = prompt('Бележка (напр. „консултация в сряда 18:00“):', l && l.note || ''); if (n === null) return; const { error } = await sb.from('leads').update({ note: n.trim() || null, updated_at: new Date().toISOString(), updated_by: who }).eq('id', id); if (error) return fail(error, 'Не се записа'); }
   loadLeads();
+}
+
+/* ── Клиентски запитвания (собственикът и Мартин) ── */
+const LEADS_STAFF = ['c5160341-9f27-4527-9a8e-5ac6a680014f']; /* Мартин Златанов */
+const leadsAllowed = () => S.owner || (S.me && S.me.row && LEADS_STAFF.includes(S.me.row.id));
+const LEAD_ST2 = { new: ['Ново', 'warn'], contacted: ['Писахме във Viber', ''], called: ['Обадихме се', ''], invited: ['Поканен', 'ok'], scheduled: ['Насрочен час', 'ok'], client: ['Стана клиент', 'ok'], lost: ['Отказ / не отговаря', 'bad'] };
+const LEAD_KIND = { consult: ['Консултация', 30, 'безплатна консултация'], trial: ['Пробна тренировка', 60, 'пробна тренировка'], reg: ['Регистрация в приложението', 0, 'регистрация в приложението'] };
+const ldPhone = p => { let d = String(p || '').replace(/[^\d+]/g, ''); if (d.startsWith('00')) d = '+' + d.slice(2); if (d.startsWith('0')) d = '+359' + d.slice(1); if (!d.startsWith('+') && d) d = '+' + d; return d; };
+const ldAddr = l => l === 'Лерин' ? 'ул. Лерин 53 (Белите брези)' : 'ул. Боян Петров 3';
+const ldViberText = l => `Здравейте, ${String(l.name || '').split(' ')[0]}! Пишем Ви от New Level Training във връзка със запитването Ви от сайта ни${l.source_page ? ' за „' + l.source_page + '“' : ''} в залата на ${ldAddr(l.location)}. Кога би Ви било удобно да се видим за кратка консултация, за да се запознаем и да обсъдим целите? Ще се съобразим с Вашия график.\n\nПоздрави,\nNLTEAM`;
+const ldOpen = l => ['new', 'contacted', 'called', 'invited', 'scheduled'].includes(l.status || 'new');
+const ldNeedsCall = l => ['new', 'contacted'].includes(l.status || 'new');
+async function ldSet(l, st, extra = {}) {
+  const who = S.me && S.me.row ? S.me.row.id : null, upd = { status: st, updated_at: new Date().toISOString(), updated_by: who, ...extra };
+  let { error } = await sb.from('leads').update(upd).eq('id', l.id);
+  if (error && /check|constraint|invalid input/i.test(error.message)) { /* стара схема на статусите */
+    const map = { new: 'contacted', called: 'contacted', invited: 'scheduled' }; ({ error } = await sb.from('leads').update({ ...upd, status: map[st] || st }).eq('id', l.id)); }
+  if (error) { fail(error, 'Запитването не се промени'); return false; }
+  Object.assign(l, upd); return true;
+}
+async function loadLeadsDue() {
+  if (!leadsAllowed()) return;
+  const { data } = await sb.from('leads').select('id,name,phone,location,status,received_at').in('status', ['new', 'contacted']).gte('received_at', new Date(Date.now() - 30 * 864e5).toISOString());
+  const mine = (data || []).filter(l => S.owner || !l.location || actLocs(S.me.row).includes(l.location));
+  const old = S.leadsDue; S.leadsDue = mine.length; S.leadsDueList = mine;
+  if (old !== S.leadsDue) { const b = document.querySelector('[data-act="tab"][data-t="leads"]'); if (b) b.innerHTML = `Запитвания${S.leadsDue ? ` <span class="ld-dot">${S.leadsDue}</span>` : ''}`; }
+  /* известие „Обади ли се?“ (ако е разрешено в браузъра/телефона) — най-много веднъж на 3 часа за запитване */
+  try { if (window.Notification && Notification.permission === 'granted') { const seen = JSON.parse(store.get('nlt-ldnote', '{}')); const now = Date.now();
+    mine.filter(l => now - new Date(l.received_at) > 30 * 60e3 && (!seen[l.id] || now - seen[l.id] > 3 * 3600e3)).slice(0, 3).forEach(l => { new Notification('Обади ли се?', { body: `${l.name}${l.phone ? ' · ' + l.phone : ''} — запитване от сайта`, tag: 'lead-' + l.id }); seen[l.id] = now; });
+    store.set('nlt-ldnote', JSON.stringify(seen)); } } catch (e) { }
+}
+async function leadsView() {
+  if (!leadsAllowed()) { S.tab = 'week'; return renderTab(); }
+  loadMain();
+  const { data, error } = await sb.from('leads').select('*').gte('received_at', new Date(Date.now() - 120 * 864e5).toISOString()).order('received_at', { ascending: false });
+  if (error) return fail(error, 'Запитванията не се заредиха');
+  LEADS = (data || []).filter(l => S.owner || !l.location || actLocs(S.me.row).includes(l.location));
+  drawLeads(); loadLeadsDue();
+}
+function drawLeads() {
+  const m = $('#main'); if (!m) return;
+  const dt = x => x ? new Date(x).toLocaleString('bg-BG', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+  const need = LEADS.filter(ldNeedsCall), wait = LEADS.filter(l => ['called', 'invited', 'scheduled'].includes(l.status)), done = LEADS.filter(l => !ldOpen(l));
+  const row = l => { const st = LEAD_ST2[l.status || 'new'] || [l.status, ''], ph = ldPhone(l.phone);
+    return `<div class="ld-r"><div style="flex:1;min-width:220px"><b>${esc(l.name)}</b> <span class="chip ${st[1]}">${esc(st[0])}</span>
+      <div class="mute" style="font-size:12px">${l.phone ? `<a href="tel:${esc(ph)}">${esc(l.phone)}</a>` : 'без телефон'}${l.email ? ` · ${esc(l.email)}` : ''} · ${esc(l.location || '—')}${l.source_page ? ' · ' + esc(l.source_page) : ''}</div>
+      <div class="mute" style="font-size:12px">запитване ${dt(l.received_at)}${l.contacted_at ? ` · Viber ${dt(l.contacted_at)}` : ''}${l.note ? ' · ' + esc(l.note) : ''}</div></div>
+      <div class="ld-b">${ph && ldOpen(l) ? `<a class="btn sm" href="viber://chat?number=${encodeURIComponent(ph)}&draft=${encodeURIComponent(ldViberText(l))}" data-act="ldviber" data-id="${l.id}">Viber</a><a class="btn sm" href="tel:${esc(ph)}">Обади се</a>` : ''}
+        ${ldNeedsCall(l) ? `<button class="sm" data-act="ldcalled" data-id="${l.id}">✓ Обадих се</button>` : ''}
+        ${ldOpen(l) ? `<button class="sm pri" data-act="ldinv" data-id="${l.id}">Покана</button>` : ''}
+        ${['client', 'lost'].filter(k => k !== l.status).map(k => `<button class="sm" data-act="ldst" data-id="${l.id}" data-s="${k}">${esc(LEAD_ST2[k][0])}</button>`).join('')}
+        <button class="sm" data-act="ldnote" data-id="${l.id}" title="Бележка">✎</button></div></div>`; };
+  const notif = window.Notification && Notification.permission !== 'granted' ? `<button class="sm" data-act="ldnotif">🔔 Включи известия „Обади ли се?“</button>` : '';
+  m.innerHTML = `<style>.ld-r{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}.ld-b{display:flex;gap:6px;flex-wrap:wrap}.ld-b a.btn{text-decoration:none;display:inline-flex;align-items:center;padding:5px 12px;border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--ink)}.ld-b a.btn:first-child{background:#7360f2;border-color:#7360f2;color:#fff}</style>
+    <div class="row" style="margin-bottom:12px"><h2 style="margin:0;flex:1">Клиентски запитвания</h2>${notif}<button class="sm" data-act="ldadd">+ Ново запитване</button></div>
+    <div class="card" style="margin-bottom:12px"><h3 style="margin:0 0 4px">Да се обадим <span class="mute">· ${need.length}</span></h3>
+      ${need.map(row).join('') || '<div class="mute" style="padding:6px 0">Няма чакащи обаждане.</div>'}</div>
+    <div class="card" style="margin-bottom:12px"><h3 style="margin:0 0 4px">Обадихме се / поканени <span class="mute">· ${wait.length}</span></h3>
+      ${wait.map(row).join('') || '<div class="mute" style="padding:6px 0">Няма.</div>'}</div>
+    ${done.length ? `<details class="card"><summary class="mute" style="cursor:pointer">Приключени (${done.length})</summary>${done.map(row).join('')}</details>` : ''}`;
+}
+function ldInviteDialog(l) {
+  const tr = (S.staff || []).filter(t => t.active !== false && t.role !== 'admin' && (!l.location || actLocs(t).includes(l.location)));
+  const me = S.me && S.me.row ? S.me.row.id : '';
+  modal.show(`<div id="ldi" data-id="${l.id}"><h2>Покана · ${esc(l.name)}</h2>
+    <div class="mute" style="margin-bottom:8px">${esc(l.email || 'няма имейл')}${l.phone ? ' · ' + esc(l.phone) : ''} · ${esc(l.location || '')}</div>
+    <div class="seg" style="margin-bottom:10px">${Object.entries(LEAD_KIND).map(([k, v], i) => `<button class="${i === 0 ? 'on' : ''}" data-act="ldk" data-k="${k}">${v[0]}</button>`).join('')}</div>
+    <div id="ldi-when" class="grid2"><label class="f">Дата<input type="date" id="ldi-d" value="${ymd(addDays(new Date(), 1))}"></label><label class="f">Час<input type="time" step="900" id="ldi-t" value="18:00"></label>
+      <label class="f">Треньор<select id="ldi-tr">${tr.map(t => `<option value="${t.id}" ${t.id === me ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label></div>
+    <div class="mute" style="font-size:12px;margin-top:6px">Часът се записва в графика, клиентът получава профил (ако няма) и се отваря готов имейл с поканата към ${esc(l.email || '—')}.</div>
+    <div class="row" style="margin-top:12px"><button class="pri" data-act="ldgo">Изпрати покана</button></div></div>`);
+  $('#ldi').dataset.k = 'consult';
+}
+async function ldInviteGo() {
+  const box = $('#ldi'), l = LEADS.find(x => x.id === box.dataset.id), k = box.dataset.k || 'consult', K = LEAD_KIND[k];
+  if (!l.email) return toast('Няма имейл — добави го с ✎ или пиши във Viber.');
+  /* клиентски профил */
+  const norm = x => String(x || '').replace(/\D/g, '').slice(-9);
+  let c = S.clients.find(x => (l.email && x.email && x.email.toLowerCase() === l.email.toLowerCase()) || (l.phone && x.phone && norm(x.phone) === norm(l.phone)));
+  if (!c) { const { data, error } = await sb.from('clients').insert({ name: l.name, phone: l.phone || null, email: l.email || null, location: l.location || S.loc, source: 'Уебсайт' }).select().single(); if (error) return fail(error, 'Профилът не се създаде'); c = data; S.clients.push(c); }
+  let when = '';
+  if (K[1]) { const d = $('#ldi-d').value, t = $('#ldi-t').value, trn = $('#ldi-tr').value; if (!d || !t) return toast('Избери дата и час.');
+    const { data: ns, error } = await sb.from('sessions').insert({ kind: 'solo', trainer_id: trn, location: l.location || S.loc, title: K[0], capacity: 1, green: true, duration_min: K[1], free: true, date: d, start_time: t + ':00' }).select('id').single();
+    if (error) return fail(error, 'Часът не се създаде');
+    await bookClient(ns.id, c.id, true);
+    when = `${['неделя', 'понеделник', 'вторник', 'сряда', 'четвъртък', 'петък', 'събота'][parse(d).getDay()]}, ${fmt(d)} от ${t} ч.`; }
+  const first = String(l.name || '').split(' ')[0];
+  const subj = K[1] ? `Покана за ${K[2]} – New Level Training` : 'Регистрация в приложението на New Level Training';
+  const body = K[1]
+    ? `Здравейте, ${first}!\n\nБлагодарим Ви за разговора. Потвърждаваме Вашата ${K[2]} в New Level Training:\n\n📅 ${when}\n📍 ${ldAddr(l.location)}\n⏱ ${K[1]} минути\n\nМоля, елате 5 минути по-рано, в удобни дрехи и с бутилка вода. Ако нещо се промени, пишете ни или се обадете на 088 39 70 007.\n\nОчакваме Ви!\n\nСъс сила и здраве,\nNLTEAM`
+    : `Здравейте, ${first}!\n\nБлагодарим Ви за разговора. Можете да се регистрирате в приложението на New Level Training, където ще записвате часовете си и ще следите прогреса си:\n\nhttps://app.newleveltraining.bg\n\nВлезте с този имейл адрес (${l.email}). Ако имате въпроси – пишете ни или се обадете на 088 39 70 007.\n\nСъс сила и здраве,\nNLTEAM`;
+  await ldSet(l, K[1] ? 'invited' : 'called', { note: `Покана: ${K[0]}${when ? ' · ' + when : ''} (имейл)`, });
+  logEvent('change', `Запитване ${l.name}: покана — ${K[0]}${when ? ' · ' + when : ''}`);
+  modal.close();
+  location.href = `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+  toast('Отвори се имейлът с поканата — натисни „Изпрати“.'); drawLeads(); loadLeadsDue();
 }
 /* ── Ежедневни задачи за екипа ── */
 const TT = { tasks: [], done: [] };
@@ -5121,6 +5218,17 @@ document.addEventListener('click', async e => {
           modal.show(`<div id="te" data-ty="${ty}" data-id="${id}"><h2>${ty === 'pay' ? 'Редакция на плащане' : 'Редакция на такса'}</h2><label class="f">Сума<input id="te-a" type="number" step="0.01" value="${x.amount}"></label>${ty === 'pay' ? `<label class="f">Начин<select id="te-m"><option ${x.method === 'В брой' ? 'selected' : ''}>В брой</option><option ${x.method === 'Банков път' ? 'selected' : ''}>Банков път</option>${x.method && !['В брой', 'Банков път'].includes(x.method) ? `<option selected>${esc(x.method)}</option>` : ''}</select></label>` : ''}<label class="f">Дата<input id="te-d" type="date" value="${x.date}"></label><label class="f">Бележка<input id="te-n" value="${esc(x.note || '')}"></label><div class="row" style="margin-top:12px"><button class="pri" data-act="tlsave">Запази</button></div></div>`); }
         break; }
       case 'frqgo': await freqApply(); break;
+      case 'ldviber': { const l = LEADS.find(x => x.id === el.dataset.id); if (l && (l.status || 'new') === 'new') { ldSet(l, 'contacted', { contacted_at: new Date().toISOString(), channel: 'Viber' }).then(() => { drawLeads(); loadLeadsDue(); }); } break; }
+      case 'ldcalled': { const l = LEADS.find(x => x.id === el.dataset.id); if (await ldSet(l, 'called', { note: [l.note, 'обадихме се ' + new Date().toLocaleDateString('bg-BG')].filter(Boolean).join(' · ') })) { logEvent('change', `Запитване ${l.name}: обадихме се`); drawLeads(); loadLeadsDue(); } break; }
+      case 'ldst': { const l = LEADS.find(x => x.id === el.dataset.id); if (await ldSet(l, el.dataset.s)) { drawLeads(); loadLeadsDue(); } break; }
+      case 'ldnote': { const l = LEADS.find(x => x.id === el.dataset.id); const n = prompt('Бележка / имейл (ако липсва имейл, напиши го тук):', l.note || ''); if (n === null) break; const em = (n.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0];
+        const ex = { note: n.trim() || null }; if (em && !l.email) ex.email = em; if (await ldSet(l, l.status || 'new', ex)) drawLeads(); break; }
+      case 'ldinv': ldInviteDialog(LEADS.find(x => x.id === el.dataset.id)); break;
+      case 'ldk': { const box = $('#ldi'); box.dataset.k = el.dataset.k; box.querySelectorAll('[data-act="ldk"]').forEach(b => b.classList.toggle('on', b === el)); $('#ldi-when').style.display = LEAD_KIND[el.dataset.k][1] ? '' : 'none'; break; }
+      case 'ldgo': await ldInviteGo(); break;
+      case 'ldnotif': try { await Notification.requestPermission(); } catch (e) { } drawLeads(); loadLeadsDue(); break;
+      case 'ldadd': { const name = prompt('Име на клиента:'); if (!name) break; const phone = prompt('Телефон:') || null; const email = prompt('Имейл:') || null; const loc = S.owner ? (prompt('Обект (Боян Петров / Лерин):', S.loc) || S.loc) : (actLocs(S.me.row)[0] || S.loc);
+        const { error } = await sb.from('leads').insert({ name: name.trim(), phone, email, location: loc, source_page: 'ръчно', received_at: new Date().toISOString(), status: 'new' }); if (error) { const r = await sb.from('leads').insert({ name: name.trim(), phone, email, location: loc, source_page: 'ръчно', received_at: new Date().toISOString(), status: 'contacted' }); if (r.error) return fail(r.error, 'Не се добави'); } leadsView(); break; }
       case 'dupfix': await dupFix(el.dataset.id); break;
       case 'dupgo': await dupApply(); break;
       case 'frqskip': modal.close(); break;
