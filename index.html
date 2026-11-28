@@ -3377,7 +3377,9 @@ function consentGate() {
     <section class="c-card" style="max-height:46vh;overflow:auto">${CONSENT_TEXT.map(([h, t]) => `<div class="c-k" style="margin-top:10px">${esc(h)}</div><div style="font-size:14px;line-height:1.5">${esc(t)}</div>`).join('')}</section>
     <label style="display:flex;gap:10px;align-items:flex-start;margin:14px 0;font-size:14px"><input type="checkbox" id="cg-ok" style="margin-top:3px;width:20px;height:20px"><span>Прочетох и приемам условията и обработването на личните ми данни, описано по-горе.</span></label>
     <label class="c-k" for="cg-name">Три имена</label>
-    <input id="cg-name" autocomplete="name" value="${esc(me.name || '')}" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--c-line,#ccc);font-size:16px;margin-bottom:12px">
+    <input id="cg-name" autocomplete="name" value="${esc(/@/.test(me.name || '') ? '' : (me.name || ''))}" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--c-line,#ccc);font-size:16px;margin-bottom:12px">
+    <label class="c-k" for="cg-phone">Телефон</label>
+    <input id="cg-phone" type="tel" autocomplete="tel" value="${esc(me.phone || '')}" placeholder="08…" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--c-line,#ccc);font-size:16px;margin-bottom:12px">
     <div class="c-k">Подпис (с пръст или мишка)</div>
     <canvas id="cg-sig" width="600" height="200" style="width:100%;height:150px;border:1px solid var(--c-line,#ccc);border-radius:12px;background:#fff;touch-action:none"></canvas>
     <button class="c-btn plain" data-act="cgclear" style="margin:4px 0 10px">Изчисти подписа</button>
@@ -3395,6 +3397,10 @@ async function consentSign() {
   if (!ok) return toast('Отбележи, че приемаш условията.');
   if (name.length < 5 || !name.includes(' ')) return toast('Въведи име и фамилия.');
   if (!C.sig) return toast('Моля, подпиши се в полето.');
+  const ph = ($('#cg-phone') ? $('#cg-phone').value : '').trim();
+  if (!ph || ph.replace(/\D/g, '').length < 9) return toast('Въведи телефон.');
+  if (!S.previewClient) { if (name !== S.me.row.name) { const r = await sb.rpc('set_my_name', { p_name: name }); if (!r.error) S.me.row.name = name; }
+    if (ph !== (S.me.row.phone || '')) { const r = await sb.rpc('set_my_phone', { p_phone: ph }); if (r.error) return toast(r.error.message); S.me.row.phone = ph; } }
   const { error } = await sb.from('client_consents').insert({ client_id: S.me.row.id, version: CONSENT_V, signed_name: name, signature: $('#cg-sig').toDataURL('image/png'), user_agent: navigator.userAgent.slice(0, 200) });
   if (error && error.code !== '23505') return fail(error, 'Подписът не се записа');
   clientApp();
@@ -4016,27 +4022,29 @@ function ldInviteDialog(l) {
 }
 async function ldInviteGo() {
   const box = $('#ldi'), l = LEADS.find(x => x.id === box.dataset.id), k = box.dataset.k || 'consult', K = LEAD_KIND[k];
-  if (!l.email) return toast('Няма имейл — добави го с ✎ или пиши във Viber.');
+  if (!l.email) return toast('Няма имейл — добави го с ✎.');
   /* клиентски профил */
   const norm = x => String(x || '').replace(/\D/g, '').slice(-9);
   let c = S.clients.find(x => (l.email && x.email && x.email.toLowerCase() === l.email.toLowerCase()) || (l.phone && x.phone && norm(x.phone) === norm(l.phone)));
-  if (!c) { const { data, error } = await sb.from('clients').insert({ name: l.name, phone: l.phone || null, email: l.email || null, location: l.location || S.loc, source: 'Уебсайт' }).select().single(); if (error) return fail(error, 'Профилът не се създаде'); c = data; S.clients.push(c); }
+  if (!c) { const { data, error } = await sb.from('clients').insert({ name: l.name || l.email, phone: l.phone || null, email: l.email || null, location: l.location || S.loc, source: 'Уебсайт' }).select().single(); if (error) return fail(error, 'Профилът не се създаде'); c = data; S.clients.push(c); }
   let when = '';
   if (K[1]) { const d = $('#ldi-d').value, t = $('#ldi-t').value, trn = $('#ldi-tr').value; if (!d || !t) return toast('Избери дата и час.');
     const { data: ns, error } = await sb.from('sessions').insert({ kind: 'solo', trainer_id: trn, location: l.location || S.loc, title: K[0], capacity: 1, green: true, duration_min: K[1], free: true, date: d, start_time: t + ':00' }).select('id').single();
     if (error) return fail(error, 'Часът не се създаде');
     await bookClient(ns.id, c.id, true);
     when = `${['неделя', 'понеделник', 'вторник', 'сряда', 'четвъртък', 'петък', 'събота'][parse(d).getDay()]}, ${fmt(d)} от ${t} ч.`; }
-  const first = String(l.name || '').split(' ')[0];
+  /* автоматичен имейл от приложението: линк за вход, където клиентът сам попълва всичките си данни */
+  const invOk = !c.user_id ? await sendInvite(l.email, true) : true;
+  const first = /@/.test(l.name || '') ? '' : String(l.name || '').split(' ')[0];
   const subj = K[1] ? `Покана за ${K[2]} – New Level Training` : 'Регистрация в приложението на New Level Training';
   const body = K[1]
-    ? `Здравейте, ${first}!\n\nБлагодарим Ви за разговора. Потвърждаваме Вашата ${K[2]} в New Level Training:\n\n📅 ${when}\n📍 ${ldAddr(l.location)}\n⏱ ${K[1]} минути\n\nМоля, елате 5 минути по-рано, в удобни дрехи и с бутилка вода. Ако нещо се промени, пишете ни или се обадете на 088 39 70 007.\n\nОчакваме Ви!\n\nСъс сила и здраве,\nNLTEAM`
-    : `Здравейте, ${first}!\n\nБлагодарим Ви за разговора. Можете да се регистрирате в приложението на New Level Training, където ще записвате часовете си и ще следите прогреса си:\n\nhttps://app.newleveltraining.bg\n\nВлезте с този имейл адрес (${l.email}). Ако имате въпроси – пишете ни или се обадете на 088 39 70 007.\n\nСъс сила и здраве,\nNLTEAM`;
+    ? `Здравейте${first ? ', ' + first : ''}!\n\nБлагодарим Ви за разговора. Потвърждаваме Вашата ${K[2]} в New Level Training:\n\n📅 ${when}\n📍 ${ldAddr(l.location)}\n⏱ ${K[1]} минути\n\nПреди това, моля, влезте в приложението ни с линка, който получихте на този имейл, и попълнете данните си: https://app.newleveltraining.bg\n\nМоля, елате 5 минути по-рано, в удобни дрехи и с бутилка вода. Ако нещо се промени, пишете ни или се обадете на 088 39 70 007.\n\nОчакваме Ви!\n\nСъс сила и здраве,\nNLTEAM`
+    : `Здравейте${first ? ', ' + first : ''}!\n\nБлагодарим Ви за разговора. Можете да се регистрирате в приложението на New Level Training, където ще записвате часовете си и ще следите прогреса си:\n\nhttps://app.newleveltraining.bg\n\nВлезте с този имейл адрес (${l.email}). Ако имате въпроси – пишете ни или се обадете на 088 39 70 007.\n\nСъс сила и здраве,\nNLTEAM`;
   await ldSet(l, K[1] ? 'invited' : 'called', { note: `Покана: ${K[0]}${when ? ' · ' + when : ''} (имейл)`, });
   logEvent('change', `Запитване ${l.name}: покана — ${K[0]}${when ? ' · ' + when : ''}`);
   modal.close();
   location.href = `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-  toast('Отвори се имейлът с поканата — натисни „Изпрати“.'); drawLeads(); loadLeadsDue();
+  toast((invOk ? 'Клиентът получи имейл за вход в приложението. ' : '') + 'Отвори се имейлът с часа — натисни „Изпрати“.'); drawLeads(); loadLeadsDue();
 }
 /* ── Ежедневни задачи за екипа ── */
 const TT = { tasks: [], done: [] };
@@ -5227,7 +5235,7 @@ document.addEventListener('click', async e => {
       case 'ldk': { const box = $('#ldi'); box.dataset.k = el.dataset.k; box.querySelectorAll('[data-act="ldk"]').forEach(b => b.classList.toggle('on', b === el)); $('#ldi-when').style.display = LEAD_KIND[el.dataset.k][1] ? '' : 'none'; break; }
       case 'ldgo': await ldInviteGo(); break;
       case 'ldnotif': try { await Notification.requestPermission(); } catch (e) { } drawLeads(); loadLeadsDue(); break;
-      case 'ldadd': { const name = prompt('Име на клиента:'); if (!name) break; const phone = prompt('Телефон:') || null; const email = prompt('Имейл:') || null; const loc = S.owner ? (prompt('Обект (Боян Петров / Лерин):', S.loc) || S.loc) : (actLocs(S.me.row)[0] || S.loc);
+      case 'ldadd': { const email = (prompt('Имейл на клиента (останалото той ще попълни сам):') || '').trim(); if (!/^\S+@\S+\.\S+$/.test(email)) { if (email) toast('Невалиден имейл.'); break; } const name = (prompt('Име (по желание):') || '').trim() || email; const phone = (prompt('Телефон (по желание):') || '').trim() || null; const loc = S.owner ? (prompt('Обект (Боян Петров / Лерин):', S.loc) || S.loc) : (actLocs(S.me.row)[0] || S.loc);
         const { error } = await sb.from('leads').insert({ name: name.trim(), phone, email, location: loc, source_page: 'ръчно', received_at: new Date().toISOString(), status: 'new' }); if (error) { const r = await sb.from('leads').insert({ name: name.trim(), phone, email, location: loc, source_page: 'ръчно', received_at: new Date().toISOString(), status: 'contacted' }); if (r.error) return fail(r.error, 'Не се добави'); } leadsView(); break; }
       case 'dupfix': await dupFix(el.dataset.id); break;
       case 'dupgo': await dupApply(); break;
