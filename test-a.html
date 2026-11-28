@@ -3626,7 +3626,10 @@ function pkgStrip(p) {
   return `<div class="c-nx-pk" data-act="cnav" data-t="pkg"><div class="c-nx-pr"><span>${esc(p.package_name || 'Абонамент')}</span><span><b>${done}</b> от ${p.total} направени</span></div>${vis}<div class="c-nx-pd">до ${fmt(p.end_date)}</div></div>`;
 }
 function pkgWarn(warn, main) {
-  const txt = p => (p !== main ? esc(p.package_name || 'Абонамент') + ': ' : '') + (p.days <= 7 ? (p.days <= 0 ? 'Абонаментът изтича днес' : 'Абонаментът изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : p.left === 0 ? 'Нямаш оставащи посещения' : 'Остава' + (p.left === 1 ? ' 1 посещение' : 'т ' + p.left + ' посещения'));
+  const txt = p => { const a = [];
+    if (p.left <= 2) a.push(p.left === 0 ? 'Нямаш оставащи посещения' : 'Остава' + (p.left === 1 ? ' 1 посещение' : 'т ' + p.left + ' посещения'));
+    if (p.days <= 7) a.push(p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни'));
+    const t2 = a.join(' · '); return (p !== main ? esc(p.package_name || 'Абонамент') + ': ' : '') + t2.charAt(0).toUpperCase() + t2.slice(1); };
   return `<div class="c-nx-w" data-act="cnav" data-t="pkg"><span>${warn.map(txt).join('<br>')}</span><span style="font-size:12px;white-space:nowrap">Поднови ›</span></div>`;
 }
 function clientHome(me, t, act) {
@@ -3642,7 +3645,7 @@ function clientHome(me, t, act) {
       <div class="c-nx-top">
         <div class="c-nx-cal"><span>${['НД','ПН','ВТ','СР','ЧТ','ПТ','СБ'][parse(se.date).getDay()]}</span><b>${+se.date.slice(8, 10)}</b><span>${['ЯНУ','ФЕВ','МАР','АПР','МАЙ','ЮНИ','ЮЛИ','АВГ','СЕП','ОКТ','НОЕ','ДЕК'][+se.date.slice(5, 7) - 1]}</span></div>
         <div class="c-h2i">
-          ${untilText(se) ? `<div class="c-hero-k" style="font-size:11px"><i class="c-live"></i>${untilText(se)}</div>` : `<div class="c-hero-k" style="font-size:11px">${esc(dayWord(se.date, t))}</div>`}
+          ${untilText(se) ? `<div class="c-hero-k" style="font-size:11px"><i class="c-live"></i>${untilText(se)}</div>` : `<div class="c-hero-k" style="font-size:11px">Следваща тренировка</div>`}
           <div class="c-nx-t">${hm(se.start_time)}</div>
           <div class="c-h2s">${esc(se.title || (se.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}${se.location ? ` · <a class="c-nx-l" target="_blank" rel="noopener" href="${esc(navUrl(se.location))}">${esc(LOC_ADDR[se.location] || se.location)}</a>` : ''}</div>
         </div>
