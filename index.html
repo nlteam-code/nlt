@@ -2953,6 +2953,18 @@ async function dashView() {
   if (D.filter === 'leads') actLeads();
   loadInvCard(); loadCashCard(); loadDupCard(); loadChkCard(); loadTeamTasks(); enrichMoves(); loadWeekCard(); loadSubsFlow(); loadLocKpis();
 }
+/* ред за масажното: брой и приход по ценоразпис (проведени) */
+async function masStats(a, z) {
+  const [mb, ms] = await Promise.all([sb.from('massage_bookings').select('client_id,guest_name,date,start_time,service').eq('status', 'booked').gte('date', a).lte('date', z).limit(3000), sb.from('massage_services').select('name,price')]);
+  const pr = Object.fromEntries((ms.data || []).map(x => [x.name, Number(x.price || 0)])), t = today(), nowT = new Date().toTimeString().slice(0, 5);
+  const all = mb.data || [], done = all.filter(x => x.date < t || (x.date === t && (x.start_time || '').slice(0, 5) <= nowT));
+  return { n: done.length, plan: all.length - done.length, rev: done.reduce((s, x) => s + (pr[x.service] || 0), 0), cl: new Set(done.map(x => x.client_id || x.guest_name)).size };
+}
+const masBar = () => `<div style="width:16px;display:flex;align-items:center" title="Масажно"><i style="display:inline-block;width:6px;height:100%;min-height:60px;border-radius:3px;background:${TRC['Масажи']}"></i></div>`;
+async function masKpiRow(kp, mS, t) {
+  const m = await masStats(mS, ymd(addDays(new Date(parse(t).getFullYear(), parse(t).getMonth() + 1, 1), -1)));
+  return `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px">${masBar()}<div class="kpis" style="flex:1;margin:0">${kp('Масажи', m.n, `проведени · още ${m.plan} записани`)}${kp('Изработено', eur(m.rev), 'по ценоразпис')}${kp('Клиенти', m.cl, 'този месец')}${kp('Средно на масаж', eur(m.n ? m.rev / m.n : 0), '')}</div></div>`;
+}
 /* Приход по обекти — двата обекта един под друг */
 async function loadLocKpis() {
   const el = document.getElementById('lockpis'); if (!el) return;
@@ -2965,8 +2977,8 @@ async function loadLocKpis() {
     const sold = (S.pstat || []).filter(p => p.start_date >= mS && p.start_date <= t && locOf(p.client_id) === l), soldV = sold.reduce((a, p) => a + Number(p.price || 0), 0);
     const due = (D.bal || []).filter(r => r.bal > 0 && r.c.location === l).reduce((a, r) => a + r.bal, 0);
     const act = S.clients.filter(c => c.location === l && !c.massage_only && cstat(c) === 'active').length;
-    return `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px"><div style="width:120px;display:flex;align-items:center;gap:6px;font-weight:700"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]}"></i>${esc(l)}</div>
-      <div class="kpis" style="flex:1;margin:0">${kp('Плащания', eur(pay), 'този месец')}${kp('Изработено', eur((E[l] || {})[mS] || 0), 'проведени тренировки')}${kp('Абонаменти', eur(soldV), sold.length + ' започнали')}${kp('Дължими', eur(due), 'от клиенти')}${kp('Активни клиенти', act, '')}</div></div>`; }).join('');
+    return `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px"><div style="width:16px;display:flex;align-items:center" title="${esc(l)}"><i style="display:inline-block;width:6px;height:100%;min-height:60px;border-radius:3px;background:${TRC[l]}"></i></div>
+      <div class="kpis" style="flex:1;margin:0">${kp('Плащания', eur(pay), 'този месец')}${kp('Изработено', eur((E[l] || {})[mS] || 0), 'проведени тренировки')}${kp('Абонаменти', eur(soldV), sold.length + ' започнали')}${kp('Дължими', eur(due), 'от клиенти')}${kp('Активни клиенти', act, '')}</div></div>`; }).join('') + await masKpiRow(kp, mS, t);
 }
 /* запитванията в „Дневна активност“ (приоритет) */
 async function actLeads() {
@@ -4198,9 +4210,13 @@ async function loadWeekCard() {
   const kp = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
   const row = x => `<tr class="click" data-act="client" data-id="${x.c.id}"><td><b>${esc(x.c.name)}</b></td><td>${esc(x.c.location || '')}</td><td>${esc(creason(x.c))}</td><td>${esc(x.c.phone || '')}</td></tr>`;
   const byL = (k, l) => cl.filter(c => c.location === l && cstat(c) === k).length;
+  let masW = '';
+  if (S.owner) { const [a, b] = await Promise.all([masStats(ymd(mon), ymd(addDays(mon, 6))), masStats(ymd(pmon), ymd(addDays(pmon, dow)))]);
+    masW = `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px">${masBar()}<div class="kpis" style="flex:1;margin:0">${kp('Масажи', a.n, `${b.n} миналата седмица ${g(a.n, b.n)}`)}${kp('Записани до неделя', a.plan, '')}${kp('Клиенти', a.cl, 'тази седмица')}${kp('Изработено', eur(a.rev), 'по ценоразпис')}</div></div>`; }
+  if (!document.getElementById('wkcard')) return;
   el.innerHTML = `<div class="card" style="margin-bottom:12px"><div class="row" style="margin-bottom:8px"><h2 style="margin:0">Седмичен преглед</h2><span class="mute">седмица от ${fmt(ymd(mon))} · спрямо същите дни миналата седмица · без пилатес</span></div>
-    ${locs.map(l => `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px"><div style="width:120px;display:flex;align-items:center;gap:6px;font-weight:700"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TRC[l]}"></i>${esc(l)}</div>
-      <div class="kpis" style="flex:1;margin:0">${kp('Посещения', thisW(l), `${lastW(l)} миналата седмица ${g(thisW(l), lastW(l))}`)}${kp('Активни', byL('active', l), '')}${kp('Еднократни', byL('single', l), '')}${kp('За проверка', byL('check', l), 'виж най-долу')}</div></div>`).join('')}</div>`;
+    ${locs.map(l => `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px"><div style="width:16px;display:flex;align-items:center" title="${esc(l)}"><i style="display:inline-block;width:6px;height:100%;min-height:60px;border-radius:3px;background:${TRC[l]}"></i></div>
+      <div class="kpis" style="flex:1;margin:0">${kp('Посещения', thisW(l), `${lastW(l)} миналата седмица ${g(thisW(l), lastW(l))}`)}${kp('Активни', byL('active', l), '')}${kp('Еднократни', byL('single', l), '')}${kp('За проверка', byL('check', l), 'виж най-долу')}</div></div>`).join('')}${masW}</div>`;
   /* „За проверка“ — най-долу; треньорите виждат само своите клиенти (тренирали при тях последните 5 седмици) */
   const box = document.getElementById('chkcl'); if (!box) return;
   let list = chk;
