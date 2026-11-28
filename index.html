@@ -2934,16 +2934,16 @@ async function dashView() {
   const ldN = (S.leadsDueList || []).length;
   if (ldN && !D.filterSet) D.filter = 'leads';
   $('#main').innerHTML = `
-    <div class="card" style="margin-bottom:12px"><h2>Дневна активност</h2>
+    <div id="lockpis" style="margin-bottom:12px"></div>
+    <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
+    <div class="cols" style="margin-bottom:12px">
+    <div class="card"><h2>Дневна активност</h2>
         ${alocBtns}
         <div class="row" style="margin-bottom:8px"><button class="sm" data-act="aday" data-d="-1">‹</button><b>${dd.toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="sm" data-act="aday" data-d="1">›</button><button class="sm" data-act="aday" data-d="0">Днес</button></div>
         <div class="chips">${chip('afilter', 'leads', `${ldN ? '🔴 ' : ''}Запитвания`, D.filter, ` ${ldN}`)}${chip('afilter', 'paid', 'Платени', D.filter, ` ${cnt('paid')}`)}${chip('afilter', 'move', 'Смени на час', D.filter, ` ${cnt('move')}`)}${chip('afilter', 'all', 'Всички', D.filter, ` ${acts.length}`)}${chip('afilter', 'cancel', 'Отказани', D.filter, ` ${cnt('cancel')}`)}${chip('afilter', 'change', 'Сменени', D.filter, ` ${cnt('change')}`)}${chip('afilter', 'activated', 'Нови профили', D.filter, ` ${cnt('activated')}`)}</div>
         <div id="actlist" style="max-height:380px;overflow:auto">${D.filter === 'leads' ? '<div class="mute">Зареждане…</div>' : (shownActs.map(e => feRow(e, FEEDS)).join('') || '<div class="mute">Няма събития за този ден.</div>')}</div></div>
-    <div id="lockpis" style="margin-bottom:12px"></div>
-    <div class="card" id="paycard" style="margin-bottom:12px">${payCard()}</div>
-    <div id="wkcard"></div>
+    <div id="ttcard"></div></div>
     <div class="card" id="sfcard" style="margin-bottom:12px">${subsFlowCard()}</div>
-    <div id="ttcard"></div>
     <div id="dupcard"></div>
     <div id="invcard"></div>
     <div id="cashcard"></div>
@@ -2958,12 +2958,12 @@ async function masStats(a, z) {
   const [mb, ms] = await Promise.all([sb.from('massage_bookings').select('client_id,guest_name,date,start_time,service').eq('status', 'booked').gte('date', a).lte('date', z).limit(3000), sb.from('massage_services').select('name,price')]);
   const pr = Object.fromEntries((ms.data || []).map(x => [x.name, Number(x.price || 0)])), t = today(), nowT = new Date().toTimeString().slice(0, 5);
   const all = mb.data || [], done = all.filter(x => x.date < t || (x.date === t && (x.start_time || '').slice(0, 5) <= nowT));
-  return { n: done.length, plan: all.length - done.length, rev: done.reduce((s, x) => s + (pr[x.service] || 0), 0), cl: new Set(done.map(x => x.client_id || x.guest_name)).size };
+  return { n: done.length, plan: all.length - done.length, planRev: all.filter(x => !done.includes(x)).reduce((s, x) => s + (pr[x.service] || 0), 0), rev: done.reduce((s, x) => s + (pr[x.service] || 0), 0), cl: new Set(done.map(x => x.client_id || x.guest_name)).size };
 }
 const masBar = () => `<div style="width:16px;display:flex;align-items:center" title="Масажно"><i style="display:inline-block;width:6px;height:100%;min-height:60px;border-radius:3px;background:${TRC['Масажи']}"></i></div>`;
 async function masKpiRow(kp, mS, t) {
   const m = await masStats(mS, ymd(addDays(new Date(parse(t).getFullYear(), parse(t).getMonth() + 1, 1), -1)));
-  return `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px">${masBar()}<div class="kpis" style="flex:1;margin:0">${kp('Масажи', m.n, `проведени · още ${m.plan} записани`)}${kp('Изработено', eur(m.rev), 'по ценоразпис')}${kp('Клиенти', m.cl, 'този месец')}${kp('Средно на масаж', eur(m.n ? m.rev / m.n : 0), '')}</div></div>`;
+  return `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px">${masBar()}<div class="kpis" style="flex:1;margin:0">${kp('Масажи', m.n, `проведени · още ${m.plan} записани`)}${kp('Изработено', eur(m.rev), `очаквано до края на месеца ~${eur(m.rev + m.planRev)}`)}${kp('Клиенти', m.cl, 'този месец')}${kp('Средно на масаж', eur(m.n ? m.rev / m.n : 0), '')}</div></div>`;
 }
 /* Приход по обекти — двата обекта един под друг */
 async function loadLocKpis() {
@@ -2972,13 +2972,24 @@ async function loadLocKpis() {
   const [py, E] = await Promise.all([sb.from('payments').select('client_id,amount,date').gte('date', mS).lte('date', t).limit(5000), loadEarned()]);
   if (!document.getElementById('lockpis')) return;
   const locOf = id => (S.clients.find(c => c.id === id) || {}).location;
+  /* записани, още непроведени посещения до края на месеца × стойността им */
+  const mE = ymd(addDays(new Date(parse(t).getFullYear(), parse(t).getMonth() + 1, 1), -1)), fut = {};
+  { const { data: bk } = await sb.from('bookings').select('id,client_id,use_plan,status,sessions!inner(date,location,kind,cancelled)').eq('status', 'booked').gte('sessions.date', t).lte('sessions.date', mE).order('id').limit(3000);
+    const byC = {}; (S.pstat || []).forEach(p => (byC[p.client_id] = byC[p.client_id] || []).push(p));
+    (bk || []).filter(b => !b.sessions.cancelled).forEach(b => { const s2 = b.sessions; let v = 0;
+      if (b.use_plan) { const p = (byC[b.client_id] || []).find(q => q.kind === s2.kind && q.start_date <= s2.date && q.end_date >= s2.date); v = p && Number(p.total) > 0 ? Number(p.price) / Number(p.total) : 0; } else v = cVisitPrice(b.client_id, s2.kind);
+      fut[s2.location] = (fut[s2.location] || 0) + v; });
+    (S.pstat || []).filter(p => !Number(p.total) && Number(p.price) > 0 && p.end_date > t && p.start_date <= mE).forEach(p => { const L0 = locOf(p.client_id); const days = Math.round((parse(p.end_date) - parse(p.start_date)) / 864e5) + 1; const rest = Math.max(0, Math.round((parse(p.end_date < mE ? p.end_date : mE) - parse(t)) / 864e5)); fut[L0] = (fut[L0] || 0) + Number(p.price) / days * rest; }); }
+  if (!document.getElementById('lockpis')) return;
   const kp = (l, v, sub) => `<div class="kpi"><div class="kl">${l}</div><div class="kv" style="font-size:22px">${v}</div><div class="ks">${sub || '&nbsp;'}</div></div>`;
   el.innerHTML = LOCS.map(l => { const pay = (py.data || []).filter(p => locOf(p.client_id) === l).reduce((a, p) => a + Number(p.amount || 0), 0);
     const sold = (S.pstat || []).filter(p => p.start_date >= mS && p.start_date <= t && locOf(p.client_id) === l), soldV = sold.reduce((a, p) => a + Number(p.price || 0), 0);
     const due = (D.bal || []).filter(r => r.bal > 0 && r.c.location === l).reduce((a, r) => a + r.bal, 0);
-    const act = S.clients.filter(c => c.location === l && !c.massage_only && cstat(c) === 'active').length;
+    const subsOn = d => new Set((S.pstat || []).filter(p => p.start_date <= d && p.end_date >= d && locOf(p.client_id) === l).map(p => p.client_id)).size;
+    const aNow = subsOn(t), aPrev = subsOn(ymd(addDays(parse(t), -7))), dA = aNow - aPrev;
+    const expV = (E[l] || {})[mS] || 0, futV = fut[l] || 0;
     return `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px"><div style="width:16px;display:flex;align-items:center" title="${esc(l)}"><i style="display:inline-block;width:6px;height:100%;min-height:60px;border-radius:3px;background:${TRC[l]}"></i></div>
-      <div class="kpis" style="flex:1;margin:0">${kp('Плащания', eur(pay), 'този месец')}${kp('Изработено', eur((E[l] || {})[mS] || 0), 'проведени тренировки')}${kp('Абонаменти', eur(soldV), sold.length + ' започнали')}${kp('Дължими', eur(due), 'от клиенти')}${kp('Активни клиенти', act, '')}</div></div>`; }).join('') + await masKpiRow(kp, mS, t);
+      <div class="kpis" style="flex:1;margin:0">${kp('Плащания', eur(pay), 'този месец')}${kp('Изработено', eur(expV), `очаквано до края на месеца ~${eur(expV + futV)}`)}${kp('Абонаменти', eur(soldV), sold.length + ' започнали')}${kp('Дължими', eur(due), 'от клиенти')}${kp('Активни абонаменти', `${aNow} <span style="font-size:15px;color:var(--${dA > 0 ? 'ok' : dA < 0 ? 'bad' : 'mute'})">${dA > 0 ? '▲' : dA < 0 ? '▼' : '='}${dA ? Math.abs(dA) : ''}</span>`, `спрямо преди седмица (${aPrev})`)}</div></div>`; }).join('') + await masKpiRow(kp, mS, t);
 }
 /* запитванията в „Дневна активност“ (приоритет) */
 async function actLeads() {
@@ -4191,13 +4202,13 @@ async function fixLeads() {
   for (const c of S.clients.filter(c => c.status === 'Lead' && has.has(c.id))) { const { error } = await sb.from('clients').update({ status: 'Active' }).eq('id', c.id); if (!error) { c.status = 'Active'; logEvent('change', `${c.name}: „потенциален“ → „Активен“ (има абонамент)`); } }
 }
 async function loadWeekCard() {
-  const el = document.getElementById('wkcard'); if (!el) return;
+  const el = document.getElementById('wkcard') || document.createElement('div'); if (!document.getElementById('wkcard') && !document.getElementById('chkcl')) return;
   el.innerHTML = '<div class="card" style="margin-bottom:12px"><h2>Седмичен преглед</h2><div class="mute">Зареждане…</div></div>';
   const myL = S.owner ? null : actLocs(S.me.row), inL = loc => !myL || myL.includes(loc);
   const t = today(), td = parse(t), mon = addDays(td, -((td.getDay() + 6) % 7)), pmon = addDays(mon, -7), dow = Math.round((td - mon) / 864e5);
   const [, , wb] = await Promise.all([loadVinfo(true), (async () => { S.pstat = await loadPstat(); await syncDiscounts(); await fixLeads(); })(),
     sb.from('bookings').select('client_id,status,late,sessions!inner(date,location,title)').gte('sessions.date', ymd(pmon)).lte('sessions.date', t).in('status', ['done', 'cancelled']).limit(5000)]);
-  if (!document.getElementById('wkcard')) return;
+  if (!document.getElementById('wkcard') && !document.getElementById('chkcl')) return;
   const vis = (wb.data || []).filter(b => (b.status === 'done' || b.late) && !isPil(b.sessions.title) && inL(b.sessions.location));
   const locs = (myL || LOCS).filter(l => LOCS.includes(l));
   const cnt = (l, a, z) => vis.filter(b => b.sessions.location === l && b.sessions.date >= a && b.sessions.date <= z).length;
@@ -4211,9 +4222,9 @@ async function loadWeekCard() {
   const row = x => `<tr class="click" data-act="client" data-id="${x.c.id}"><td><b>${esc(x.c.name)}</b></td><td>${esc(x.c.location || '')}</td><td>${esc(creason(x.c))}</td><td>${esc(x.c.phone || '')}</td></tr>`;
   const byL = (k, l) => cl.filter(c => c.location === l && cstat(c) === k).length;
   let masW = '';
-  if (S.owner) { const [a, b] = await Promise.all([masStats(ymd(mon), ymd(addDays(mon, 6))), masStats(ymd(pmon), ymd(addDays(pmon, dow)))]);
+  if (S.owner && document.getElementById('wkcard')) { const [a, b] = await Promise.all([masStats(ymd(mon), ymd(addDays(mon, 6))), masStats(ymd(pmon), ymd(addDays(pmon, dow)))]);
     masW = `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px">${masBar()}<div class="kpis" style="flex:1;margin:0">${kp('Масажи', a.n, `${b.n} миналата седмица ${g(a.n, b.n)}`)}${kp('Записани до неделя', a.plan, '')}${kp('Клиенти', a.cl, 'тази седмица')}${kp('Изработено', eur(a.rev), 'по ценоразпис')}</div></div>`; }
-  if (!document.getElementById('wkcard')) return;
+  if (!document.getElementById('wkcard') && !document.getElementById('chkcl')) return;
   el.innerHTML = `<div class="card" style="margin-bottom:12px"><div class="row" style="margin-bottom:8px"><h2 style="margin:0">Седмичен преглед</h2><span class="mute">седмица от ${fmt(ymd(mon))} · спрямо същите дни миналата седмица · без пилатес</span></div>
     ${locs.map(l => `<div class="row" style="align-items:stretch;gap:0;margin-bottom:6px"><div style="width:16px;display:flex;align-items:center" title="${esc(l)}"><i style="display:inline-block;width:6px;height:100%;min-height:60px;border-radius:3px;background:${TRC[l]}"></i></div>
       <div class="kpis" style="flex:1;margin:0">${kp('Посещения', thisW(l), `${lastW(l)} миналата седмица ${g(thisW(l), lastW(l))}`)}${kp('Активни', byL('active', l), '')}${kp('Еднократни', byL('single', l), '')}${kp('За проверка', byL('check', l), 'виж най-долу')}</div></div>`).join('')}${masW}</div>`;
