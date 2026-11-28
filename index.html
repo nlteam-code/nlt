@@ -276,6 +276,16 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-h2l{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:13px;color:#fff;opacity:.9;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.35)}
 .c-h2b{display:flex;flex-direction:column;gap:10px}
 .c-h2ib{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);cursor:pointer;padding:0}
+.c-nx{padding:0;overflow:hidden}.c-nx-top{display:flex;align-items:center;gap:12px;padding:16px 16px 4px}
+.c-nx-cal{flex:none;min-width:52px;text-align:center;border-radius:14px;padding:6px 8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);display:flex;flex-direction:column;line-height:1.15}.c-nx-cal span{font:700 10px Montserrat,sans-serif;letter-spacing:.08em;opacity:.8}.c-nx-cal b{font:800 22px/1.05 Montserrat,sans-serif}
+.c-nx-t{font:800 30px/1 Montserrat,sans-serif;letter-spacing:-.03em;margin-top:4px}.c-nx-l{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.35)}
+.c-nx .c-h2b{gap:8px}.c-nx .c-h2ib{width:38px;height:38px;border-radius:12px}
+.c-nx-pk{padding:10px 16px 14px;cursor:pointer}.c-nx-pr{display:flex;justify-content:space-between;gap:10px;font-size:12px;opacity:.8;margin-bottom:6px}.c-nx-pr b{font-size:14px;opacity:1}
+.c-nx-seg{display:grid;gap:3px}.c-nx-seg i{height:8px;border-radius:3px;background:rgba(255,255,255,.16)}.c-nx-seg i.on{background:#5fbf8a}
+.c-nx-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.16);overflow:hidden}.c-nx-bar i{display:block;height:100%;background:#5fbf8a}
+.c-nx-pd{font-size:11px;opacity:.6;margin-top:6px}
+.c-nx-w{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;background:#c95454;font-size:13px;font-weight:600;cursor:pointer}
+.c-hero.empty .c-nx-pk{padding:14px 0 0}.c-hero.empty .c-nx-w{margin:14px -22px -20px}
 .c-hero-b{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 .c-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border-radius:16px;font:700 15px Roboto,sans-serif;border:1px solid var(--c-line);background:var(--c-card);color:var(--c-ink);text-decoration:none;cursor:pointer;transition:transform .12s,opacity .2s}
 .c-btn:active{transform:scale(.97)}
@@ -3609,6 +3619,19 @@ function payReminder() {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b style="font-size:26px">${eur(bal)}</b></div>${ic('ring', 26)}</div>
     <div class="c-note" style="margin-top:6px">Моля, плати при следващото си посещение.</div></section>`;
 }
+function pkgStrip(p) {
+  const done = Math.min(p.total, p.used || 0);
+  const vis = p.total <= 30 ? `<div class="c-nx-seg" style="grid-template-columns:repeat(${p.total},1fr)">${Array.from({ length: p.total }, (_, i) => `<i${i < done ? ' class="on"' : ''}></i>`).join('')}</div>`
+    : `<div class="c-nx-bar"><i style="width:${Math.round(done / p.total * 100)}%"></i></div>`;
+  return `<div class="c-nx-pk" data-act="cnav" data-t="pkg"><div class="c-nx-pr"><span>${esc(p.package_name || 'Абонамент')}</span><span><b>${done}</b> от ${p.total} направени</span></div>${vis}<div class="c-nx-pd">до ${fmt(p.end_date)}</div></div>`;
+}
+function pkgWarn(warn, main) {
+  const txt = p => { const a = [];
+    if (p.left <= 2) a.push(p.left === 0 ? 'Нямаш оставащи посещения' : 'Остава' + (p.left === 1 ? ' 1 посещение' : 'т ' + p.left + ' посещения'));
+    if (p.days <= 7) a.push(p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни'));
+    const t2 = a.join(' · '); return (p !== main ? esc(p.package_name || 'Абонамент') + ': ' : '') + t2.charAt(0).toUpperCase() + t2.slice(1); };
+  return `<div class="c-nx-w" data-act="cnav" data-t="pkg"><span>${warn.map(txt).join('<br>')}</span><span style="font-size:12px;white-space:nowrap">Поднови ›</span></div>`;
+}
 function clientHome(me, t, act) {
   const nb = C.bookings[0], first = (me.name || '').split(' ')[0];
   const warn = act.filter(p => p.left <= 2 || p.days <= 7);
@@ -3618,22 +3641,25 @@ function clientHome(me, t, act) {
   ${payReminder()}
   ${weighCard(t)}
   ${nutrCard()}
-  ${nb ? `<section class="c-hero c-hero2">
-      <div class="c-hero-k">${untilText(se) ? `<i class="c-live"></i>${untilText(se)}` : 'Следваща тренировка'}</div>
-      <div class="c-h2r"><div class="c-h2i">
-        <div class="c-h2t">${hm(se.start_time)}</div>
-        <div class="c-h2d">${esc(dayWord(se.date, t))}</div>
-        <div class="c-h2s">${esc(se.title || (se.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}</div>
-        ${se.location ? `<a class="c-h2l" target="_blank" rel="noopener" href="${esc(navUrl(se.location))}">${ic('pin', 14)}${esc(LOC_ADDR[se.location] || se.location)}</a>` : ''}
-      </div><div class="c-h2b">
-        <a class="c-h2ib" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}" aria-label="Добави в календара" title="Добави в календара">${ic('calplus', 19)}</a>
-        ${se.kind === 'group' ? `<button class="c-h2ib" data-act="ccancel" data-bid="${nb.id}" data-sid="${nb.session_id}" aria-label="Промяна" title="Промяна">${ic('edit', 19)}</button>` : ''}
-      </div></div>
+  ${nb ? `<section class="c-hero c-hero2 c-nx">
+      <div class="c-nx-top">
+        <div class="c-nx-cal"><span>${['НД','ПН','ВТ','СР','ЧТ','ПТ','СБ'][parse(se.date).getDay()]}</span><b>${+se.date.slice(8, 10)}</b><span>${['ЯНУ','ФЕВ','МАР','АПР','МАЙ','ЮНИ','ЮЛИ','АВГ','СЕП','ОКТ','НОЕ','ДЕК'][+se.date.slice(5, 7) - 1]}</span></div>
+        <div class="c-h2i">
+          ${untilText(se) ? `<div class="c-hero-k" style="font-size:11px"><i class="c-live"></i>${untilText(se)}</div>` : `<div class="c-hero-k" style="font-size:11px">Следваща тренировка</div>`}
+          <div class="c-nx-t">${hm(se.start_time)}</div>
+          <div class="c-h2s">${esc(se.title || (se.kind === 'group' ? 'Групова тренировка' : 'Персонална тренировка'))}${se.location ? ` · <a class="c-nx-l" target="_blank" rel="noopener" href="${esc(navUrl(se.location))}">${esc(LOC_ADDR[se.location] || se.location)}</a>` : ''}</div>
+        </div>
+        <div class="c-h2b">
+          ${se.kind === 'group' ? `<button class="c-h2ib" data-act="ccancel" data-bid="${nb.id}" data-sid="${nb.session_id}" aria-label="Промяна" title="Промяна">${ic('edit', 17)}</button>` : ''}
+          <a class="c-h2ib" target="_blank" rel="noopener" href="${esc(gcalUrl(se))}" aria-label="Добави в календара" title="Добави в календара">${ic('calplus', 17)}</a>
+        </div>
+      </div>
+      ${main ? pkgStrip(main) : ''}
+      ${warn.length ? pkgWarn(warn, main) : ''}
     </section>` : `<section class="c-hero empty"><div class="c-hero-d" style="font-size:22px;line-height:1.15">Няма записан час</div>
-      <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
-  ${main ? `<section class="c-card" data-act="cnav" data-t="pkg" style="cursor:pointer;${warn.length ? 'border:1px solid rgba(235,76,81,.45);' : ''}"><div style="display:flex;align-items:center;gap:12px"><div style="flex:1"><div class="c-k">${esc(main.package_name || 'Абонамент')}</div><b style="font-size:18px">остават ${main.left} от ${main.total}</b><div class="c-mute" style="font-size:12px">до ${fmt(main.end_date)} · ${main.days} ${main.days === 1 ? 'ден' : 'дни'}</div></div><span class="c-mute">›</span></div>
-      ${warn.map(p => `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--c-line,rgba(255,255,255,.08));font-size:13px;display:flex;gap:8px;align-items:flex-start"><i style="flex:none;width:8px;height:8px;border-radius:50%;background:#eb4c51;margin-top:5px"></i><div>${p !== main ? `<b>${esc(p.package_name || 'Абонамент')}</b> — ` : ''}${p.left === 0 ? 'нямаш оставащи посещения' : 'остава' + (p.left === 1 ? ' 1 посещение' : 'т ' + p.left + ' посещения')}${p.days <= 7 ? (p.days <= 0 ? ', изтича днес' : ', изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}. <span class="c-mute">Свържи се с клуба за подновяване.</span></div></div>`).join('')}</section>`
-    : warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — изтича. <span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
+      <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div>
+      ${main ? pkgStrip(main) : ''}
+      ${warn.length ? pkgWarn(warn, main) : ''}</section>`}
   ${massageCard(t)}
   ${reviewCard()}
   ${''}
