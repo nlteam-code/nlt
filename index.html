@@ -944,7 +944,11 @@ function finRender() {
     c.cats.forEach(k => {
       if (!k.rows.length && FIN.sheet === 'Масажно') return;
       body += `<tr class="fxh"><td class="fxl">${esc(k.c)} <button class="sm fxadd" data-act="finadd" data-c="${esc(k.c)}" title="Добави перо">+</button></td>${k.tot.map(v => `<td class="fxn">${fnum(v)}</td>`).join('')}<td class="fxn fxt">${fhas(k.tot) ? fnum(fsum(k.tot)) : ''}</td></tr>`;
-      k.rows.forEach(r => { body += `<tr><td class="fxl fxln" data-act="finline" data-l="${r.l.id}" title="Преименувай или изтрий">${esc(r.l.name)}</td>${fedit(r.l, r.v)}</tr>`; });
+      { const pre = r => String(r.l.name).split(' — ')[0].trim().toLowerCase(), cnt = {}; k.rows.forEach(r => { cnt[pre(r)] = (cnt[pre(r)] || 0) + 1; }); const seen = new Set();
+        k.rows.forEach(r => { const p0 = pre(r);
+          if (cnt[p0] > 1 && !seen.has(p0)) { seen.add(p0); const grp = k.rows.filter(x => pre(x) === p0), tot = Array.from({ length: 12 }, (_, i) => grp.some(x => x.v[i] != null) ? fsum(grp.map(x => x.v[i])) : null);
+            body += `<tr class="fxsub"><td class="fxl" style="font-weight:700">${esc(String(r.l.name).split(' — ')[0].trim())} — общо</td>${fcells(tot).replace(/<td class="fxn /g, '<td style="font-weight:700" class="fxn ')}</tr>`; }
+          body += `<tr><td class="fxl fxln" data-act="finline" data-l="${r.l.id}" title="Преименувай или изтрий"${cnt[p0] > 1 ? ' style="padding-left:22px"' : ''}>${esc(r.l.name)}</td>${fedit(r.l, r.v)}</tr>`; }); }
     });
     if (FIN.sheet === 'Масажно') {
       body += `<tr><td class="fxl">Остатък</td>${fcells(c.rest)}</tr>`;
