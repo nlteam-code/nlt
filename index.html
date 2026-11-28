@@ -3631,9 +3631,7 @@ function clientHome(me, t, act) {
   ${massageCard(t)}
   ${reviewCard()}
   ${warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
-  ${main ? `<section class="c-card c-sum" data-act="cnav" data-t="pkg">${rings(main, 132)}
-      <div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.total - main.left} от ${main.total}</b><span>изразходени посещения · остават ${main.left}</span></div></div>
-      <div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>`
+  ${main ? `<section class="c-card" data-act="cnav" data-t="pkg" style="cursor:pointer;display:flex;align-items:center;gap:12px"><div style="flex:1"><div class="c-k">Абонамент</div><b style="font-size:18px">остават ${main.left} от ${main.total}</b><div class="c-mute" style="font-size:12px">до ${fmt(main.end_date)} · ${main.days} ${main.days === 1 ? 'ден' : 'дни'}</div></div><span class="c-mute">›</span></section>`
     : ''}
   ${wcHomeCard()}
   ${bonusCard(me)}
@@ -3648,20 +3646,23 @@ function clientBookTab(me, t, act) {
   const hasGroup = act.some(p => p.kind === 'group');
   const list = byDay[C.day] || [];
   if (C.bmode === 'week') return cWeekHtml(me, t, hasGroup);
-  return `<h2 class="c-title">Запиши се</h2>
+  return `<h2 class="c-title">График</h2>${cTopSeg('book')}
   ${cModeSeg()}
   ${hasGroup ? '' : '<div class="c-warn"><i></i><div>За групов час е нужен активен групов абонамент.<br><span>Свържи се с клуба.</span></div></div>'}
   <div class="c-days">${days.map(d => { const dt = parse(d), n = (byDay[d] || []).length; return `<button class="c-day ${d === C.day ? 'on' : ''}" data-act="cday" data-d="${d}" ${n ? '' : 'disabled'}><span>${d === t ? 'Днес' : WD[dt.getDay()]}</span><b>${dt.getDate()}</b><u class="${n ? 'dot' : ''}"></u></button>`; }).join('')}</div>
-  <div class="c-dayh">${esc(dayWord(C.day, t))}</div>
+  <div class="c-dayh">${esc(dayWord(C.day, t))}${cDayTaken(C.day) && !list.some(s => s.mine) ? ' <span class="c-mute" style="font-size:12px;font-weight:400">· вече имаш час този ден</span>' : ''}</div>
   ${list.length ? list.map(s => {
     const full = s.free === 0, cap = s.capacity || ((s.taken || 0) + (s.free || 0)) || 0, pct = cap ? Math.min(100, (s.taken ?? 0) / cap * 100) : 0;
     return `<div class="c-class ${s.mine ? 'mine' : ''}"><div class="c-ct">${hm(s.start_time)}</div><div class="c-cinfo"><div class="c-st">${esc(s.title || 'Групова тренировка')}</div>
       <div class="c-ss">${s.location ? esc(s.location) : ''}</div>
       ${s.free != null ? `<div class="c-spots"><div class="c-meter"><i style="width:${pct}%"></i></div><span class="${full ? 'bad' : ''}">${full ? 'пълен' : s.free + ' свободни'}</span></div>` : ''}</div>
-      ${s.mine ? `<span class="c-done">${ic('check', 18)}Записан</span>` : cDayTaken(s.date) ? `<span class="c-mute" style="font-size:12px">Имаш час този ден</span>` : `<button class="c-btn solid sm" data-act="cask" data-id="${s.id}" ${full || !hasGroup ? 'disabled' : ''}>${full ? 'Пълен' : 'Запиши'}</button>`}</div>`;
+      ${s.mine ? `<span class="c-done">${ic('check', 18)}Записан</span>` : cDayTaken(s.date) ? '' : `<button class="c-btn solid sm" data-act="cask" data-id="${s.id}" ${full || !hasGroup ? 'disabled' : ''}>${full ? 'Пълен' : 'Запиши'}</button>`}</div>`;
   }).join('') : '<div class="c-empty">Няма часове за този ден.</div>'}`;
 }
 
+function cTopSeg(on) {
+  return `<div class="c-seg" role="tablist" style="margin:8px 0 6px"><button class="${on === 'book' ? 'on' : ''}" data-act="cnav" data-t="book">Тренировки</button><button class="${on === 'mas' ? 'on' : ''}" data-act="cnav" data-t="mas">Масаж</button><i style="transform:translateX(${on === 'mas' ? 100 : 0}%)"></i></div>`;
+}
 function cModeSeg() {
   const w = C.bmode === 'week';
   return `<div class="c-seg" role="tablist" style="margin:12px 0 10px"><button class="${w ? '' : 'on'}" data-act="cbmode" data-m="day">По дни</button><button class="${w ? 'on' : ''}" data-act="cbmode" data-m="week">График за седмицата</button><i style="transform:translateX(${w ? 100 : 0}%)"></i></div>`;
@@ -3680,7 +3681,7 @@ async function cWeekLoad(me) {
   if (C.tab === 'book' && C.bmode === 'week') renderClient();
 }
 function cWeekHtml(me, t, hasGroup) {
-  const loc = cWeekLoc(me), head = `<h2 class="c-title">Запиши се</h2>${cModeSeg()}
+  const loc = cWeekLoc(me), head = `<h2 class="c-title">График</h2>${cTopSeg('book')}${cModeSeg()}
     ${me.location && LOCS.includes(me.location) ? '' : `<div class="c-seg" style="margin:0 0 10px">${LOCS.map((l, i) => `<button class="${l === loc ? 'on' : ''}" data-act="cwkloc" data-l="${esc(l)}">${esc(locName(l))}</button>`).join('')}<i style="transform:translateX(${LOCS.indexOf(loc) * 100}%)"></i></div>`}`;
   const mon = addDays(parse(t), -((parse(t).getDay() + 6) % 7) + 7 * (C.wkOff || 0)), from = ymd(mon);
   if (!C.wk || C.wk.key !== loc + from || C.wk.loading) { cWeekLoad(me); return head + '<div class="c-empty">Зареждане…</div>'; }
@@ -3693,11 +3694,11 @@ function cWeekHtml(me, t, hasGroup) {
   const row = x => {
     const past = new Date(`${x.date}T${hm(x.start_time)}:00`) <= now, m = mine.has(x.id), full = x.free === 0, can = C.classes.some(c => c.id === x.id);
     const sub = m ? 'записан си' : past ? 'минал' : full ? 'пълен' : x.free != null ? `${x.free} свободни` : '';
-    const right = m ? `<span class="ok">${ic('check', 16)}Записан</span>` : past ? '' : cDayTaken(x.date) ? `<span class="c-mute" style="font-size:12px">Имаш час този ден</span>` : `<button class="c-btn solid sm" ${full || !hasGroup || !can ? 'disabled' : `data-act="cask" data-id="${x.id}"`}>${full ? 'Пълен' : 'Запиши'}</button>`;
+    const right = m ? `<span class="ok">${ic('check', 16)}Записан</span>` : past ? '' : cDayTaken(x.date) ? '' : `<button class="c-btn solid sm" ${full || !hasGroup || !can ? 'disabled' : `data-act="cask" data-id="${x.id}"`}>${full ? 'Пълен' : 'Запиши'}</button>`;
     return `<div class="c-wr ${m ? 'mine' : ''} ${past ? 'past' : ''}"><span class="t">${hm(x.start_time)}</span><span class="n">${esc(x.title || 'Групова тренировка')}${sub ? `<small class="${full && !m && !past ? 'bad' : ''}">${sub}</small>` : ''}</span>${right}</div>`;
   };
   const DN = ['Неделя', 'Понеделник', 'Вторник', 'Сряда', 'Четвъртък', 'Петък', 'Събота'];
-  const body = days.map(d => { const L2 = shown.filter(x => x.date === d).sort((a, b) => a.start_time.localeCompare(b.start_time)); if (!L2.length) return ''; const dt = parse(d); return `<div class="c-wd ${d < t ? 'past' : ''}">${DN[dt.getDay()]} ${dt.getDate()}${d === t ? ' · днес' : ''}</div>${L2.map(row).join('')}`; }).join('');
+  const body = days.map(d => { const L2 = shown.filter(x => x.date === d).sort((a, b) => a.start_time.localeCompare(b.start_time)); if (!L2.length) return ''; const dt = parse(d); return `<div class="c-wd ${d < t ? 'past' : ''}">${DN[dt.getDay()]} ${dt.getDate()}${d === t ? ' · днес' : ''}${d >= t && cDayTaken(d) && !L2.some(x => mine.has(x.id)) ? ' · вече имаш час' : ''}</div>${L2.map(row).join('')}`; }).join('');
   return head + `<div style="display:flex;align-items:center;gap:8px;margin:0 0 4px"><button class="c-btn outline sm" data-act="cwk" data-d="-1" ${C.wkOff > 0 ? '' : 'disabled'}>‹</button><b style="flex:1;text-align:center;font:700 14px Roboto,sans-serif">${esc(loc)} · ${wk}</b><button class="c-btn outline sm" data-act="cwk" data-d="1" ${(C.wkOff || 0) < 3 ? '' : 'disabled'}>›</button></div>
   ${hasGroup ? '' : '<div class="c-note" style="margin:6px 0">За записване е нужен активен групов абонамент.</div>'}
   ${body || '<div class="c-empty">Няма групови часове тази седмица.</div>'}`;
@@ -3783,7 +3784,7 @@ const MAS_REV = [
   ['Йорданка Папалезова', 'клиент', 'rv/papalezova.jpg', 'След масажа се чувствам отлично. Тялото ми е отпуснато и леко.']
 ];
 function clientMassageTab() {
-  return `<h2 class="c-title">Масаж</h2>
+  return `<h2 class="c-title">График</h2>${cTopSeg('mas')}
   <section class="c-card" style="padding:0;overflow:hidden"><img src="massage.jpg" alt="Масажното студио" style="display:block;width:100%;height:210px;object-fit:cover">
     <div style="padding:16px 18px"><div class="c-k">Масажно студио · Лерин</div><div class="c-st" style="font-size:17px;margin-top:4px">Възстановяване. Релакс. Ново ниво на усещане.</div>
     <div class="c-note" style="margin-top:6px">Всеки масаж се изпълнява с внимание, прецизност и индивидуален подход според нуждите ти. Плащане на място.</div>
@@ -3841,11 +3842,27 @@ function clientPkg(t, act) {
   const main = act.slice().sort((a, b) => a.end_date.localeCompare(b.end_date))[0];
   return `<h2 class="c-title">Абонамент</h2>
   ${main ? `<section class="c-card c-sum big">${rings(main, 180)}<div class="c-leg"><div class="c-lg"><i style="background:var(--c-coral)"></i><div><b>${main.left} от ${main.total}</b><span>оставащи посещения</span></div></div><div class="c-lg"><i style="background:var(--c-orange)"></i><div><b>${main.days} ${main.days === 1 ? 'ден' : 'дни'}</b><span>до ${fmt(main.end_date)}</span></div></div></div></section>` : ''}
-  ${C.bookings.length ? `<h3 class="c-h">Предстоящи тренировки</h3><section class="c-card c-list">${C.bookings.map(b => cSession(b, t)).join('')}</section>` : ''}
+  ${cPkgVisits(t)}
   ${act.length ? act.map(card).join('') : '<div class="c-empty">Нямаш активен абонамент.<br>Свържи се с клуба, за да го подновиш.</div>'}
   ${old.length ? `<h3 class="c-h">Изтекли</h3>${old.slice(0, 5).map(card).join('')}` : ''}
+  <section class="c-card" data-act="cnav" data-t="svc" style="cursor:pointer;display:flex;align-items:center"><div style="flex:1"><div class="c-k">Услуги и цени</div><div class="c-mute" style="font-size:13px">абонаменти, персонални тренировки, масажи</div></div><span class="c-mute">›</span></section>
   ${clientInvoiceCard()}
   ${clientHistory()}`;
+}
+/* Предстоящи (1 седмица + падащо „още“) / Предходни (история с номер от абонамента) */
+function cPkgVisits(t) {
+  const m = C.pvMode || 'up', wk = ymd(addDays(parse(t), 7));
+  const seg = `<div class="c-seg" role="tablist" style="margin:14px 0 8px"><button class="${m === 'up' ? 'on' : ''}" data-act="cpv" data-m="up">Предстоящи</button><button class="${m === 'past' ? 'on' : ''}" data-act="cpv" data-m="past">Предходни</button><i style="transform:translateX(${m === 'past' ? 100 : 0}%)"></i></div>`;
+  if (m === 'up') {
+    const near = C.bookings.filter(b => b.sessions && b.sessions.date <= wk), far = C.bookings.filter(b => b.sessions && b.sessions.date > wk);
+    return seg + (C.bookings.length ? `<section class="c-card c-list">${near.map(b => cSession(b, t)).join('') || '<div class="c-mute" style="padding:6px 0">Няма часове през следващите 7 дни.</div>'}
+      ${far.length ? `<details style="margin-top:6px"><summary class="c-mute" style="cursor:pointer;padding:6px 0">Още ${far.length} ${far.length === 1 ? 'час' : 'часа'} по-нататък ▾</summary>${far.slice(0, 40).map(b => cSession(b, t)).join('')}</details>` : ''}</section>` : '<div class="c-empty">Нямаш записани часове.</div>');
+  }
+  const rec = (C.recent || []).slice().sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+  const pk = (C.pkgs || []), num = v => { const p = pk.find(p => v.date >= p.start_date && v.date <= p.end_date && (!v.kind || !p.kind || p.kind === v.kind)); if (!p) return 'еднократно';
+    const inP = rec.filter(x => x.date >= p.start_date && x.date <= p.end_date && (!x.kind || !p.kind || p.kind === x.kind)).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+    return `${inP.indexOf(v) + 1}/${p.total} · ${p.package_name || 'абонамент'}`; };
+  return seg + `<section class="c-card c-list">${rec.length ? rec.slice(0, 40).map(v => `<div class="c-vrow"><b>${fmt(v.date).slice(0, 5)}</b><div style="flex:1"><div class="c-st">${esc(v.title)}</div><div class="c-ss">${[v.time, v.loc, v.late ? 'късен отказ' : ''].filter(Boolean).map(esc).join(' · ')}</div></div><span class="c-chip">${esc(num(v))}</span></div>`).join('') : '<div class="c-mute" style="padding:6px 0">Още няма посещения.</div>'}</section>`;
 }
 /* ── заявка за фактура (само клиенти с попълнена „Фирма за фактура") ── */
 function clientInvoiceCard() {
@@ -4262,7 +4279,7 @@ function clientHistory() {
   const fin = C.cv.showFinance !== false, chs = C.chs || [], pays = C.pays || [], c3 = since3m();
   const sumPk = (C.pkgs || []).reduce((a, p) => a + Number(p.price || 0), 0), sumCh = chs.reduce((a, x) => a + Number(x.amount), 0), sumPay = pays.reduce((a, x) => a + Number(x.amount), 0), bal = Math.round((sumPk + sumCh - sumPay) * 100) / 100;
   const pays3 = pays.filter(x => x.date >= c3), chs3 = chs.filter(x => x.date >= c3), pk3 = (C.pkgs || []).filter(p => p.end_date >= c3), rec = C.recent || [];
-  const visits = clientVisitGroups(rec);
+  const visits = ''; /* посещенията са в „Предходни“ горе */
   if (!fin) return `${visits}<h3 class="c-h">Абонаменти · последните 3 месеца</h3><section class="c-card">${subHistory(pk3, C.done, null)}</section>`;
   return `${visits}${clientLedger(c3)}`;
 }
@@ -4442,11 +4459,11 @@ function renderClient() {
   closeSheet(); document.body.classList.add('cm');
   const me = S.me.row, t = today(), act = cActivePkgs(t); C.tab = C.tab || 'home';
   const body = C.tab === 'book' ? clientBookTab(me, t, act) : C.tab === 'mine' ? clientMine(t) : C.tab === 'mas' ? clientMassageTab() : C.tab === 'pkg' ? clientPkg(t, act) : C.tab === 'rew' ? (REW_LOCKED ? progLocked('Награди', 'Скоро ще можеш да събираш награди за своите тренировки.') : clientRewards()) : C.tab === 'prog' ? `<h2 class="c-title">Прогрес</h2><div class="pg" id="pg"></div>` : C.tab === 'svc' ? clientServices() : C.tab === 'nutr' ? clientNutr() : clientHome(me, t, act);
-  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'Запиши се'], ['mas', 'spa', 'Масаж'], ['pkg', 'ring', 'Абонамент'], ['svc', 'tag', 'Услуги'], ['prog', 'chart', 'Прогрес']];
-  nav.splice(5, 0, ['nutr', 'leaf', 'Хранене']);
+  const nav = [['home', 'home', 'Начало'], ['book', 'plus', 'График'], ['pkg', 'ring', 'Абонамент'], ['nutr', 'leaf', 'Хранене'], ['prog', 'chart', 'Прогрес']];
+  const navOn = k => C.tab === k || (k === 'book' && C.tab === 'mas') || (k === 'pkg' && (C.tab === 'svc' || C.tab === 'mine'));
   $('#app').innerHTML = `${S.previewClient ? `<div style="position:sticky;top:0;z-index:50;background:#eb4c51;color:#fff;display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font:600 13px Montserrat,sans-serif">Преглед като ${esc(me.name)} · само за четене <button data-act="exitpreview" style="background:#fff;color:#262d38;border:0;border-radius:999px;padding:5px 12px;font-weight:700">Обратно</button></div>` : ''}<div class="cx"><header class="c-top">${logoHtml(34)}<span class="sp"></span><button class="c-av" data-act="cprofile" aria-label="Профил">${esc((me.name || '?').trim()[0] || '?')}</button></header>
     <main class="c-main" key="${C.tab}">${body}</main>
-    <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${C.tab === k ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
+    <nav class="c-nav">${nav.map(([k, i, l]) => `<button class="${navOn(k) ? 'on' : ''}" data-act="cnav" data-t="${k}">${ic(i, 22)}<span>${l}</span></button>`).join('')}</nav></div>`;
   if (C.tab === 'prog') { if (!PG_CLIENT_TABS.some(x => x[0] === PG.tab)) PG.tab = 'weight'; pgBoot(false, me.id, 'pg', me.user_id || null); }
 }
 async function clientBook(sid) {
@@ -4520,7 +4537,8 @@ function wcClientTab() {
   const ex = WC.ex.filter(e => e.location === loc && e.active !== false), byId = Object.fromEntries(WC.ex.map(e => [e.id, e]));
   const t = today(), wk = Math.min(Math.max(wcWeek(t), 1), cfg.weeks || 4), started = t >= cfg.start, ended = t > wcEnd();
   const wd = (parse(t).getDay() + 6) % 7 + 1, dSel = WC.day || (wd <= 5 ? wd : 1);
-  const eSel = ex.find(e => e.weekday === dSel);
+  const uniq = []; ex.forEach(e => { if (!uniq.some(u => u.name === e.name)) uniq.push(e); });
+  const eSel = (WC.exSel && ex.find(e => e.id === WC.exSel)) || ex.find(e => e.weekday === dSel) || uniq[0];
   const res = WC.res.filter(r => byId[r.ex_id]?.active !== false && r.day >= cfg.start);
   /* прогрес по упражнение (по име — 1000 м Ски е в понеделник и четвъртък) */
   const names = [...new Set(ex.map(e => e.name))];
@@ -4534,8 +4552,9 @@ function wcClientTab() {
       ${rows.length > 1 ? `<div class="wc-bars">${bars}</div><div class="pg-sm pg-mute">По-високият стълб е по-бързо време. Зеленият е личният ти рекорд.</div>` : ''}</div>`;
   }).join('');
   const form = !started ? `<div class="pg-empty">Започва на ${fmt(cfg.start)}.</div>` : ended ? '<div class="pg-empty">Предизвикателството приключи. Благодарим, че участва!</div>' : `
-    <div class="wc-days">${[1, 2, 3, 4, 5].map(d => `<button class="pg-tb ${d === dSel ? 'on' : ''}" data-act="wcday" data-d="${d}">${WC_DAYS[d].slice(0, 3)}</button>`).join('')}</div>
-    ${eSel ? `<div class="wc-opt on" style="cursor:default"><b>${esc(eSel.name)}</b><span>${WC_DAYS[dSel]} · за време</span></div>
+    <div class="pg-mute pg-sm" style="margin-bottom:6px">Избери упражнението и запиши времето си, когато го направиш — в който ден ти е удобно.</div>
+    <div class="wc-days" style="flex-wrap:wrap">${uniq.map(e => `<button class="pg-tb ${eSel && e.name === eSel.name ? 'on' : ''}" data-act="wcex" data-id="${e.id}">${esc(e.name)}</button>`).join('')}</div>
+    ${eSel ? `<div class="wc-opt on" style="cursor:default"><b>${esc(eSel.name)}</b><span>за време</span></div>
     <div class="wc-form"><div class="wc-ms"><label><input id="wc-m" type="number" inputmode="numeric" min="0" max="59" placeholder="0"><span>мин</span></label><b>:</b><label><input id="wc-s" type="number" inputmode="numeric" min="0" max="59" placeholder="00"><span>сек</span></label></div>
       <input id="wc-d" type="date" min="${cfg.start}" max="${t}" value="${t}">
       <button class="pg-btn" data-act="wcsave" data-id="${eSel.id}">Запиши времето</button></div>` : ''}`;
@@ -5081,6 +5100,7 @@ document.addEventListener('click', async e => {
       case 'leadst': case 'leadnote': await leadAct(act, el); break;
       case 'weighgo': C.tab = 'prog'; PG.tab = 'weight'; renderClient(); window.scrollTo(0, 0); break;
       case 'csvc': C.svcMode = el.dataset.m; renderClient(); break;
+      case 'cpv': C.pvMode = el.dataset.m; renderClient(); break;
       case 'cday': C.day = el.dataset.d; renderClient(); break;
       case 'cbmode': C.bmode = el.dataset.m; renderClient(); break;
       case 'cwk': C.wkOff = Math.max(0, Math.min(3, (C.wkOff || 0) + +el.dataset.d)); renderClient(); break;
@@ -5389,6 +5409,7 @@ document.addEventListener('click', async e => {
       case 'ccancel': clientCancelDialog(el.dataset.bid, el.dataset.sid); break;
       case 'wcgo': C.tab = 'prog'; PG.tab = 'chal'; renderClient(); window.scrollTo(0, 0); break;
       case 'wcday': WC.day = +el.dataset.d; WC.exSel = null; pgRender(); break;
+      case 'wcex': WC.exSel = +el.dataset.id; pgRender(); break;
       case 'wcex': WC.exSel = +el.dataset.id; pgRender(); break;
       case 'wcsave': await wcClientSave(el.dataset.id); break;
       case 'wcdel': { if (S.previewClient) { toast('Само преглед — промените са изключени.'); break; } const { error } = await sb.from('challenge_results').delete().eq('id', el.dataset.id); if (error) fail(error, 'Не се изтри'); else { await wcLoad(S.me.row.id); pgRender(); } break; }
