@@ -3533,7 +3533,7 @@ function weightCard() {
   const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
   const pf = C.wprof || {}, tgt = pf.target_weight != null ? +pf.target_weight : null, st = pf.start_weight != null ? +pf.start_weight : +first.weight_kg;
   const g = wGoal(+last.weight_kg, st, tgt), f1 = n => (+n).toFixed(1).replace('.', ',');
-  const goalLn = tgt == null ? '<div class="c-mute" style="font-size:12px;margin-top:6px">Целево тегло още не е зададено — попитай треньора си.</div>'
+  const goalLn = tgt == null ? '<div class="c-mute" style="font-size:12px;margin-top:6px">Задай си цел — желано тегло → <b>Прогрес</b></div>'
     : `<div style="font-size:13px;margin-top:6px">Цел <b>${f1(tgt)} кг</b> · ${g.reached ? '<b>целта е постигната ✓</b>' : `остават <b>${g.pct != null ? Math.round(g.pct) + '%' : f1(g.left) + ' кг'}</b>${g.pct != null ? ` <span class="c-mute">(${f1(g.left)} кг)</span>` : ''}`}</div>${wGoalBar(g)}`;
   return `<section class="c-card" data-act="cnav" data-t="prog" style="cursor:pointer"><div class="c-k">Прогрес · тегло</div>
     <div style="display:flex;align-items:center;gap:14px;justify-content:space-between"><div><b style="font-size:26px">${(+last.weight_kg).toFixed(1)} кг</b><div class="c-mute" style="font-size:12px">${fmt(last.day)}${w.length > 1 ? ` · ${sign}${Math.abs(diff).toFixed(1)} кг от началото` : ''}</div></div>
@@ -4761,13 +4761,16 @@ function pgConsent() {
 function pgWeightTab() {
   const s = pgWeightStats(), w = PG.D.weights, e = PG.ed.w || {};
   const g = wGoal(s.now, s.start, s.tgt);
-  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>${pgDm(s.last)}${s.avg7 != null ? ' · средно 7 дни ' + pgF(s.avg7) : ''}</small></div><div><span>Целево тегло</span><b>${s.tgt == null ? '—' : pgF(s.tgt) + ' кг'}</b><small>${s.tgt == null ? (PG.staff ? 'задай в „Профил“' : 'още не е зададено') : 'старт ' + pgF(s.start)}</small></div><div><span>Остава до целта</span><b>${!g ? '—' : g.reached ? '0%' : g.pct != null ? Math.round(g.pct) + '%' : pgF(g.left) + ' кг'}</b><small>${!g ? 'няма цел' : g.reached ? 'целта е постигната ✓' : pgF(g.left) + ' кг'}</small></div><div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div></div>
+  const stats = s.n ? `<div class="pg-stats"><div><span>Моментно тегло</span><b>${pgF(s.now)} кг</b><small>${pgDm(s.last)}${s.avg7 != null ? ' · средно 7 дни ' + pgF(s.avg7) : ''}</small></div>${s.tgt != null ? `<div><span>Цел ${pgF(s.tgt)} кг</span><b>${!g ? '—' : g.reached ? '✓' : pgF(g.left) + ' кг'}</b><small>${!g ? '' : g.reached ? 'целта е постигната' : 'остават' + (g.pct != null ? ` · ${Math.round(g.pct)}% от пътя` : '')}</small></div>` : ''}<div><span>От старта</span><b>${pgSgn(s.change)} кг</b><small>старт ${pgF(s.start)}</small></div></div>
     ${g && g.pct != null ? `<div style="height:8px;border-radius:99px;background:var(--pg-line);overflow:hidden;margin-top:10px" title="Изминат път до целта"><i style="display:block;height:100%;width:${(100 - g.pct).toFixed(1)}%;background:var(--pg-acc);border-radius:99px"></i></div>` : ''}
     ${s.pace ? `<div class="pg-pace">Темпо: ${pgChip(s.pace[0], s.pace[1])} <span class="pg-mute">${s.pct > 0 ? '+' : ''}${pgF(s.pct * 100, 2)}% спрямо предходната седмица</span></div>` : ''}${s.hint ? `<div class="pg-mute pg-sm">${esc(s.hint)}</div>` : ''}` : '<div class="pg-empty">Въведи първото си тегло.</div>';
   const lst = w.slice().reverse().slice(0, 14).map(x => `<div class="pg-li"><span>${fmt(x.day)}</span><b>${pgF(x.weight_kg)} кг</b>${pgAud(x)}<span class="pg-sp"></span><button class="pg-ico" data-act="pgwedit" data-d="${x.day}" data-v="${x.weight_kg}" aria-label="Редактирай">✎</button><button class="pg-ico bad" data-act="pgwdel" data-id="${x.id}" aria-label="Изтрий">✕</button></div>`).join('');
   return `<section class="pg-card"><h3 class="pg-h">${PG.staff ? 'Тегло' : 'Тегло днес'}</h3>
     <div class="pg-wf"><input id="pg-wv" type="text" inputmode="decimal" autocomplete="off" step="0.1" min="30" max="300" placeholder="кг" value="${esc(e.v ?? '')}" aria-label="Тегло в кг"><input id="pg-wd" type="date" max="${today()}" value="${e.d || today()}" aria-label="Дата"><button class="pg-btn" data-act="pgwsave">Запиши</button></div>
     <div class="pg-mute pg-sm">Сутрин, на гладно, след тоалетна, по бельо, на един и същ кантар. Един запис на ден — повторният го презаписва.</div></section>
+    <section class="pg-card"><h3 class="pg-h">Моята цел</h3>
+      <div class="pg-wf"><input id="pg-tw" type="text" inputmode="decimal" autocomplete="off" placeholder="желано тегло, кг" value="${s.tgt != null ? pgF(s.tgt) : ''}" aria-label="Желано тегло в кг"><button class="pg-btn" data-act="pgtsave">${s.tgt != null ? 'Промени целта' : 'Задай цел'}</button></div>
+      ${s.tgt != null && s.n ? `<div class="pg-mute pg-sm">${s.tgt < s.now ? 'Отслабване' : s.tgt > s.now ? 'Покачване' : 'Поддържане'} · от ${pgF(s.start)} кг към ${pgF(s.tgt)} кг</div>` : '<div class="pg-mute pg-sm">Колко килограма искаш да стигнеш? Ще виждаш колко ти остава.</div>'}</section>
     ${s.n ? `<section class="pg-card"><h3 class="pg-h">${PG.staff ? 'Графика' : 'Твоят резултат'}</h3>${pgChart([{ name: 'Дневно', pts: w.map(x => ({ d: x.day, v: Number(x.weight_kg) })), dotsOnly: true, r: 2.6 }, { name: '7-дневна средна', pts: s.ma, dots: false, w: 2.6 }], { goal: s.tgt, label: 'Тегло' })}</section>` : ''}
     <section class="pg-card">${stats}</section>
     ${s.n ? `<section class="pg-card"><h3 class="pg-h">Последни записи</h3>${lst}</section>` : ''}`;
@@ -4943,6 +4946,12 @@ async function pgAct(act, el) {
       if (!d || d > today()) return toast('Избери валидна дата (не в бъдещето)');
       await up('weight_log', { day: d, weight_kg: Math.round(v * 10) / 10 }, 'client_id,day'); PG.ed.w = null; toast('Записано'); await pgReload();
     });
+    case 'pgtsave': return need(async () => {
+      const v = pgNum($('#pg-tw').value); if (v == null || v < 30 || v > 300) return toast('Въведи желано тегло между 30 и 300 кг');
+      const w0 = (D.weights || [])[0], pf = D.profile || {}, row = { target_weight: Math.round(v * 10) / 10 };
+      if (pf.start_weight == null && w0) { row.start_weight = Number(w0.weight_kg); row.start_date = w0.day; }
+      if (!pf.goal && w0) row.goal = v < Number(w0.weight_kg) ? 'Отслабване' : v > Number(w0.weight_kg) ? 'Покачване на мускулна маса' : 'Поддържане/рекомпозиция';
+      await up('progress_profile', row, 'client_id'); toast('Целта е записана'); await pgReload(); });
     case 'pgwedit': PG.ed.w = { v: el.dataset.v, d: el.dataset.d }; pgRender(); return window.scrollTo(0, 0);
     case 'pgwdel': return need(async () => { const { error } = await sb.from('weight_log').delete().eq('id', el.dataset.id); if (error) throw error; await pgReload(); });
     case 'pgmsave': return need(async () => {
