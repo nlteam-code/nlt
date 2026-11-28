@@ -3631,11 +3631,13 @@ function clientHome(me, t, act) {
       </div></div>
     </section>` : `<section class="c-hero empty"><div class="c-hero-d" style="font-size:22px;line-height:1.15">Няма записан час</div>
       <div class="c-hero-b"><button class="c-btn solid" data-act="cnav" data-t="book">Запиши се</button></div></section>`}
+  ${main ? `<section class="c-card" data-act="cnav" data-t="pkg" style="cursor:pointer;${warn.length ? 'border:1px solid rgba(235,76,81,.45);' : ''}"><div style="display:flex;align-items:center;gap:12px"><div style="flex:1"><div class="c-k">${esc(main.package_name || 'Абонамент')}</div><b style="font-size:18px">остават ${main.left} от ${main.total}</b><div class="c-mute" style="font-size:12px">до ${fmt(main.end_date)} · ${main.days} ${main.days === 1 ? 'ден' : 'дни'}</div></div><span class="c-mute">›</span></div>
+      ${warn.map(p => `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--c-line,rgba(255,255,255,.08));font-size:13px;display:flex;gap:8px;align-items:flex-start"><i style="flex:none;width:8px;height:8px;border-radius:50%;background:#eb4c51;margin-top:5px"></i><div>${p !== main ? `<b>${esc(p.package_name || 'Абонамент')}</b> — ` : ''}${p.left === 0 ? 'нямаш оставащи посещения' : 'остава' + (p.left === 1 ? ' 1 посещение' : 'т ' + p.left + ' посещения')}${p.days <= 7 ? (p.days <= 0 ? ', изтича днес' : ', изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}. <span class="c-mute">Свържи се с клуба за подновяване.</span></div></div>`).join('')}</section>`
+    : warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — изтича. <span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
   ${massageCard(t)}
   ${reviewCard()}
-  ${warn.map(p => `<div class="c-warn"><i></i><div><b>${esc(p.package_name || 'Абонамент')}</b> — ${p.left === 0 ? 'нямаш оставащи посещения' : 'остават ' + p.left + ' ' + (p.left === 1 ? 'посещение' : 'посещения')}${p.days <= 7 ? (p.left <= 2 ? ', ' : ' · ') + (p.days <= 0 ? 'изтича днес' : 'изтича след ' + p.days + ' ' + (p.days === 1 ? 'ден' : 'дни')) : ''}.<br><span>Свържи се с клуба за подновяване.</span></div></div>`).join('')}
-  ${main ? `<section class="c-card" data-act="cnav" data-t="pkg" style="cursor:pointer;display:flex;align-items:center;gap:12px"><div style="flex:1"><div class="c-k">Абонамент</div><b style="font-size:18px">остават ${main.left} от ${main.total}</b><div class="c-mute" style="font-size:12px">до ${fmt(main.end_date)} · ${main.days} ${main.days === 1 ? 'ден' : 'дни'}</div></div><span class="c-mute">›</span></section>`
-    : ''}
+  ${''}
+
   ${wcHomeCard()}
   ${bonusCard(me)}
   ${rewardCard()}
