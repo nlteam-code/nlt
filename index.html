@@ -863,6 +863,18 @@ function finCalc(sheet) {
   out.profit = out.rev.map((r, i) => r != null || ex[i] != null ? (r || 0) - (ex[i] || 0) : null);
   return out;
 }
+/* Разходи по пера от всички обекти: категория → перо (частта от името преди „ — “, напр. „Аксел — ОББ“ и „Аксел — в брой“ → „Аксел“) */
+function finByItem() {
+  const G = {};
+  FIN.lines.filter(l => l.kind === 'exp').forEach(l => { const nm = String(l.name).split(' — ')[0].trim(), key = nm.toLowerCase(), g = (G[l.cat] = G[l.cat] || {}); (g[key] = g[key] || { nm, rs: [] }).rs.push(finRow(l.id)); });
+  const add = arrs => Array.from({ length: 12 }, (_, i) => arrs.some(a => a[i] != null) ? fsum(arrs.map(a => a[i])) : null);
+  let h = `<tr class="fxh"><td class="fxl" colspan="14">Разходи по пера <span class="mute fxhint">всички обекти заедно</span></td></tr>`;
+  FIN_CATS.filter(c => G[c]).forEach(c => { const items = Object.values(G[c]).map(o => [o.nm, add(o.rs)]).filter(([, a]) => fhas(a)); if (!items.length) return;
+    items.sort((x, y) => fsum(y[1]) - fsum(x[1]));
+    h += `<tr class="fxs"><td class="fxl">${esc(c)}</td>${fcells(add(items.map(x => x[1])))}</tr>`;
+    items.forEach(([k, a]) => { h += `<tr><td class="fxl" style="padding-left:18px">${esc(k)}</td>${fcells(a)}</tr>`; }); });
+  return h;
+}
 function finTotals() {
   const C = Object.fromEntries(['Боян Петров', 'Лерин', 'Масажно', 'Общи'].map(s => [s, finCalc(s)]));
   const add = (...arrs) => Array.from({ length: 12 }, (_, i) => arrs.some(a => a[i] != null) ? fsum(arrs.map(a => a[i])) : null);
@@ -911,6 +923,7 @@ function finRender() {
       <tr class="fxh"><td class="fxl" colspan="14">Печалба</td></tr>
       <tr><td class="fxl">Боян Петров</td>${fcells(C['Боян Петров'].profit)}</tr><tr><td class="fxl">Лерин 53</td>${fcells(C['Лерин'].profit)}</tr><tr><td class="fxl">Масажно студио</td>${fcells(C['Масажно'].profit)}</tr><tr><td class="fxl">Общи разходи</td>${fcells(C['Общи'].profit)}</tr>
       <tr class="fxs fxp"><td class="fxl">Печалба — общо</td>${fcells(T.profit)}</tr>`;
+    body += finByItem();
   } else {
     const c = finCalc(FIN.sheet), ex = c.expAll || c.exp;
     if (FIN.sheet !== 'Общи') { cards = sumCard('Приход', c.rev) + sumCard('Разходи', ex) + sumCard('Печалба', c.profit, fsum(c.profit) < 0 ? 'bad' : 'ok'); chart = finChart(c.rev, ex, c.profit); }
