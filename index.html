@@ -1712,9 +1712,11 @@ window.addEventListener('scroll', ctxClose, true);
 function dupDialog(id) {
   const s = (S.sessions || []).find(e => e.id === id); if (!s) return;
   modal.show(`<div id="dp" data-id="${id}"><h2>Дубликат · ${esc(s.title || KIND[s.kind])}</h2>
-    <div class="mute" style="margin-bottom:8px">Копие на часа (без записаните клиенти) — ${esc(s.location)}, ${esc(trName(s.trainer_id))}</div>
+    <div class="mute" style="margin-bottom:8px">Копие на часа — ${esc(s.location)}, треньор ${esc(trName(s.trainer_id))}</div>
     <div class="grid2"><label class="f">Дата<input type="date" id="dp-date" value="${s.date}"></label><label class="f">Начало<input type="time" step="900" id="dp-time" value="${hm(s.start_time)}"></label></div>
+    <label class="f" style="flex-direction:row;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="dp-cl" checked style="width:auto"> Запиши и същите клиенти <span class="mute" id="dp-cln"></span></label>
     <div class="row" style="margin-top:12px"><button class="pri" data-act="dupsave">Създай копие</button></div></div>`);
+  sb.from('bookings').select('client_id').eq('session_id', id).neq('status', 'cancelled').then(({ data }) => { const el = $('#dp-cln'); if (el) el.textContent = data && data.length ? `(${data.map(b => cname(b.client_id)).join(', ')})` : '(няма записани)'; });
 }
 async function sessClients(id) {
   const { data: s, error } = await sb.from('sessions').select('*,bookings(id,status,late,use_plan,client_id)').eq('id', id).single();
@@ -4967,8 +4969,10 @@ document.addEventListener('click', async e => {
       case 'dupsave': { const id = $('#dp').dataset.id, d = $('#dp-date').value, t = $('#dp-time').value; if (!d || !t) return toast('Въведи дата и час.');
         const { data: s, error: e1 } = await sb.from('sessions').select('*').eq('id', id).single(); if (e1) return fail(e1, 'Часът не се намери');
         const cp = { kind: s.kind, trainer_id: s.trainer_id, location: s.location, title: s.title, description: s.description, notes: s.notes, workout: s.workout, category: s.category, green: s.green, capacity: s.capacity, duration_min: s.duration_min, date: d, start_time: t.length === 5 ? t + ':00' : t };
-        const { error } = await sb.from('sessions').insert(cp); if (error) return fail(error, 'Копието не се създаде');
-        logEvent('change', `Дубликат на час ${fmt(d)} ${t}: ${s.title || KIND[s.kind]}`); modal.close(); toast(`Създадено копие за ${fmt(d)} ${t}`); weekView(); break; }
+        const withCl = $('#dp-cl') && $('#dp-cl').checked;
+        const { data: ns, error } = await sb.from('sessions').insert(cp).select('id').single(); if (error) return fail(error, 'Копието не се създаде');
+        let nb = 0; if (withCl) { const { data: bs } = await sb.from('bookings').select('client_id').eq('session_id', id).neq('status', 'cancelled'); for (const b of [...new Set((bs || []).map(x => x.client_id))]) if (await bookClient(ns.id, b, true, true)) nb++; }
+        logEvent('change', `Дубликат на час ${fmt(d)} ${t}: ${s.title || KIND[s.kind]} (${trName(s.trainer_id)})${nb ? ` · ${nb} клиента` : ''}`); modal.close(); toast(`Създадено копие за ${fmt(d)} ${t}${nb ? ` с ${nb} клиента` : ''}`); weekView(); break; }
       case 'nnctoggle': $('#n-nc').classList.toggle('hide'); if (!$('#n-nc').classList.contains('hide')) $('#n-nc-name').focus(); break;
       case 'nncadd': { const name = $('#n-nc-name').value.trim(), email = $('#n-nc-email').value.trim(), loc = $('#n-nc-loc').value;
         if (!name) return toast('Въведи име.'); if (email && !/^\S+@\S+\.\S+$/.test(email)) return toast('Имейлът не изглежда правилен.');
