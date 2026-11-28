@@ -3570,8 +3570,11 @@ async function bonusReviewClaim() {
 /* ── Покана за ревю в Google (след 10-ото посещение; „По-късно“ = пак след 30 дни) ── */
 const REVIEW_PLACE = { 'Лерин': 'ChIJuU-P7SaFqkARxch53fm9qYk', 'Боян Петров': 'ChIJdRay5-6FqkARlJTme3lbhBU' };
 function reviewLoc() { const me = S.me.row; if (REVIEW_PLACE[me.location]) return me.location; const r = (C.recent || []).find(x => REVIEW_PLACE[x.loc]); return r ? r.loc : 'Лерин'; }
+/* клиенти, които вече имат ревю в Google Maps (проверено на 28.11.2026 — Боян Петров 94 и Лерин 221 ревюта) */
+const REVIEWED = new Set('f0f4ff57,c65fc2cd,d43654e8,633f7058,692192c2,90ef68a7,61ae5016,9e34a216,8ae7280f,5c9f7868,e5d6d8a9,c2f574c4,cea484d4,91fa1ff3,6bc7cc81,72d10c25,b3916e70,f38884f5,a5905220,848f8522,1508a32e,225a0157,e024db52,ef02c5bf,c19e2e1c,7b6aa9bd,1badce08,fdb99e9b,cef0bce5,736f6a38,b4291203,a601c6c4,9026f01a,4cd21b80,66b5a2b3,7a4b2432,3e571ffc,27a64498,8258a565,15259d0b,7e9728ad,2ceb4282,f41f6722,cf2068eb,285e81a0,bc78e8ee,10c9de67,10b377bf,c60561b3,ba736803,6a17e207,6b73034e,46bc6c6a,bb4fbe4d,13832ab0,c6264ac1,63c57140,baf0808f'.split(','));
 function reviewCard() {
   if (C.rvi === false) return '';
+  if (REVIEWED.has(String(S.me.row.id).slice(0, 8))) return '';
   const n = (C.done || []).length; if (n < 10) return '';
   const r = C.rvi; if (r && r.clicked_at) return ''; if (r && r.dismissed_at && Date.now() - new Date(r.dismissed_at).getTime() < 30 * 864e5) return '';
   const loc = reviewLoc();
