@@ -286,6 +286,8 @@ body.cm:not(.x) .c-logoimg{filter:none}
 .c-nx-pd{font-size:11px;opacity:.6;margin-top:6px}
 .c-nx-w{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;background:#c95454;font-size:13px;font-weight:600;cursor:pointer}
 .c-hero.empty .c-nx-pk{padding:14px 0 0}.c-hero.empty .c-nx-w{margin:14px -22px -20px}
+.c-mp{padding:0!important;overflow:hidden}.c-mp-img{position:relative;height:150px;background:url(massage-home.jpg) center 35%/cover}
+.c-mp-b{display:flex;align-items:center;gap:12px;padding:14px 16px}.c-mp-t{font:700 16px Montserrat,sans-serif}
 .c-hero-b{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 .c-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border-radius:16px;font:700 15px Roboto,sans-serif;border:1px solid var(--c-line);background:var(--c-card);color:var(--c-ink);text-decoration:none;cursor:pointer;transition:transform .12s,opacity .2s}
 .c-btn:active{transform:scale(.97)}
@@ -3599,6 +3601,12 @@ async function reviewMark(field) {
   const q = C.rvi ? sb.from('review_invites').update({ [field]: row[field] }).eq('client_id', me.id) : sb.from('review_invites').insert(row);
   await q; C.rvi = { ...(C.rvi || {}), ...row }; $('#rvcard')?.remove();
 }
+function massagePromo(t) {
+  if (massageCard(t)) return '';
+  return `<section class="c-card c-mp" id="mpromo"><div class="c-mp-img" data-act="cnav" data-t="mas" style="cursor:pointer"></div>
+    <div class="c-mp-b"><div style="flex:1;min-width:0"><div class="c-mp-t">Възстанови се с масаж</div><div class="c-mute" style="font-size:13px">Масажно студио · ул. Лерин 53</div></div>
+    <button class="c-btn solid" style="min-height:42px;padding:0 16px;font-size:14px" data-act="cnav" data-t="mas">Запиши масаж</button></div></section>`;
+}
 function massageCard(t) {
   const m = (C.massages || []).filter(x => x.status === 'booked' && x.date >= t)[0];
   if (!m) return '';
@@ -3661,6 +3669,7 @@ function clientHome(me, t, act) {
       ${main ? pkgStrip(main) : ''}
       ${warn.length ? pkgWarn(warn, main) : ''}</section>`}
   ${massageCard(t)}
+  ${massagePromo(t)}
   ${reviewCard()}
   ${''}
 
